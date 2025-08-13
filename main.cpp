@@ -42,6 +42,8 @@ SOFTWARE.
 #include "OverlayStandings.h"
 #include "OverlayDebug.h"
 #include "OverlayDDU.h"
+#include "GuiCEF.h"
+#include "AppControl.h"
 
 enum class Hotkey
 {
@@ -107,10 +109,33 @@ static void giveFocusToIracing()
         SetForegroundWindow( hwnd );
 }
 
+static void setWorkingDirectoryToExe()
+{
+    wchar_t path[MAX_PATH] = {};
+    if( GetModuleFileNameW( NULL, path, MAX_PATH ) )
+    {
+        // strip filename
+        for( int i=(int)wcslen(path)-1; i>=0; --i )
+        {
+            if( path[i] == L'\\' || path[i] == L'/' ) { path[i] = 0; break; }
+        }
+        SetCurrentDirectoryW( path );
+    }
+}
+
 int main()
 {
     // Bump priority up so we get time from the sim
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+
+    // Ensure config.json is read/written next to the executable
+    setWorkingDirectoryToExe();
+
+#ifdef IRON_USE_CEF
+    const bool cefOk = cefInitialize();
+    if( cefOk )
+        cefCreateMainWindow();
+#endif
 
     // Load the config and watch it for changes
     g_cfg.load();
@@ -151,6 +176,10 @@ int main()
     ConnectionStatus  status   = ConnectionStatus::UNKNOWN;
     bool              uiEdit   = false;
     unsigned          frameCnt = 0;
+    bool              quitRequested = false;
+
+    // Expose pointers to bridge
+    app_register_bridge(&overlays, &uiEdit, &status, &handleConfigChange);
 
     while( true )
     {
@@ -168,6 +197,14 @@ int main()
 
             // Enable user-selected overlays, but only if we're driving
             handleConfigChange( overlays, status );
+
+#ifdef IRON_USE_CEF
+            // Push status to GUI
+            if (cefOk) {
+                std::string js = std::string("window.onIronState && window.onIronState(") + app_get_state_json() + ");";
+                cefExecuteScript(js.c_str());
+            }
+#endif
         }
 
         if( ir_session.sessionType != prevSessionType )
@@ -206,12 +243,23 @@ int main()
         {
             g_cfg.load();
             handleConfigChange( overlays, status );
+#ifdef IRON_USE_CEF
+            if (cefOk) {
+                std::string js = std::string("window.onIronState && window.onIronState(") + app_get_state_json() + ");";
+                cefExecuteScript(js.c_str());
+            }
+#endif
         }
 
         // Message pump
         MSG msg = {};
         while(PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
+            if( msg.message == WM_QUIT )
+            {
+                quitRequested = true;
+                break;
+            }
             // Handle hotkeys
             if( msg.message == WM_HOTKEY )
             {
@@ -256,9 +304,21 @@ int main()
             DispatchMessage(&msg);            
         }
 
+        if( quitRequested )
+            break;
+
+#ifdef IRON_USE_CEF
+        // Allow CEF to process pending work when using the external pump
+        cefDoMessageLoopWork();
+#endif
+
         frameCnt++;
     }
 
     for( Overlay* o : overlays )
         delete o;
+
+#ifdef IRON_USE_CEF
+    cefShutdown();
+#endif
 }

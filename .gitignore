@@ -6,3 +6,10 @@ Release/
 sessionYaml.txt
 config.json
 
+# Existing ignores
+.gitignore
+
+# UI build artifacts
+/ui/node_modules/
+/ui/dist/*.map
+

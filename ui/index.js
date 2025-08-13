@@ -1,0 +1,99 @@
+/**
+ * iRon CEF GUI Controller
+ * Handles communication between the HTML frontend and C++ backend
+ */
+
+class IronGuiController {
+    constructor() {
+        this.isInitialized = false;
+        this.setupEventListeners();
+    }
+
+    async send(cmd, payload = {}) {
+        return new Promise((resolve, reject) => {
+            if (!window.cefQuery) {
+                reject(new Error('CEF not available'));
+                return;
+            }
+            const request = JSON.stringify({ cmd, ...payload });
+            window.cefQuery({
+                request,
+                onSuccess: (response) => {
+                    try {
+                        const data = response ? JSON.parse(response) : null;
+                        resolve(data);
+                    } catch (e) {
+                        reject(new Error('Invalid JSON response: ' + e.message));
+                    }
+                },
+                onFailure: (code, msg) => reject(new Error(`CEF Error ${code}: ${msg}`))
+            });
+        });
+    }
+
+    async init() {
+        try {
+            const state = await this.send('getState');
+            this.render(state);
+            this.isInitialized = true;
+        } catch (e) { console.error('Init failed', e); }
+    }
+
+    async setUiEdit(enabled) {
+        try { this.render(await this.send('setUiEdit', { on: enabled })); } catch (e) { console.error(e); }
+    }
+
+    async setOverlay(key, enabled) {
+        try { this.render(await this.send('setOverlay', { key, on: enabled })); } catch (e) { console.error(e); }
+    }
+
+    render(state) {
+        if (!state) return;
+        this.updateConnectionStatus(state.connectionStatus);
+        this.updateUiEditToggle(state.uiEdit);
+        this.updateOverlayToggles(state.overlays);
+    }
+
+    updateConnectionStatus(status) {
+        const t = document.getElementById('connText');
+        const d = document.getElementById('connDot');
+        if (t) t.textContent = status || 'UNKNOWN';
+        if (d) {
+            d.classList.remove('bg-emerald-500','bg-amber-500','bg-red-500','bg-slate-500');
+            d.classList.add(status==='DRIVING'?'bg-emerald-500':status==='CONNECTED'?'bg-amber-500':status==='DISCONNECTED'?'bg-red-500':'bg-slate-500');
+        }
+    }
+
+    updateUiEditToggle(enabled) {
+        const el = document.getElementById('chk_uiEdit');
+        if (el) el.checked = !!enabled;
+    }
+
+    updateOverlayToggles(overlays) {
+        if (!overlays) return;
+        ['OverlayStandings','OverlayDDU','OverlayInputs','OverlayRelative','OverlayCover'].forEach(k => {
+            const el = document.getElementById('chk_'+k);
+            if (el) el.checked = !!overlays[k];
+        });
+    }
+
+    setupEventListeners() {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => this.bindControls());
+        else this.bindControls();
+        window.onIronState = (state) => this.render(state);
+    }
+
+    bindControls() {
+        const ui = document.getElementById('chk_uiEdit');
+        if (ui) ui.addEventListener('change', e => this.setUiEdit(e.target.checked));
+        ['OverlayStandings','OverlayDDU','OverlayInputs','OverlayRelative','OverlayCover'].forEach(k => {
+            const el = document.getElementById('chk_'+k);
+            if (el) el.addEventListener('change', e => this.setOverlay(k, e.target.checked));
+        });
+    }
+}
+
+const ironGui = new IronGuiController();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => ironGui.init());
+else ironGui.init();
+window.ironGui = ironGui; 
