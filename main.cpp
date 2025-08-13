@@ -44,6 +44,7 @@ SOFTWARE.
 #include "OverlayDDU.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
+#include "preview_mode.h"
 
 enum class Hotkey
 {
@@ -93,11 +94,17 @@ static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus
 
     for( Overlay* o : overlays )
     {
-        o->enable( g_cfg.getBool(o->getName(),"enabled",true) && (
+        bool overlayEnabled = g_cfg.getBool(o->getName(),"enabled",true);
+        bool connectionAllows = (
             status == ConnectionStatus::DRIVING ||
             status == ConnectionStatus::CONNECTED && o->canEnableWhileNotDriving() ||
             status == ConnectionStatus::DISCONNECTED && o->canEnableWhileDisconnected()
-            ));
+            );
+        
+        // In preview mode, show enabled overlays regardless of connection status
+        bool shouldEnable = overlayEnabled && (preview_mode_get() || connectionAllows);
+        
+        o->enable(shouldEnable);
         o->configChanged();
     }
 }
@@ -140,6 +147,9 @@ int main()
     // Load the config and watch it for changes
     g_cfg.load();
     g_cfg.watchForChanges();
+
+    // Initialize preview mode
+    preview_mode_init();
 
     // Register global hotkeys
     registerHotkeys();

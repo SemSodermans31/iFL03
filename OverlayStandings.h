@@ -28,10 +28,13 @@ SOFTWARE.
 #include "Overlay.h"
 #include "Config.h"
 #include "OverlayDebug.h"
+#include "stub_data.h"
 
 class OverlayStandings : public Overlay
 {
 public:
+
+    virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
     const float DefaultFontSize = 15;
 
@@ -97,35 +100,72 @@ protected:
         };
         std::vector<CarInfo> carInfo;
         carInfo.reserve( IR_MAX_CARS );
+        
+        // Use stub data in preview mode
+        const bool useStubData = StubDataManager::shouldUseStubData();
+        if (useStubData) {
+            StubDataManager::populateSessionCars();
+        }
+        
+        // Apply global opacity to colors
+        const float globalOpacity = getGlobalOpacity();
 
         // Init array
         float fastestLapTime = FLT_MAX;
         int fastestLapIdx = -1;
-        for( int i=0; i<IR_MAX_CARS; ++i )
-        {
-            const Car& car = ir_session.cars[i];
+        
+        if (useStubData) {
+            // Generate stub data for preview mode using centralized data
+            const auto& stubCars = StubDataManager::getStubCars();
+            
+            for (size_t i = 0; i < stubCars.size(); ++i) {
+                const auto& stubCar = stubCars[i];
+                CarInfo ci;
+                ci.carIdx = (int)i;
+                ci.lapCount = stubCar.lapCount;
+                ci.position = stubCar.position;
+                ci.pctAroundLap = 0.1f + (i * 0.08f);
+                ci.delta = stubCar.position == 1 ? 0.0f : (stubCar.position * 0.234f + 0.123f);
+                ci.best = stubCar.bestLapTime;
+                ci.last = stubCar.lastLapTime;
+                ci.pitAge = stubCar.pitAge;
+                ci.hasFastestLap = (stubCar.bestLapTime < 84.4f); // Leclerc has fastest
+                
+                carInfo.push_back(ci);
+                
+                if (ci.best < fastestLapTime) {
+                    fastestLapTime = ci.best;
+                    fastestLapIdx = (int)carInfo.size()-1;
+                }
+            }
+        } else {
+            // Real data from iRacing
+            for( int i=0; i<IR_MAX_CARS; ++i )
+            {
+                const Car& car = ir_session.cars[i];
 
-            if( car.isPaceCar || car.isSpectator || car.userName.empty() )
-                continue;
+                if( car.isPaceCar || car.isSpectator || car.userName.empty() )
+                    continue;
 
-            CarInfo ci;
-            ci.carIdx       = i;
-            ci.lapCount     = std::max( ir_CarIdxLap.getInt(i), ir_CarIdxLapCompleted.getInt(i) );
-            ci.position     = ir_getPosition(i);
-            ci.pctAroundLap = ir_CarIdxLapDistPct.getFloat(i);
-            ci.delta        = ir_session.sessionType!=SessionType::RACE ? 0 : -ir_CarIdxF2Time.getFloat(i);
-            ci.last         = ir_CarIdxLastLapTime.getFloat(i);
-            ci.pitAge       = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
+                CarInfo ci;
+                ci.carIdx       = i;
+                ci.lapCount     = std::max( ir_CarIdxLap.getInt(i), ir_CarIdxLapCompleted.getInt(i) );
+                ci.position     = ir_getPosition(i);
+                ci.pctAroundLap = ir_CarIdxLapDistPct.getFloat(i);
+                ci.delta        = ir_session.sessionType!=SessionType::RACE ? 0 : -ir_CarIdxF2Time.getFloat(i);
+                ci.last         = ir_CarIdxLastLapTime.getFloat(i);
+                ci.pitAge       = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
 
-            ci.best         = ir_CarIdxBestLapTime.getFloat(i);
-            if( ir_session.sessionType==SessionType::RACE && ir_SessionState.getInt()<=irsdk_StateWarmup || ir_session.sessionType==SessionType::QUALIFY && ci.best<=0 )
-                ci.best = car.qualTime;
+                ci.best         = ir_CarIdxBestLapTime.getFloat(i);
+                if( ir_session.sessionType==SessionType::RACE && ir_SessionState.getInt()<=irsdk_StateWarmup || ir_session.sessionType==SessionType::QUALIFY && ci.best<=0 )
+                    ci.best = car.qualTime;
 
-            carInfo.push_back( ci );
+                carInfo.push_back( ci );
 
-            if( ci.best > 0 && ci.best < fastestLapTime ) {
-                fastestLapTime = ci.best;
-                fastestLapIdx = (int)carInfo.size()-1;
+                if( ci.best > 0 && ci.best < fastestLapTime ) {
+                    fastestLapTime = ci.best;
+                    fastestLapIdx = (int)carInfo.size()-1;
+                }
             }
         }
 
@@ -372,7 +412,7 @@ protected:
 
             m_brush->SetColor(float4(1,1,1,0.4f));
             m_renderTarget->DrawLine( float2(0,ybottom),float2((float)m_width,ybottom),m_brush.Get() );
-            swprintf( s, _countof(s), L"SoF: %d      Track Temp: %.1f°%c      Air Temp: %.1f°%c      Setup: %s      Subsession: %d", ir_session.sof, trackTemp, tempUnit, airTemp, tempUnit, ir_session.isFixedSetup?L"fixed":L"open", ir_session.subsessionId );
+            swprintf( s, _countof(s), L"SoF: %d      Track Temp: %.1fï¿½%c      Air Temp: %.1fï¿½%c      Setup: %s      Subsession: %d", ir_session.sof, trackTemp, tempUnit, airTemp, tempUnit, ir_session.isFixedSetup?L"fixed":L"open", ir_session.subsessionId );
             y = m_height - (m_height-ybottom)/2;
             m_brush->SetColor( headerCol );
             m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff, (float)m_width-2*xoff, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );

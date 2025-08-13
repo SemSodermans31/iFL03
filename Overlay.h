@@ -58,6 +58,9 @@ class Overlay
 
         void            setWindowPosAndSize( int x, int y, int w, int h, bool callSetWindowPos=true );
         void            saveWindowPosAndSize();
+        
+        float           getGlobalOpacity() const;
+        void            applyPositionSetting();
 
     protected:
 

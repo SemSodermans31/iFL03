@@ -31,6 +31,7 @@ SOFTWARE.
 #include "iracing.h"
 #include "Config.h"
 #include "OverlayDebug.h"
+#include "stub_data.h"
 
 class OverlayDDU : public Overlay
 {
@@ -45,6 +46,8 @@ class OverlayDDU : public Overlay
        #ifdef _DEBUG
        virtual bool    canEnableWhileNotDriving() const { return true; }
        virtual bool    canEnableWhileDisconnected() const { return true; }
+       #else
+       virtual bool    canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
        #endif
 
 
@@ -207,26 +210,38 @@ class OverlayDDU : public Overlay
             const float4 serviceCol         = g_cfg.getFloat4( m_name, "service_col", float4(0.36f,0.61f,0.84f,1) );
             const float4 warnCol            = g_cfg.getFloat4( m_name, "warn_col", float4(1,0.6f,0,1) );
 
-            const int  carIdx   = ir_session.driverCarIdx;
-            const bool imperial = ir_DisplayUnits.getInt() == 0;
+            // Apply global opacity to colors
+            const float globalOpacity = getGlobalOpacity();
+            const float4 finalTextCol = float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity);
+
+            // Use stub data in preview mode
+            const bool useStubData = StubDataManager::shouldUseStubData();
+            if (useStubData) {
+                StubDataManager::populateSessionCars();
+            }
+            
+            const int  carIdx   = useStubData ? 0 : ir_session.driverCarIdx;
+            const bool imperial = useStubData ? true : (ir_DisplayUnits.getInt() == 0);
 
             const DWORD tickCount = GetTickCount();
 
             // Figure out who's P1
-            int p1carIdx = -1;
-            for( int i=0; i<IR_MAX_CARS; ++i )
-            {
-                if( ir_getPosition(i) == 1 ) {
-                    p1carIdx = i;
-                    break;
+            int p1carIdx = useStubData ? 0 : -1;
+            if (!useStubData) {
+                for( int i=0; i<IR_MAX_CARS; ++i )
+                {
+                    if( ir_getPosition(i) == 1 ) {
+                        p1carIdx = i;
+                        break;
+                    }
                 }
             }
 
-            // General lap info
-            const bool   sessionIsTimeLimited  = ir_SessionLapsTotal.getInt() == 32767 && ir_SessionTimeRemain.getDouble()<48.0*3600.0;  // most robust way I could find to figure out whether this is a time-limited session (info in session string is often misleading)
-            const double remainingSessionTime  = sessionIsTimeLimited ? ir_SessionTimeRemain.getDouble() : -1;
-            const int    remainingLaps         = sessionIsTimeLimited ? int(0.5+remainingSessionTime/ir_estimateLaptime()) : (ir_SessionLapsRemainEx.getInt() != 32767 ? ir_SessionLapsRemainEx.getInt() : -1);
-            const int    currentLap            = ir_isPreStart() ? 0 : std::max(0,ir_CarIdxLap.getInt(carIdx));
+            // General lap info - use stub data in preview mode
+            const bool   sessionIsTimeLimited  = useStubData ? false : (ir_SessionLapsTotal.getInt() == 32767 && ir_SessionTimeRemain.getDouble()<48.0*3600.0);
+            const double remainingSessionTime  = useStubData ? StubDataManager::getStubSessionTimeRemaining() : (sessionIsTimeLimited ? ir_SessionTimeRemain.getDouble() : -1);
+            const int    remainingLaps         = useStubData ? StubDataManager::getStubLapsRemaining() : (sessionIsTimeLimited ? int(0.5+remainingSessionTime/ir_estimateLaptime()) : (ir_SessionLapsRemainEx.getInt() != 32767 ? ir_SessionLapsRemainEx.getInt() : -1));
+            const int    currentLap            = useStubData ? StubDataManager::getStubLap() : (ir_isPreStart() ? 0 : std::max(0,ir_CarIdxLap.getInt(carIdx)));
             const bool   lapCountUpdated       = currentLap != m_prevCurrentLap;
             m_prevCurrentLap = currentLap;
             if( lapCountUpdated )
@@ -237,23 +252,25 @@ class OverlayDDU : public Overlay
             wchar_t s[512];
 
             m_renderTarget->BeginDraw();
-            m_brush->SetColor( textCol );
+            m_brush->SetColor( finalTextCol );
 
             // Background
             {
                 m_renderTarget->Clear( float4(0,0,0,0) );
-                m_brush->SetColor( g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.9f) ) );
+                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.9f) );
+                bgColor.w *= globalOpacity;
+                m_brush->SetColor( bgColor );
                 m_renderTarget->FillGeometry( m_backgroundPathGeometry.Get(), m_brush.Get() );
-                m_brush->SetColor( textCol );
+                m_brush->SetColor( finalTextCol );
             }
 
             // RPM lights
             {
                 // which of the rpm numbers to use for high/low and colored light indicators was a bit of
                 // trial and error, since I'm not really sure what they're supposed to mean exactly
-                const float lo  = (ir_session.rpmIdle + ir_session.rpmSLFirst) / 2;
-                const float hi  = ir_session.rpmRedline;
-                const float rpm = ir_RPM.getFloat();
+                const float lo  = useStubData ? 2000.0f : ((ir_session.rpmIdle + ir_session.rpmSLFirst) / 2);
+                const float hi  = useStubData ? 7500.0f : ir_session.rpmRedline;
+                const float rpm = useStubData ? StubDataManager::getStubRPM() : ir_RPM.getFloat();
                 const float rpmPct = (rpm-lo) / (hi-lo);
 
                 const float ww = 0.16f;
@@ -269,9 +286,12 @@ class OverlayDDU : public Overlay
                         m_renderTarget->DrawEllipse( &e, m_brush.Get() );
                     }
                     else {
-                        if( lightRpm < ir_session.rpmSLFirst )
+                        const float rpmSLFirst = useStubData ? 6000.0f : ir_session.rpmSLFirst;
+                        const float rpmSLLast = useStubData ? 7000.0f : ir_session.rpmSLLast;
+                        
+                        if( lightRpm < rpmSLFirst )
                             m_brush->SetColor( float4(1,1,1,1) );
-                        else if( lightRpm < ir_session.rpmSLLast )
+                        else if( lightRpm < rpmSLLast )
                             m_brush->SetColor( warnCol );
                         else
                             m_brush->SetColor( float4(1,0,0,1) );

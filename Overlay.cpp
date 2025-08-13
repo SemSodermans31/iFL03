@@ -266,6 +266,9 @@ void Overlay::configChanged()
     const int w = g_cfg.getInt(m_name,"window_size_x", (int)defaultSize.x);
     const int h = g_cfg.getInt(m_name,"window_size_y", (int)defaultSize.y);
     setWindowPosAndSize( x, y, w, h );
+    
+    // Apply position setting if specified
+    applyPositionSetting();
 
     onConfigChanged();
 }
@@ -293,7 +296,13 @@ void Overlay::update()
         rr.rect = { 0.5f, 0.5f, w-0.5f, h-0.5f };
         rr.radiusX = cornerRadius;
         rr.radiusY = cornerRadius;
-        m_brush->SetColor( g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) ) );
+        
+        // Apply global opacity setting
+        float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
+        float globalOpacity = g_cfg.getFloat( m_name, "opacity", 100.0f ) / 100.0f;
+        bgColor.w *= globalOpacity;
+        
+        m_brush->SetColor( bgColor );
         m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
         m_renderTarget->EndDraw();
     }
@@ -352,6 +361,9 @@ void Overlay::saveWindowPosAndSize()
     g_cfg.setInt( m_name, "window_pos_y", m_ypos );
     g_cfg.setInt( m_name, "window_size_x", m_width );
     g_cfg.setInt( m_name, "window_size_y", m_height  );
+    
+    // When user manually moves overlay, switch to custom position
+    g_cfg.setString( m_name, "position", "custom" );
 
     g_cfg.save();
 }
@@ -364,6 +376,64 @@ bool Overlay::canEnableWhileNotDriving() const
 bool Overlay::canEnableWhileDisconnected() const
 {
     return false;
+}
+
+float Overlay::getGlobalOpacity() const
+{
+    return g_cfg.getFloat( m_name, "opacity", 100.0f ) / 100.0f;
+}
+
+void Overlay::applyPositionSetting()
+{
+    std::string position = g_cfg.getString( m_name, "position", "custom" );
+    
+    if (position == "custom") {
+        // Use existing saved position, don't change anything
+        return;
+    }
+    
+    // Get screen dimensions for positioning
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    
+    int newX = m_xpos;
+    int newY = m_ypos;
+    
+    // Apply position setting
+    if (position == "top-left") {
+        newX = 50;
+        newY = 50;
+    } else if (position == "top-center") {
+        newX = (screenWidth - m_width) / 2;
+        newY = 50;
+    } else if (position == "top-right") {
+        newX = screenWidth - m_width - 50;
+        newY = 50;
+    } else if (position == "center-left") {
+        newX = 50;
+        newY = (screenHeight - m_height) / 2;
+    } else if (position == "center") {
+        newX = (screenWidth - m_width) / 2;
+        newY = (screenHeight - m_height) / 2;
+    } else if (position == "center-right") {
+        newX = screenWidth - m_width - 50;
+        newY = (screenHeight - m_height) / 2;
+    } else if (position == "bottom-left") {
+        newX = 50;
+        newY = screenHeight - m_height - 100;
+    } else if (position == "bottom-center") {
+        newX = (screenWidth - m_width) / 2;
+        newY = screenHeight - m_height - 100;
+    } else if (position == "bottom-right") {
+        newX = screenWidth - m_width - 50;
+        newY = screenHeight - m_height - 100;
+    }
+    
+    // Apply the new position
+    setWindowPosAndSize(newX, newY, m_width, m_height);
+    
+    // Save the new position
+    saveWindowPosAndSize();
 }
 
 void Overlay::onEnable() {}

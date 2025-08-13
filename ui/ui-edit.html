@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>iRacing Overlay GUI - UI Edit Mode</title>
+	<link rel="stylesheet" href="dist/styles.css" />
+</head>
+<body class="min-h-dvh bg-slate-950 text-slate-100 flex">
+	<!-- Sidebar -->
+	<aside class="w-56 bg-slate-900 border-r border-slate-800 flex flex-col justify-between">
+		<!-- Top navigation -->
+		<nav class="p-4 space-y-2">
+			<a href="index.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800" id="nav-home">Home</a>
+			<a href="overlays.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800" id="nav-overlays">Overlays</a>
+			<a href="ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800 bg-slate-800" id="nav-ui-edit">UI Edit Mode</a>
+		</nav>
+
+		<!-- Bottom actions -->
+		<div class="p-4 space-y-2">
+			<a href="user.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800" id="nav-user">User</a>
+			<a href="settings.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-slate-800" id="nav-settings">Settings</a>
+		</div>
+	</aside>
+
+	<!-- Main content -->
+	<div class="flex-1 flex flex-col">
+		<header class="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+			<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+				<h1 class="text-lg font-semibold tracking-tight">UI Edit Mode</h1>
+				<span id="conn" class="inline-flex items-center gap-2 text-sm text-slate-300">
+					<span class="size-2 rounded-full bg-slate-500" id="connDot"></span>
+					<span id="connText">UNKNOWN</span>
+				</span>
+			</div>
+		</header>
+
+		<main class="mx-auto max-w-4xl px-4 py-6 space-y-6">
+			<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+				<h2 class="mb-3 text-sm uppercase tracking-wide text-slate-400">Edit Mode</h2>
+				<div class="space-y-3">
+					<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+						<span class="text-slate-200">Enable UI Edit</span>
+						<span class="relative inline-flex h-6 w-11 items-center">
+							<input type="checkbox" id="chk_uiEdit" class="peer sr-only" />
+							<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+							<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+						</span>
+					</label>
+					<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+						<span class="text-slate-200">Preview Mode</span>
+						<span class="relative inline-flex h-6 w-11 items-center">
+							<input type="checkbox" id="chk_previewMode" class="peer sr-only" />
+							<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+							<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+						</span>
+					</label>
+					<div class="text-sm text-slate-400">
+						Preview mode shows overlays without requiring iRacing connection, useful for testing and positioning.
+					</div>
+				</div>
+			</section>
+		</main>
+	</div>
+	<script src="ui-edit.js"></script>
+</body>
+</html>

@@ -120,13 +120,14 @@
       <PreprocessorDefinitions>PICOJSON_USE_RVALUE_REFERENCE=0;NOMINMAX;_CRT_SECURE_NO_WARNINGS;_DEBUG;_CONSOLE;IRON_USE_CEF;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>C:\Development\cef\cef_binary_139.0.17+g6c347eb+chromium-139.0.7258.31_windows64\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\CeF\cef;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;libcef.lib;libcef_dll_wrapper.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Development\cef\cef_binary_139.0.17+g6c347eb+chromium-139.0.7258.31_windows64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\CeF\CeFBuildDebug\libcef_dll_wrapper\Debug;D:\CeF\cef\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /E /I /Y "$(ProjectDir)ui" "$(OutDir)ui"</Command>
@@ -141,7 +142,7 @@
       <PreprocessorDefinitions>PICOJSON_USE_RVALUE_REFERENCE=0;NOMINMAX;_CRT_SECURE_NO_WARNINGS;NDEBUG;_CONSOLE;IRON_USE_CEF;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
-      <AdditionalIncludeDirectories>C:\Development\cef\cef_binary_139.0.17+g6c347eb+chromium-139.0.7258.31_windows64;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>D:\CeF\cef;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -151,7 +152,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;libcef.lib;libcef_dll_wrapper.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>true</Profile>
-      <AdditionalLibraryDirectories>C:\Development\cef\cef_binary_139.0.17+g6c347eb+chromium-139.0.7258.31_windows64\Release;C:\Development\cef\cef_build\libcef_dll_wrapper\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>D:\CeF\cef\Release;D:\CeF\CeFBuild\libcef_dll_wrapper\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /E /I /Y "$(ProjectDir)ui" "$(OutDir)ui"</Command>
@@ -169,6 +170,8 @@
     <ClCompile Include="GuiCEF.cpp" />
     <ClCompile Include="WinMainShim.cpp" />
     <ClCompile Include="AppControl.cpp" />
+    <ClCompile Include="preview_mode.cpp" />
+    <ClCompile Include="stub_data.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -187,6 +190,8 @@
     <ClInclude Include="util.h" />
     <ClInclude Include="GuiCEF.h" />
     <ClInclude Include="AppControl.h" />
+    <ClInclude Include="preview_mode.h" />
+    <ClInclude Include="stub_data.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />

@@ -197,6 +197,12 @@ void Config::setBool( const std::string& component, const std::string& key, bool
     pjcomp[key].set<bool>( v );
 }
 
+void Config::setString( const std::string& component, const std::string& key, const std::string& v )
+{
+    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    pjcomp[key].set<std::string>( v );
+}
+
 picojson::object& Config::getOrInsertComponent( const std::string& component, bool* existed )
 {
     auto it = m_pj.insert(std::make_pair(component,picojson::object()));

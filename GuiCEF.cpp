@@ -5,6 +5,7 @@
 #include <string>
 #include <utility>
 #include <cstdint>
+#include <cctype>
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/cef_browser.h"
@@ -24,9 +25,17 @@ namespace {
 
 	LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
-		switch (msg)
-		{
-		case WM_SIZE:
+				switch (msg)
+	{
+	case WM_GETMINMAXINFO:
+	{
+		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lparam;
+		// Set minimum window size to 1280x720
+		lpMMI->ptMinTrackSize.x = 1280;
+		lpMMI->ptMinTrackSize.y = 720;
+		return 0;
+	}
+	case WM_SIZE:
 		{
 			if (g_browser.get())
 			{
@@ -135,6 +144,12 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			if (has("\"cmd\":\"setPreviewMode\"")) {
+				bool on = false; (void)extractBoolField(req, "on", on);
+				app_set_preview_mode(on);
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			if (has("\"cmd\":\"toggleOverlay\"")) {
 				std::string key; if (extractStringField(req, "key", key)) app_toggle_overlay(key.c_str());
 				callback->Success(app_get_state_json());
@@ -144,6 +159,44 @@ namespace {
 				std::string key; bool on=false;
 				if (extractStringField(req, "key", key) && extractBoolField(req, "on", on))
 					app_set_overlay(key.c_str(), on);
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"setHotkey\"")) {
+				std::string component, key, value;
+				if (extractStringField(req, "component", component) && 
+					extractStringField(req, "key", key) && 
+					extractStringField(req, "value", value)) {
+					app_set_config_string(component.c_str(), key.c_str(), value.c_str());
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"setOverlayPosition\"")) {
+				std::string component, position;
+				if (extractStringField(req, "component", component) && 
+					extractStringField(req, "position", position)) {
+					app_set_config_string(component.c_str(), "position", position.c_str());
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"setOverlayOpacity\"")) {
+				std::string component;
+				if (extractStringField(req, "component", component)) {
+					// Extract opacity as integer - look for "opacity":123 pattern
+					size_t opacityPos = req.find("\"opacity\":");
+					if (opacityPos != std::string::npos) {
+						size_t valueStart = opacityPos + 10; // length of "opacity":
+						while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
+						size_t valueEnd = valueStart;
+						while (valueEnd < req.size() && std::isdigit(req[valueEnd])) valueEnd++;
+						if (valueEnd > valueStart) {
+							int opacity = std::stoi(req.substr(valueStart, valueEnd - valueStart));
+							app_set_config_int(component.c_str(), "opacity", opacity);
+						}
+					}
+				}
 				callback->Success(app_get_state_json());
 				return true;
 			}
@@ -242,12 +295,15 @@ static void createParentWindow()
 	wc.lpszClassName = kGuiWndClass;
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 	RegisterClassExW(&wc);
 
-	RECT r = { 100, 100, 100 + 800, 100 + 600 };
-	AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, FALSE, WS_EX_APPWINDOW);
-	g_parentHwnd = CreateWindowExW(WS_EX_APPWINDOW, kGuiWndClass, L"iRon GUI", WS_OVERLAPPEDWINDOW,
+	RECT r = { 100, 100, 100 + 1280, 100 + 720 };
+	AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, FALSE, 0);
+	g_parentHwnd = CreateWindowExW(0, kGuiWndClass, L"iRacing Overlay GUI", WS_OVERLAPPEDWINDOW,
 		r.left, r.top, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), NULL);
+	
 	ShowWindow(g_parentHwnd, SW_SHOW);
 	UpdateWindow(g_parentHwnd);
 }
@@ -294,11 +350,24 @@ void cefCreateMainWindow()
 
 	CefBrowserSettings browser_settings;
 
-	// Try to load local UI if present, else fall back to about:blank
+	// Try to load UI from the repo root first (..\\..\\ui),
+	// fall back to the copied UI next to the executable (..\\ui),
+	// else fall back to about:blank.
 	std::wstring exeDir = getExecutableDirW();
-	std::wstring uiPath = exeDir + L"\\ui\\index.html";
-	DWORD attrs = GetFileAttributesW(uiPath.c_str());
-	std::string url = (attrs != INVALID_FILE_ATTRIBUTES) ? toFileUrl(uiPath) : std::string("about:blank");
+	std::wstring candidateRepo = exeDir + L"\\..\\..\\ui\\index.html";
+	std::wstring candidateLocal = exeDir + L"\\ui\\index.html";
+
+	auto fileExists = [](const std::wstring& p) -> bool {
+		DWORD a = GetFileAttributesW(p.c_str());
+		return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) == 0;
+	};
+
+	std::string url = "about:blank";
+	if (fileExists(candidateRepo)) {
+		url = toFileUrl(candidateRepo);
+	} else if (fileExists(candidateLocal)) {
+		url = toFileUrl(candidateLocal);
+	}
 
 	CefBrowserHost::CreateBrowser(window_info, g_client.get(), url, browser_settings, nullptr, nullptr);
 }

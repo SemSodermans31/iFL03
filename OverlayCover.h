@@ -25,10 +25,13 @@ SOFTWARE.
 #pragma once
 
 #include "Overlay.h"
+#include "stub_data.h"
 
 class OverlayCover : public Overlay
 {
     public:
+
+        virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
         OverlayCover()
             : Overlay("OverlayCover")

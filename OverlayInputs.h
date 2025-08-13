@@ -27,10 +27,13 @@ SOFTWARE.
 #include "Overlay.h"
 #include "Config.h"
 #include "OverlayDebug.h"
+#include "stub_data.h"
 
 class OverlayInputs : public Overlay
 {
     public:
+
+        virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
         OverlayInputs()
             : Overlay("OverlayInputs")
@@ -72,17 +75,31 @@ class OverlayInputs : public Overlay
 
             // Advance input vertices
             {
+                // Use stub data in preview mode
+                const bool useStubData = StubDataManager::shouldUseStubData();
+                
+                float throttleValue, brakeValue, steerValue;
+                if (useStubData) {
+                    throttleValue = StubDataManager::getStubThrottle();
+                    brakeValue = StubDataManager::getStubBrake();
+                    steerValue = StubDataManager::getStubSteering();
+                } else {
+                    throttleValue = ir_Throttle.getFloat();
+                    brakeValue = ir_Brake.getFloat();
+                    steerValue = std::min( 1.0f, std::max( 0.0f, (ir_SteeringWheelAngle.getFloat() / ir_SteeringWheelAngleMax.getFloat()) * -0.5f + 0.5f) );
+                }
+                
                 for( int i=0; i<(int)m_throttleVtx.size()-1; ++i )
                     m_throttleVtx[i].y = m_throttleVtx[i+1].y;
-                m_throttleVtx[(int)m_throttleVtx.size()-1].y = ir_Throttle.getFloat();
+                m_throttleVtx[(int)m_throttleVtx.size()-1].y = throttleValue;
 
                 for( int i=0; i<(int)m_brakeVtx.size()-1; ++i )
                     m_brakeVtx[i].y = m_brakeVtx[i+1].y;
-                m_brakeVtx[(int)m_brakeVtx.size()-1].y = ir_Brake.getFloat();
+                m_brakeVtx[(int)m_brakeVtx.size()-1].y = brakeValue;
 
                 for( int i=0; i<(int)m_steerVtx.size()-1; ++i )
                     m_steerVtx[i].y = m_steerVtx[i+1].y;
-                m_steerVtx[(int)m_steerVtx.size()-1].y = std::min( 1.0f, std::max( 0.0f, (ir_SteeringWheelAngle.getFloat() / ir_SteeringWheelAngleMax.getFloat()) * -0.5f + 0.5f) );
+                m_steerVtx[(int)m_steerVtx.size()-1].y = steerValue;
             }
 
             const float thickness = g_cfg.getFloat( m_name, "line_thickness", 2.0f );
@@ -148,16 +165,35 @@ class OverlayInputs : public Overlay
             steeringLineSink->Close();
 
             m_renderTarget->BeginDraw();
-            m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_fill_col", float4(0.2f,0.45f,0.15f,0.6f) ) );
+            
+            // Apply global opacity to all colors
+            const float globalOpacity = getGlobalOpacity();
+            
+            float4 throttleFillCol = g_cfg.getFloat4( m_name, "throttle_fill_col", float4(0.2f,0.45f,0.15f,0.6f) );
+            throttleFillCol.w *= globalOpacity;
+            m_brush->SetColor( throttleFillCol );
             m_renderTarget->FillGeometry( throttleFillPath.Get(), m_brush.Get() );
-            m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_fill_col", float4(0.46f,0.01f,0.06f,0.6f) ) );
+            
+            float4 brakeFillCol = g_cfg.getFloat4( m_name, "brake_fill_col", float4(0.46f,0.01f,0.06f,0.6f) );
+            brakeFillCol.w *= globalOpacity;
+            m_brush->SetColor( brakeFillCol );
             m_renderTarget->FillGeometry( brakeFillPath.Get(), m_brush.Get() );
-            m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) ) );
+            
+            float4 throttleCol = g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) );
+            throttleCol.w *= globalOpacity;
+            m_brush->SetColor( throttleCol );
             m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
-            m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) ) );
+            
+            float4 brakeCol = g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) );
+            brakeCol.w *= globalOpacity;
+            m_brush->SetColor( brakeCol );
             m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
-            m_brush->SetColor( g_cfg.getFloat4( m_name, "steering_col", float4(1,1,1,0.3f) ) );
+            
+            float4 steeringCol = g_cfg.getFloat4( m_name, "steering_col", float4(1,1,1,0.3f) );
+            steeringCol.w *= globalOpacity;
+            m_brush->SetColor( steeringCol );
             m_renderTarget->DrawGeometry( steeringLinePath.Get(), m_brush.Get(), thickness );
+            
             m_renderTarget->EndDraw();
         }
 

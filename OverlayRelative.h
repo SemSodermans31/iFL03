@@ -29,10 +29,13 @@ SOFTWARE.
 #include "Overlay.h"
 #include "iracing.h"
 #include "Config.h"
+#include "stub_data.h"
 
 class OverlayRelative : public Overlay
 {
     public:
+
+        virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
         const float DefaultFontSize = 15.3f;
 
@@ -97,8 +100,29 @@ class OverlayRelative : public Overlay
             std::vector<CarInfo> relatives;
             relatives.reserve( IR_MAX_CARS );
 
-            // Populate cars with the ones for which a relative/delta comparison is valid
-            for( int i=0; i<IR_MAX_CARS; ++i )
+            // Use stub data in preview mode
+            const bool useStubData = StubDataManager::shouldUseStubData();
+            if (useStubData) {
+                StubDataManager::populateSessionCars();
+            }
+            
+            // Apply global opacity
+            const float globalOpacity = getGlobalOpacity();
+            
+            if (useStubData) {
+                // Generate stub data for preview mode using centralized data
+                auto relativeData = StubDataManager::getRelativeData();
+                for (const auto& rel : relativeData) {
+                    CarInfo ci;
+                    ci.carIdx = rel.carIdx;
+                    ci.delta = rel.delta;
+                    ci.lapDelta = rel.lapDelta;
+                    ci.pitAge = rel.pitAge;
+                    relatives.push_back(ci);
+                }
+            } else {
+                // Populate cars with the ones for which a relative/delta comparison is valid
+                for( int i=0; i<IR_MAX_CARS; ++i )
             {
                 const Car& car = ir_session.cars[i];
 
@@ -150,6 +174,7 @@ class OverlayRelative : public Overlay
                     relatives.push_back( ci );
                 }
             }
+            }
 
             // Sort by delta
             std::sort( relatives.begin(), relatives.end(), 
@@ -157,9 +182,10 @@ class OverlayRelative : public Overlay
 
             // Locate our driver's index in the new array
             int selfCarInfoIdx = -1;
+            int driverCarIdx = useStubData ? 1 : ir_session.driverCarIdx; // "You" is at index 1 in stub data
             for( int i=0; i<(int)relatives.size(); ++i )
             {
-                if( relatives[i].carIdx == ir_session.driverCarIdx ) {
+                if( relatives[i].carIdx == driverCarIdx ) {
                     selfCarInfoIdx = i;
                     break;
                 }
@@ -228,8 +254,11 @@ class OverlayRelative : public Overlay
 
                 if( car.isSelf )
                     col = selfCol;
-                else if( ir_CarIdxOnPitRoad.getBool(ci.carIdx) )
+                else if( !useStubData && ir_CarIdxOnPitRoad.getBool(ci.carIdx) )
                     col.a *= 0.5f;
+                
+                // Apply global opacity
+                col.w *= globalOpacity;
                 
                 wchar_t s[512];
                 D2D1_RECT_F r = {};
@@ -237,11 +266,12 @@ class OverlayRelative : public Overlay
                 const ColumnLayout::Column* clm = nullptr;
                 
                 // Position
-                if( ir_getPosition(ci.carIdx) > 0 )
+                int position = useStubData ? (ci.carIdx + 1) : ir_getPosition(ci.carIdx);
+                if( position > 0 )
                 {
                     clm = m_columns.get( (int)Columns::POSITION );
                     m_brush->SetColor( col );
-                    swprintf( s, _countof(s), L"P%d", ir_getPosition(ci.carIdx) );
+                    swprintf( s, _countof(s), L"P%d", position );
                     m_textFormat->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_TRAILING );
                     m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
                 }
@@ -254,9 +284,13 @@ class OverlayRelative : public Overlay
                     rr.rect = { r.left-2, r.top+1, r.right+2, r.bottom-1 };
                     rr.radiusX = 3;
                     rr.radiusY = 3;
-                    m_brush->SetColor( car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol:carNumberBgCol)) );
+                    float4 bgCol = car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol:carNumberBgCol));
+                    bgCol.w *= globalOpacity;
+                    m_brush->SetColor( bgCol );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
-                    m_brush->SetColor( carNumberTextCol );
+                    float4 numberTextCol = carNumberTextCol;
+                    numberTextCol.w *= globalOpacity;
+                    m_brush->SetColor( numberTextCol );
                     m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
                 }
 

@@ -16,9 +16,16 @@ void app_register_bridge(std::vector<Overlay*>* overlaysPtr,
 // Toggle UI edit mode for all overlays
 void app_set_ui_edit(bool on);
 
+// Toggle preview mode for overlays
+void app_set_preview_mode(bool on);
+
 // Set or toggle an overlay by its config section key, e.g. "OverlayStandings"
 void app_set_overlay(const char* sectionKey, bool on);
 void app_toggle_overlay(const char* sectionKey);
+
+// Set configuration values
+void app_set_config_string(const char* component, const char* key, const char* value);
+void app_set_config_int(const char* component, const char* key, int value);
 
 // Build current state JSON for the GUI
 std::string app_get_state_json();
