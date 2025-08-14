@@ -5,6 +5,7 @@ Debug/
 Release/
 sessionYaml.txt
 config.json
+local.props
 
 # Existing ignores
 .gitignore
