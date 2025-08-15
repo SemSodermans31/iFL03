@@ -97,13 +97,14 @@ std::string app_get_state_json()
 	snprintf(buf, sizeof(buf),
 		"{\"uiEdit\":%s,\"previewMode\":%s,\"connectionStatus\":\"%s\","
 		"\"overlays\":{"
-		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s},"
+		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s},"
 		"\"config\":{"
 		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
 		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
 		"\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
 		"\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
-		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d}"
+		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
+		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d}"
 		"}}",
 		(s_uiEdit && *s_uiEdit) ? "true":"false",
 		boolStr(preview_mode_get()),
@@ -113,6 +114,7 @@ std::string app_get_state_json()
 		boolStr(g_cfg.getBool("OverlayInputs","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayRelative","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayCover","enabled",true)),
+		boolStr(g_cfg.getBool("OverlayWeather","enabled",true)),
 		// OverlayStandings config
 		boolStr(g_cfg.getBool("OverlayStandings","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayStandings","toggle_hotkey","ctrl-space")).c_str(),
@@ -137,7 +139,12 @@ std::string app_get_state_json()
 		boolStr(g_cfg.getBool("OverlayCover","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayCover","toggle_hotkey","ctrl-4")).c_str(),
 		escapeJson(g_cfg.getString("OverlayCover","position","custom")).c_str(),
-		g_cfg.getInt("OverlayCover","opacity",100)
+		g_cfg.getInt("OverlayCover","opacity",100),
+		// OverlayWeather config  
+		boolStr(g_cfg.getBool("OverlayWeather","enabled",true)),
+		escapeJson(g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl-5")).c_str(),
+		escapeJson(g_cfg.getString("OverlayWeather","position","custom")).c_str(),
+		g_cfg.getInt("OverlayWeather","opacity",100)
 	);
 	return std::string(buf);
 }

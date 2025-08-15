@@ -28,6 +28,11 @@ const overlayConfig = {
 		name: 'Cover',
 		configKey: 'OverlayCover',
 		description: 'Cover overlay'
+	},
+	'weather': {
+		name: 'Weather',
+		configKey: 'OverlayWeather',
+		description: 'Weather conditions and track information'
 	}
 };
 

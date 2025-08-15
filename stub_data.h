@@ -64,6 +64,14 @@ public:
     
     // Get stub car by index
     static const StubCar* getStubCar(int carIdx);
+    
+    // Weather-specific stub data
+    static float getStubTrackTemp();
+    static float getStubAirTemp();
+    static float getStubTrackWetness();
+    static float getStubPrecipitation();
+    static float getStubWindSpeed();
+    static float getStubWindDirection();
 
 private:
     static std::vector<StubCar> s_stubCars;

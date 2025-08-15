@@ -2,6 +2,11 @@
 #include "preview_mode.h"
 #include <algorithm>
 #include <cstdio>
+#include <cmath>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // Static member definitions
 std::vector<StubDataManager::StubCar> StubDataManager::s_stubCars;
@@ -168,4 +173,49 @@ const StubDataManager::StubCar* StubDataManager::getStubCar(int carIdx)
     if (carIdx >= 0 && carIdx < (int)s_stubCars.size())
         return &s_stubCars[carIdx];
     return nullptr;
+}
+
+// Weather-specific stub data
+float StubDataManager::getStubTrackTemp()
+{
+    updateAnimation();
+    // Realistic track temperature that varies slightly
+    return 32.5f + 2.0f * std::sin(s_animationTime * 0.1f);
+}
+
+float StubDataManager::getStubAirTemp()
+{
+    updateAnimation();
+    // Air temperature usually cooler than track
+    return 28.0f + 1.5f * std::sin(s_animationTime * 0.08f);
+}
+
+float StubDataManager::getStubTrackWetness()
+{
+    updateAnimation();
+    // Simulate varying track wetness (0.0 = dry, 1.0 = extremely wet)
+    float baseWetness = 0.3f + 0.2f * std::sin(s_animationTime * 0.05f);
+    return std::max(0.0f, std::min(1.0f, baseWetness));
+}
+
+float StubDataManager::getStubPrecipitation()
+{
+    updateAnimation();
+    // Simulate precipitation percentage (0.0 to 1.0)
+    float basePrecip = 0.15f + 0.1f * std::sin(s_animationTime * 0.03f);
+    return std::max(0.0f, std::min(1.0f, basePrecip));
+}
+
+float StubDataManager::getStubWindSpeed()
+{
+    updateAnimation();
+    // Wind speed in m/s (0-15 m/s range)
+    return 5.0f + 3.0f * std::sin(s_animationTime * 0.2f);
+}
+
+float StubDataManager::getStubWindDirection()
+{
+    updateAnimation();
+    // Wind direction in radians, slowly rotating
+    return fmod(s_animationTime * 0.1f, 2.0f * M_PI);
 }

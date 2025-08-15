@@ -1,1 +1,14 @@
-@import "tailwindcss"; 
+@import "tailwindcss";
+
+/* Hide CEF status bar and any browser chrome elements */
+::-webkit-status-bar,
+*[class*="status"],
+*[id*="status"] {
+  display: none !important;
+}
+
+/* Hide any bottom status elements that might show link previews */
+body::after,
+html::after {
+  display: none !important;
+} 

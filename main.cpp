@@ -42,6 +42,7 @@ SOFTWARE.
 #include "OverlayStandings.h"
 #include "OverlayDebug.h"
 #include "OverlayDDU.h"
+#include "OverlayWeather.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
 #include "preview_mode.h"
@@ -53,7 +54,8 @@ enum class Hotkey
     DDU,
     Inputs,
     Relative,
-    Cover
+    Cover,
+    Weather
 };
 
 static void registerHotkeys()
@@ -64,6 +66,7 @@ static void registerHotkeys()
     UnregisterHotKey( NULL, (int)Hotkey::Inputs );
     UnregisterHotKey( NULL, (int)Hotkey::Relative );
     UnregisterHotKey( NULL, (int)Hotkey::Cover );
+    UnregisterHotKey( NULL, (int)Hotkey::Weather );
 
     UINT vk, mod;
 
@@ -84,6 +87,9 @@ static void registerHotkeys()
 
     if( parseHotkey( g_cfg.getString("OverlayCover","toggle_hotkey","ctrl-4"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Cover, mod, vk );
+
+    if( parseHotkey( g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl-5"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Weather, mod, vk );
 }
 
 static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus status )
@@ -164,6 +170,7 @@ int main()
     printf("    Toggle inputs overlay:        %s\n", g_cfg.getString("OverlayInputs","toggle_hotkey","").c_str() );
     printf("    Toggle relative overlay:      %s\n", g_cfg.getString("OverlayRelative","toggle_hotkey","").c_str() );
     printf("    Toggle cover overlay:         %s\n", g_cfg.getString("OverlayCover","toggle_hotkey","").c_str() );
+    printf("    Toggle weather overlay:       %s\n", g_cfg.getString("OverlayWeather","toggle_hotkey","").c_str() );
     printf("\niRon will generate a file called \'config.json\' in its current directory. This file\n"\
            "stores your settings. You can edit the file at any time, even while iRon is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
@@ -179,6 +186,7 @@ int main()
     overlays.push_back( new OverlayInputs() );
     overlays.push_back( new OverlayStandings() );
     overlays.push_back( new OverlayDDU() );
+    overlays.push_back( new OverlayWeather() );
 #ifdef _DEBUG
     overlays.push_back( new OverlayDebug() );
 #endif
@@ -302,6 +310,9 @@ int main()
                         break;
                     case (int)Hotkey::Cover:
                         g_cfg.setBool( "OverlayCover", "enabled", !g_cfg.getBool("OverlayCover","enabled",true) );
+                        break;
+                    case (int)Hotkey::Weather:
+                        g_cfg.setBool( "OverlayWeather", "enabled", !g_cfg.getBool("OverlayWeather","enabled",true) );
                         break;
                     }
                     

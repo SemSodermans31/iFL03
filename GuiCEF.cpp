@@ -30,9 +30,9 @@ namespace {
 	case WM_GETMINMAXINFO:
 	{
 		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lparam;
-		// Set minimum window size to 1280x720
-		lpMMI->ptMinTrackSize.x = 1280;
-		lpMMI->ptMinTrackSize.y = 720;
+		// Set minimum window size to 1368x768
+		lpMMI->ptMinTrackSize.x = 1920;
+		lpMMI->ptMinTrackSize.y = 1080;
 		return 0;
 	}
 	case WM_SIZE:
@@ -299,7 +299,7 @@ static void createParentWindow()
 	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
 	RegisterClassExW(&wc);
 
-	RECT r = { 100, 100, 100 + 1280, 100 + 720 };
+	RECT r = { 100, 100, 100 + 1920, 100 + 1080 };
 	AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, FALSE, 0);
 	g_parentHwnd = CreateWindowExW(0, kGuiWndClass, L"iRacing Overlay GUI", WS_OVERLAPPEDWINDOW,
 		r.left, r.top, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), NULL);
@@ -349,6 +349,7 @@ void cefCreateMainWindow()
 	window_info.SetAsChild(g_parentHwnd, rect);
 
 	CefBrowserSettings browser_settings;
+	browser_settings.chrome_status_bubble = STATE_DISABLED;
 
 	// Try to load UI from the repo root first (..\\..\\ui),
 	// fall back to the copied UI next to the executable (..\\ui),
