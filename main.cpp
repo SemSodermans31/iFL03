@@ -43,6 +43,7 @@ SOFTWARE.
 #include "OverlayDebug.h"
 #include "OverlayDDU.h"
 #include "OverlayWeather.h"
+#include "OverlayFlags.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
 #include "preview_mode.h"
@@ -55,7 +56,8 @@ enum class Hotkey
     Inputs,
     Relative,
     Cover,
-    Weather
+    Weather,
+    Flags
 };
 
 static void registerHotkeys()
@@ -90,6 +92,9 @@ static void registerHotkeys()
 
     if( parseHotkey( g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl-5"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Weather, mod, vk );
+    
+    if( parseHotkey( g_cfg.getString("OverlayFlags","toggle_hotkey","ctrl-6"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Flags, mod, vk );
 }
 
 static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus status )
@@ -101,11 +106,19 @@ static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus
     for( Overlay* o : overlays )
     {
         bool overlayEnabled = g_cfg.getBool(o->getName(),"enabled",true);
-        bool connectionAllows = (
-            status == ConnectionStatus::DRIVING ||
-            status == ConnectionStatus::CONNECTED && o->canEnableWhileNotDriving() ||
-            status == ConnectionStatus::DISCONNECTED && o->canEnableWhileDisconnected()
-            );
+        
+        // Check show_in_menu and show_in_race settings
+        bool showInMenu = g_cfg.getBool(o->getName(), "show_in_menu", true);
+        bool showInRace = g_cfg.getBool(o->getName(), "show_in_race", true);
+        
+        bool connectionAllows = false;
+        if (status == ConnectionStatus::DRIVING) {
+            connectionAllows = showInRace;
+        } else if (status == ConnectionStatus::CONNECTED) {
+            connectionAllows = showInMenu && o->canEnableWhileNotDriving();
+        } else if (status == ConnectionStatus::DISCONNECTED) {
+            connectionAllows = o->canEnableWhileDisconnected();
+        }
         
         // In preview mode, show enabled overlays regardless of connection status
         bool shouldEnable = overlayEnabled && (preview_mode_get() || connectionAllows);
@@ -171,6 +184,7 @@ int main()
     printf("    Toggle relative overlay:      %s\n", g_cfg.getString("OverlayRelative","toggle_hotkey","").c_str() );
     printf("    Toggle cover overlay:         %s\n", g_cfg.getString("OverlayCover","toggle_hotkey","").c_str() );
     printf("    Toggle weather overlay:       %s\n", g_cfg.getString("OverlayWeather","toggle_hotkey","").c_str() );
+    printf("    Toggle flags overlay:         %s\n", g_cfg.getString("OverlayFlags","toggle_hotkey","").c_str() );
     printf("\niRon will generate a file called \'config.json\' in its current directory. This file\n"\
            "stores your settings. You can edit the file at any time, even while iRon is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
@@ -187,6 +201,7 @@ int main()
     overlays.push_back( new OverlayStandings() );
     overlays.push_back( new OverlayDDU() );
     overlays.push_back( new OverlayWeather() );
+    overlays.push_back( new OverlayFlags() );
 #ifdef _DEBUG
     overlays.push_back( new OverlayDebug() );
 #endif
@@ -313,6 +328,9 @@ int main()
                         break;
                     case (int)Hotkey::Weather:
                         g_cfg.setBool( "OverlayWeather", "enabled", !g_cfg.getBool("OverlayWeather","enabled",true) );
+                        break;
+                    case (int)Hotkey::Flags:
+                        g_cfg.setBool( "OverlayFlags", "enabled", !g_cfg.getBool("OverlayFlags","enabled",true) );
                         break;
                     }
                     

@@ -44,7 +44,7 @@ class OverlayWeather : public Overlay
 {
     public:
 
-        const float DefaultFontSize = 16;
+        const float DefaultFontSize = 24; // 16 * 1.5 = 24
 
         OverlayWeather()
             : Overlay("OverlayWeather")
@@ -73,7 +73,7 @@ class OverlayWeather : public Overlay
 
         virtual float2 getDefaultSize()
         {
-            // Make the default size taller to accommodate bigger boxes
+            // Reference size for scaling calculations
             return float2(320, 800);
         }
 
@@ -96,26 +96,46 @@ class OverlayWeather : public Overlay
 
         virtual void onConfigChanged()
         {
-            // Font setup
+            // Calculate scaling factors based on current overlay size vs reference size
+            const float2 refSize = getDefaultSize();
+            
+            // Safety checks to prevent crashes
+            if (m_width <= 0 || m_height <= 0 || refSize.x <= 0 || refSize.y <= 0) {
+                m_scaleFactorX = m_scaleFactorY = m_scaleFactor = 1.0f;
+            } else {
+                m_scaleFactorX = (float)m_width / refSize.x;
+                m_scaleFactorY = (float)m_height / refSize.y;
+                m_scaleFactor = std::min(m_scaleFactorX, m_scaleFactorY); // Use minimum to maintain aspect ratio
+                
+                // Clamp scale factor to reasonable bounds to prevent invalid font sizes
+                m_scaleFactor = std::max(0.1f, std::min(10.0f, m_scaleFactor));
+                m_scaleFactorX = std::max(0.1f, std::min(10.0f, m_scaleFactorX));
+                m_scaleFactorY = std::max(0.1f, std::min(10.0f, m_scaleFactorY));
+            }
+            
+            // Font setup with dynamic scaling
             {
                 m_text.reset( m_dwriteFactory.Get() );
 
                 const std::string font = g_cfg.getString( m_name, "font", "Arial" );
-                const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+                const float baseFontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+                const float scaledFontSize = std::max(6.0f, std::min(200.0f, baseFontSize * m_scaleFactor)); // Clamp font size to reasonable bounds
                 
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, scaledFontSize, L"en-us", &m_textFormat ));
                 m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormatBold ));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, scaledFontSize, L"en-us", &m_textFormatBold ));
                 m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
+                const float smallFontSize = std::max(4.0f, std::min(160.0f, scaledFontSize*0.8f));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, smallFontSize, L"en-us", &m_textFormatSmall ));
                 m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize*1.5f, L"en-us", &m_textFormatLarge ));
+                const float largeFontSize = std::max(8.0f, std::min(300.0f, scaledFontSize*1.5f));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, largeFontSize, L"en-us", &m_textFormatLarge ));
                 m_textFormatLarge->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormatLarge->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
             }
@@ -153,13 +173,20 @@ class OverlayWeather : public Overlay
             m_renderTarget->BeginDraw();
             m_renderTarget->Clear( float4(0,0,0,0) );
 
+            const float titlePadding = std::max(1.5f, 20.0f * m_scaleFactor);   
+            const float titleMargin = std::max(1.5f, 20.0f * m_scaleFactor);   
+            const float valuePadding = std::max(1.5f, 15.0f * m_scaleFactor);  
+            const float iconSize = std::max(6.0f, std::min(300.0f, 42.0f * m_scaleFactor));
+            const float iconAdjustment = std::max(1.5f, 18.0f * m_scaleFactor);
+
             // Helper function to draw section background
             auto drawSectionBackground = [&](const WeatherBox& box) {
                 float4 bgColor = backgroundCol;
                 bgColor.w *= globalOpacity;
                 m_brush->SetColor( bgColor );
                 D2D1_RECT_F bgRect = { box.x0, box.y0, box.x1, box.y1};
-                D2D1_ROUNDED_RECT roundedBg = { bgRect, 8, 8 };
+                const float bgCornerRadius = 12 * m_scaleFactor;
+                D2D1_ROUNDED_RECT roundedBg = { bgRect, bgCornerRadius, bgCornerRadius };
                 m_renderTarget->FillRoundedRectangle( &roundedBg, m_brush.Get() );
             };
 
@@ -175,19 +202,22 @@ class OverlayWeather : public Overlay
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), L"TRACK TEMP", m_textFormatBold.Get(), 
-                              m_trackTempBox.x0 + 15, m_trackTempBox.x1 - 10, m_trackTempBox.y0 + 15, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_trackTempBox.x0 + titlePadding, m_trackTempBox.x1 - titleMargin, m_trackTempBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
 
                 // Temperature value - larger, centered
                 m_brush->SetColor( trackTempCol );
                 const wchar_t degree = L'\x00B0';
                 swprintf( s, _countof(s), L"%.1f%lc%c", trackTemp, degree, imperial ? 'F' : 'C' );
                 const float tempValueY = m_trackTempBox.y0 + m_trackTempBox.h * 0.65f;
-                m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
-                              m_trackTempBox.x0 + 10, m_trackTempBox.x1 - 10, tempValueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
 
-                // Icon horizontally aligned with temperature value
-                const float iconX = m_trackTempBox.x0 + m_trackTempBox.w/2 - 40; // Left of center
-                drawIcon(m_trackTempIcon.Get(), iconX, tempValueY - 12, 24, 24, true);
+                // Icon on the left side of temperature value
+                const float iconX = m_trackTempBox.x0 + valuePadding;
+                drawIcon(m_trackTempIcon.Get(), iconX, tempValueY - iconAdjustment, iconSize, iconSize, true);
+
+                // Adjust text position to be after the icon
+                const float textOffset = iconX + iconSize + valuePadding;
+                m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
+                              textOffset, m_trackTempBox.x1 - valuePadding, tempValueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
             }
 
             // Track Wetness Section
@@ -200,67 +230,97 @@ class OverlayWeather : public Overlay
                 // Wetness title - left aligned
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), L"TRACK WETNESS", m_textFormatBold.Get(), 
-                              m_trackWetnessBox.x0 + 15, m_trackWetnessBox.x1 - 10, m_trackWetnessBox.y0 + 15, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_trackWetnessBox.x0 + titlePadding, m_trackWetnessBox.x1 - titleMargin, m_trackWetnessBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
 
                 // Progress bar showing wetness level
                 {
-                    const float barWidth = m_trackWetnessBox.w * 0.6f;
-                    const float barHeight = 8;
-                    const float barX = m_trackWetnessBox.x0 + (m_trackWetnessBox.w - barWidth) / 2;
+                    const float sideIconSize = 30 * m_scaleFactor;
+                    const float sideIconAdjust = 7.5f * m_scaleFactor;
+                    
+                    // Calculate bar width to fit between icons at title padding positions
+                    const float barWidth = m_trackWetnessBox.w - (2.5f * titlePadding) - (2.5f * sideIconSize);
+                    const float barHeight = 12 * m_scaleFactor;
+                    const float barX = m_trackWetnessBox.x0 + (m_trackWetnessBox.w - barWidth) * 0.5f;
                     const float barY = m_trackWetnessBox.y0 + m_trackWetnessBox.h * 0.6f;
                     
-                    // Sun icon on left (dry side)
-                    drawIcon(m_sunIcon.Get(), barX - 30, barY - 5, 20, 20, true);
+                    // Sun icon aligned with left title padding
+                    drawIcon(m_sunIcon.Get(), m_trackWetnessBox.x0 + titlePadding, barY - sideIconAdjust, sideIconSize, sideIconSize, true);
                     
-                    // Waterdrop icon on right (wet side) - aligned with bar
-                    drawIcon(m_trackWetnessIcon.Get(), barX + barWidth + 10, barY - 5, 20, 20, true);
+                    // Waterdrop icon aligned with right title padding
+                    drawIcon(m_trackWetnessIcon.Get(), m_trackWetnessBox.x1 - titlePadding - sideIconSize, barY - sideIconAdjust, sideIconSize, sideIconSize, true);
                     
                     // Background bar with white outline
                     D2D1_RECT_F barBg = { barX, barY, barX + barWidth, barY + barHeight };
                     m_brush->SetColor( float4(0.3f, 0.3f, 0.3f, 0.8f) );
-                    D2D1_ROUNDED_RECT rrBg = { barBg, 4, 4 };
+                    const float cornerRadius = 6 * m_scaleFactor;
+                    D2D1_ROUNDED_RECT rrBg = { barBg, cornerRadius, cornerRadius };
                     m_renderTarget->FillRoundedRectangle( &rrBg, m_brush.Get() );
                     
                     // White outline around bar
                     m_brush->SetColor( float4(1.0f, 1.0f, 1.0f, 0.6f) );
-                    m_renderTarget->DrawRoundedRectangle( &rrBg, m_brush.Get(), 1.0f );
+                    const float outlineThickness = 1.0f * m_scaleFactor;
+                    m_renderTarget->DrawRoundedRectangle( &rrBg, m_brush.Get(), outlineThickness );
                     
                     // Wetness fill
                     if (trackWetness > 0) {
                         D2D1_RECT_F bar = { barX, barY, barX + (barWidth * trackWetness), barY + barHeight };
                         m_brush->SetColor( accentCol );
-                        D2D1_ROUNDED_RECT rr = { bar, 4, 4 };
+                        D2D1_ROUNDED_RECT rr = { bar, cornerRadius, cornerRadius };
                         m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     }
                 }
 
-                // Wetness text description
+                // Wetness text description with increased padding from graph
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), toWide(wetnessText).c_str(), m_textFormatBold.Get(), 
-                              m_trackWetnessBox.x0 + 10, m_trackWetnessBox.x1 - 10, m_trackWetnessBox.y0 + m_trackWetnessBox.h * 0.8f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                              m_trackWetnessBox.x0 + valuePadding, m_trackWetnessBox.x1 - valuePadding, m_trackWetnessBox.y0 + m_trackWetnessBox.h * 0.85f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
             }
 
-            // Precipitation Section
+            // Precipitation/Air Temperature Section
             {
                 drawSectionBackground(m_precipitationBox);
                 
-                float precipitation = useStubData ? StubDataManager::getStubPrecipitation() : getPrecipitationValue();
-
+                const bool showPrecip = shouldShowPrecipitation();
+                
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
-                m_text.render( m_renderTarget.Get(), L"PRECIPITATION", m_textFormatBold.Get(), 
-                              m_precipitationBox.x0 + 15, m_precipitationBox.x1 - 10, m_precipitationBox.y0 + 15, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                m_text.render( m_renderTarget.Get(), showPrecip ? L"PRECIPITATION" : L"AIR TEMP", m_textFormatBold.Get(), 
+                              m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
 
-                // Percentage value - larger, centered
-                m_brush->SetColor( precipCol );
-                swprintf( s, _countof(s), L"%.0f%%", precipitation * 100.0f );
-                const float precipValueY = m_precipitationBox.y0 + m_precipitationBox.h * 0.65f;
-                m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
-                              m_precipitationBox.x0 + 10, m_precipitationBox.x1 - 10, precipValueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                const float valueY = m_precipitationBox.y0 + m_precipitationBox.h * 0.65f;
+                const float iconX = m_precipitationBox.x0 + titlePadding; // Align with title
 
-                // Icon horizontally aligned with precipitation value
-                const float precipIconX = m_precipitationBox.x0 + m_precipitationBox.w/2 - 50; // Left of center
-                drawIcon(m_precipitationIcon.Get(), precipIconX, precipValueY - 12, 24, 24, true);
+                if (showPrecip) {
+                    // Show precipitation data
+                    float precipitation = useStubData ? StubDataManager::getStubPrecipitation() : getPrecipitationValue();
+
+                    // Icon on the left
+                    drawIcon(m_precipitationIcon.Get(), iconX, valueY - iconAdjustment, iconSize, iconSize, true);
+
+                    // Percentage value - larger, to the right of the icon
+                    m_brush->SetColor( precipCol );
+                    swprintf( s, _countof(s), L"%.0f%%", precipitation * 100.0f );
+                    const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
+                                  m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                } else {
+                    // Show air temperature
+                    float airTemp = useStubData ? StubDataManager::getStubAirTemp() : ir_AirTemp.getFloat();
+                    if (imperial) {
+                        airTemp = celsiusToFahrenheit(airTemp);
+                    }
+
+                    // Use track temp icon for now (or could load a new air temp icon)
+                    drawIcon(m_trackTempIcon.Get(), iconX, valueY - iconAdjustment, iconSize, iconSize, true);
+
+                    // Temperature value - larger, to the right of the icon
+                    m_brush->SetColor( precipCol );
+                    const wchar_t degree = L'\x00B0';
+                    swprintf( s, _countof(s), L"%.1f%lc%c", airTemp, degree, imperial ? 'F' : 'C' );
+                    const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
+                                  m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                }
             }
 
             // Wind Section (Compass)
@@ -273,15 +333,17 @@ class OverlayWeather : public Overlay
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), L"WIND", m_textFormatBold.Get(), 
-                              m_windBox.x0 + 15, m_windBox.x1 - 10, m_windBox.y0 + 15, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_windBox.x0 + titlePadding, m_windBox.x1 - titleMargin, m_windBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
 
-                // Draw compass - move further down from the top edge
+                // Draw compass - dynamically positioned and sized with safety checks
                 const float compassCenterX = m_windBox.x0 + m_windBox.w/2;
-                const float compassCenterY = m_windBox.y0 + 110; // Increased from 75 to 110 for more vertical padding
-                drawWindCompass(windDir, compassCenterX, compassCenterY, 70); // Larger radius for bigger box
+                const float compassCenterY = m_windBox.y0 + m_windBox.h * 0.5f; // Center in available box space
+                const float compassRadius = std::max(22.5f, std::min(m_windBox.w, m_windBox.h) * 0.375f);
+                drawWindCompass(windDir, compassCenterX, compassCenterY, compassRadius);
 
                 // Wind speed at bottom with icon - left aligned like title
-                const float windSpeedY = m_windBox.y0 + m_windBox.h - 35;
+                const float windSpeedBottomMargin = 52.5f * m_scaleFactor;
+                const float windSpeedY = m_windBox.y0 + m_windBox.h - windSpeedBottomMargin;
                 
                 // Convert wind speed for display
                 if (imperial) {
@@ -293,12 +355,15 @@ class OverlayWeather : public Overlay
                 }
                 
                 // Wind icon aligned to the left like title
-                drawIcon(m_windIcon.Get(), m_windBox.x0 + 15, windSpeedY - 10, 20, 20, true);
+                const float windIconSize = 50 * m_scaleFactor;
+                const float windIconAdjust = 25 * m_scaleFactor;
+                drawIcon(m_windIcon.Get(), m_windBox.x0 + titlePadding, windSpeedY - windIconAdjust, windIconSize, windIconSize, true);
                 
                 // Wind speed text left-aligned like title
+                const float windTextOffset = 75.0f * m_scaleFactor;
                 m_brush->SetColor( windCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormatBold.Get(), 
-                              m_windBox.x0 + 45, m_windBox.x1 - 10, windSpeedY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
+                              m_windBox.x0 + windTextOffset, m_windBox.x1 - titleMargin, windSpeedY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
             }
 
             m_renderTarget->EndDraw();
@@ -308,32 +373,34 @@ class OverlayWeather : public Overlay
 
         void setupWeatherBoxes()
         {
-            const float padding = 15;
-            const float spacing = 10;
-            // Make the boxes vertically bigger by increasing their heights
-            const float trackTempHeight = 110;
-            const float trackWetnessHeight = 110;
-            const float precipitationHeight = 110;
-            const float windHeight = 250;
+            const float padding = std::max(1.5f, 22.5f * m_scaleFactor);
+            const float spacing = std::max(1.5f, 15.0f * m_scaleFactor);
+
+            const float availableHeight = std::max(60.0f, (float)m_height - 2 * padding - 3 * spacing);
+            const float trackTempHeight = std::max(15.0f, availableHeight * 0.15f);
+            const float trackWetnessHeight = std::max(15.0f, availableHeight * 0.15f);
+            const float precipitationHeight = std::max(15.0f, availableHeight * 0.15f);
+            const float windHeight = std::max(30.0f, availableHeight * 0.55f);
             
             float yPos = padding;
             
-            m_trackTempBox = makeWeatherBox(padding, m_width - 2*padding, yPos, "Track Temperature", "assets/icons/track_temp.png");
+            const float boxWidth = std::max(30.0f, (float)m_width - 2*padding);
+            m_trackTempBox = makeWeatherBox(padding, boxWidth, yPos, "Track Temperature", "assets/icons/track_temp.png");
             m_trackTempBox.h = trackTempHeight;
             m_trackTempBox.y1 = m_trackTempBox.y0 + trackTempHeight;
             
             yPos += trackTempHeight + spacing;
-            m_trackWetnessBox = makeWeatherBox(padding, m_width - 2*padding, yPos, "Track Wetness", "assets/icons/waterdrop.png");
+            m_trackWetnessBox = makeWeatherBox(padding, boxWidth, yPos, "Track Wetness", "assets/icons/waterdrop.png");
             m_trackWetnessBox.h = trackWetnessHeight;
             m_trackWetnessBox.y1 = m_trackWetnessBox.y0 + trackWetnessHeight;
             
             yPos += trackWetnessHeight + spacing;
-            m_precipitationBox = makeWeatherBox(padding, m_width - 2*padding, yPos, "Precipitation", "assets/icons/precipitation.png");
+            m_precipitationBox = makeWeatherBox(padding, boxWidth, yPos, "Precipitation", "assets/icons/precipitation.png");
             m_precipitationBox.h = precipitationHeight;
             m_precipitationBox.y1 = m_precipitationBox.y0 + precipitationHeight;
             
             yPos += precipitationHeight + spacing;
-            m_windBox = makeWeatherBox(padding, m_width - 2*padding, yPos, "Wind", "assets/icons/wind.png");
+            m_windBox = makeWeatherBox(padding, boxWidth, yPos, "Wind", "assets/icons/wind.png");
             m_windBox.h = windHeight;
             m_windBox.y1 = m_windBox.y0 + windHeight;
         }
@@ -344,14 +411,9 @@ class OverlayWeather : public Overlay
             box.x0 = x;
             box.x1 = x + w;
             box.y0 = y;
-            // Make the wind box even taller, others also bigger
-            if (title == "Wind") {
-                box.y1 = y + 250;
-            } else {
-                box.y1 = y + 110;
-            }
+            box.y1 = y;
             box.w = w;
-            box.h = box.y1 - box.y0;
+            box.h = 0;
             box.title = title;
             box.iconPath = iconPath;
             return box;
@@ -397,7 +459,7 @@ class OverlayWeather : public Overlay
                 try {
                     Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
                     HRESULT hr = m_wicFactory->CreateDecoderFromFilename(filePath.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder);
-                    if (FAILED(hr)) return bitmap; // Return null bitmap on failure
+                    if (FAILED(hr)) return bitmap;
 
                     Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
                     hr = decoder->GetFrame(0, &frame);
@@ -473,24 +535,26 @@ class OverlayWeather : public Overlay
 
         void drawWindCompass(float windDirection, float centerX, float centerY, float radius)
         {
-            const float carSize = 50.0f; // Make car icon bigger for larger box
+            const float carSize = radius * 0.7f; // Scale car size relative to compass radius
 
             // Draw compass circle
             D2D1_ELLIPSE compassCircle = { {centerX, centerY}, radius, radius };
-            m_brush->SetColor(float4(0.3f, 0.3f, 0.3f, 0.8f));
-            m_renderTarget->DrawEllipse(&compassCircle, m_brush.Get(), 2.0f);
+            m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, 1.0f));
+            const float compassLineThickness = 3.0f * m_scaleFactor;
+            m_renderTarget->DrawEllipse(&compassCircle, m_brush.Get(), compassLineThickness);
 
             // Draw cardinal directions (NESW) inside compass - fixed positions, centered and larger font
             m_brush->SetColor(float4(0.8f, 0.8f, 0.8f, 0.9f));
             const wchar_t* directions[] = { L"N", L"E", L"S", L"W" };
             const float textRadius = radius * 0.8f;
 
-            // Create a larger font for the compass labels (m_textFormatSmall + 4)
+            // Create a larger font for the compass labels (m_textFormatSmall + scaled amount)
             Microsoft::WRL::ComPtr<IDWriteTextFormat> compassLabelFormat;
             if (m_textFormatSmall) {
                 FLOAT fontSize = 0.0f;
                 fontSize = m_textFormatSmall->GetFontSize();
-                fontSize += 4.0f;
+                fontSize += 6.0f * m_scaleFactor;
+                fontSize = std::max(6.0f, std::min(150.0f, fontSize));
                 DWRITE_FONT_WEIGHT weight = m_textFormatSmall->GetFontWeight();
                 DWRITE_FONT_STYLE style = m_textFormatSmall->GetFontStyle();
                 DWRITE_FONT_STRETCH stretch = m_textFormatSmall->GetFontStretch();
@@ -516,14 +580,13 @@ class OverlayWeather : public Overlay
                 float textX = centerX + textRadius * (float)sin(angle);
                 float textY = centerY - textRadius * (float)cos(angle);
 
-                // Center the label horizontally and vertically
-                float labelBoxW = 32.0f;
-                float labelBoxH = 28.0f;
+                float labelBoxW = 48.0f * m_scaleFactor;
+                float labelBoxH = 42.0f * m_scaleFactor;
                 float boxLeft = textX - labelBoxW * 0.5f;
                 float boxRight = textX + labelBoxW * 0.5f;
                 float boxTop = textY - labelBoxH * 0.5f;
 
-                float verticalNudge = 14.0f; // Adjust this value as needed for perfect centering
+                float verticalNudge = 21.0f * m_scaleFactor;
                 boxTop += verticalNudge;
 
                 m_text.render(
@@ -552,7 +615,7 @@ class OverlayWeather : public Overlay
                 const float endX = centerX + arrowEndRadius * (float)sin(windDirection);
                 const float endY = centerY - arrowEndRadius * (float)cos(windDirection);
 
-                const float arrowWidth = 36.0f;
+                const float arrowWidth = 54.0f * m_scaleFactor;
                 const float arrowLength = (float)hypot(endX - startX, endY - startY);
 
                 const float midX = (startX + endX) * 0.5f;
@@ -563,7 +626,6 @@ class OverlayWeather : public Overlay
                 const float angleDeg = windDirection * 180.0f / (float)M_PI + 180.0f;
                 m_renderTarget->SetTransform(oldTx * D2D1::Matrix3x2F::Rotation(angleDeg, D2D1::Point2F(midX, midY)));
 
-                // Draw with opacity 0.75
                 m_renderTarget->DrawBitmap(
                     m_windArrowIcon.Get(),
                     D2D1::RectF(midX - arrowWidth*0.5f, midY - arrowLength*0.5f, midX + arrowWidth*0.5f, midY + arrowLength*0.5f),
@@ -583,11 +645,12 @@ class OverlayWeather : public Overlay
                 const float endY = centerY - arrowEndRadius * (float)cos(windDirection);
 
                 m_brush->SetColor(float4(0.2f, 0.8f, 1.0f, 0.9f));
-                m_renderTarget->DrawLine({startX, startY}, {endX, endY}, m_brush.Get(), 4.0f);
+                const float arrowLineThickness = 6.0f * m_scaleFactor;
+                m_renderTarget->DrawLine({startX, startY}, {endX, endY}, m_brush.Get(), arrowLineThickness);
 
                 // Draw arrowhead pointing INWARD toward center
-                const float arrowHeadLength = 12;
-                const float arrowHeadAngle = (float)(M_PI / 6); // 30 degrees
+                const float arrowHeadLength = 18 * m_scaleFactor;
+                const float arrowHeadAngle = (float)(M_PI / 6);
 
                 // Arrowhead points toward center (inward direction)
                 float headX1 = endX - arrowHeadLength * (float)sin(windDirection + arrowHeadAngle);
@@ -595,8 +658,8 @@ class OverlayWeather : public Overlay
                 float headX2 = endX - arrowHeadLength * (float)sin(windDirection - arrowHeadAngle);
                 float headY2 = endY + arrowHeadLength * (float)cos(windDirection - arrowHeadAngle);
 
-                m_renderTarget->DrawLine({endX, endY}, {headX1, headY1}, m_brush.Get(), 4.0f);
-                m_renderTarget->DrawLine({endX, endY}, {headX2, headY2}, m_brush.Get(), 4.0f);
+                m_renderTarget->DrawLine({endX, endY}, {headX1, headY1}, m_brush.Get(), arrowLineThickness);
+                m_renderTarget->DrawLine({endX, endY}, {headX2, headY2}, m_brush.Get(), arrowLineThickness);
             }
         }
 
@@ -624,12 +687,27 @@ class OverlayWeather : public Overlay
             return 0.0f;
         }
 
+        bool shouldShowPrecipitation() const
+        {
+            if (StubDataManager::shouldUseStubData()) {
+                // In preview mode, use the preview_weather_type setting
+                return g_cfg.getInt("OverlayWeather", "preview_weather_type", 1) == 1;
+            }
+            // Show precipitation if weather is dynamic (1)
+            return ir_WeatherType.getInt() == 1;
+        }
+
         virtual bool hasCustomBackground()
         {
             return true;
         }
 
     protected:
+
+        // Scaling factors for dynamic sizing
+        float m_scaleFactorX = 1.0f;
+        float m_scaleFactorY = 1.0f;
+        float m_scaleFactor = 1.0f;
 
         WeatherBox m_trackTempBox;
         WeatherBox m_trackWetnessBox; 

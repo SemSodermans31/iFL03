@@ -33,6 +33,11 @@ const overlayConfig = {
 		name: 'Weather',
 		configKey: 'OverlayWeather',
 		description: 'Weather conditions and track information'
+	},
+	'flags': {
+		name: 'Flags',
+		configKey: 'OverlayFlags',
+		description: 'Displays active iRacing session flags'
 	}
 };
 
@@ -65,6 +70,36 @@ function setupEventListeners() {
 				sendCommand('setOverlay', { 
 					key: configKey, 
 					on: this.checked 
+				});
+			}
+		});
+	}
+
+	// Show in Menu toggle
+	const showMenuToggle = document.getElementById('overlay-show-menu');
+	if (showMenuToggle) {
+		showMenuToggle.addEventListener('change', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('setConfigBool', {
+					component: configKey,
+					key: 'show_in_menu',
+					value: this.checked
+				});
+			}
+		});
+	}
+
+	// Show in Race toggle
+	const showRaceToggle = document.getElementById('overlay-show-race');
+	if (showRaceToggle) {
+		showRaceToggle.addEventListener('change', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('setConfigBool', {
+					component: configKey,
+					key: 'show_in_race',
+					value: this.checked
 				});
 			}
 		});
@@ -125,6 +160,44 @@ function setupEventListeners() {
 			saveOverlaySettings();
 		});
 	}
+
+	// Flags preview flag change
+	const previewFlagSel = document.getElementById('overlay-preview-flag');
+	if (previewFlagSel) {
+		previewFlagSel.addEventListener('change', function() {
+			// Send to backend only for OverlayFlags
+			if (selectedOverlay === 'flags') {
+				if (window.cefQuery) {
+					window.cefQuery({
+						request: JSON.stringify({ cmd: 'setPreviewFlag', value: this.value }),
+						onSuccess: function(response) {
+							try { currentState = JSON.parse(response); updateUI(); } catch(e) { console.error(e); }
+						},
+						onFailure: function(code, msg) { console.error('setPreviewFlag failed', code, msg); }
+					});
+				}
+			}
+		});
+	}
+
+	// Weather type change
+	const previewWeatherTypeSel = document.getElementById('overlay-preview-weather-type');
+	if (previewWeatherTypeSel) {
+		previewWeatherTypeSel.addEventListener('change', function() {
+			// Send to backend only for OverlayWeather
+			if (selectedOverlay === 'weather') {
+				if (window.cefQuery) {
+					window.cefQuery({
+						request: JSON.stringify({ cmd: 'setPreviewWeatherType', value: parseInt(this.value) }),
+						onSuccess: function(response) {
+							try { currentState = JSON.parse(response); updateUI(); } catch(e) { console.error(e); }
+						},
+						onFailure: function(code, msg) { console.error('setPreviewWeatherType failed', code, msg); }
+					});
+				}
+			}
+		});
+	}
 }
 
 function selectOverlay(overlayKey) {
@@ -162,6 +235,15 @@ function updateOverlaySettings(overlayKey) {
 	if (overlayToggle && currentState.config && currentState.config[config.configKey]) {
 		overlayToggle.checked = currentState.config[config.configKey].enabled || false;
 	}
+
+	// Update show in menu/race toggles
+	const showMenuToggle = document.getElementById('overlay-show-menu');
+	const showRaceToggle = document.getElementById('overlay-show-race');
+	if (currentState.config && currentState.config[config.configKey]) {
+		const cfg = currentState.config[config.configKey];
+		if (showMenuToggle) showMenuToggle.checked = cfg.show_in_menu !== false; // Default to true
+		if (showRaceToggle) showRaceToggle.checked = cfg.show_in_race !== false; // Default to true
+	}
 	
 	// Update hotkey
 	const overlayHotkey = document.getElementById('overlay-hotkey');
@@ -181,6 +263,30 @@ function updateOverlaySettings(overlayKey) {
 		const opacity = currentState.config[config.configKey].opacity || 100;
 		overlayOpacity.value = opacity;
 		document.getElementById('opacity-value').textContent = opacity + '%';
+	}
+
+	// Flags-specific: show preview flag selector when Flags overlay selected
+	const previewFlagRow = document.getElementById('overlay-preview-flag-row');
+	if (previewFlagRow) previewFlagRow.classList.add('hidden');
+	if (overlayKey === 'flags') {
+		if (previewFlagRow) previewFlagRow.classList.remove('hidden');
+		const sel = document.getElementById('overlay-preview-flag');
+		if (sel) {
+			const cfg = currentState.config && currentState.config['OverlayFlags'];
+			if (cfg && cfg.preview_flag) sel.value = cfg.preview_flag;
+		}
+	}
+
+	// Weather-specific: show weather type selector when Weather overlay selected
+	const previewWeatherRow = document.getElementById('overlay-preview-weather-row');
+	if (previewWeatherRow) previewWeatherRow.classList.add('hidden');
+	if (overlayKey === 'weather') {
+		if (previewWeatherRow) previewWeatherRow.classList.remove('hidden');
+		const sel = document.getElementById('overlay-preview-weather-type');
+		if (sel) {
+			const cfg = currentState.config && currentState.config['OverlayWeather'];
+			if (cfg && cfg.preview_weather_type !== undefined) sel.value = cfg.preview_weather_type;
+		}
 	}
 }
 

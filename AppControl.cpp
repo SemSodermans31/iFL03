@@ -75,12 +75,21 @@ void app_set_config_int(const char* component, const char* key, int value)
 		s_onConfigChange(*s_overlays, *s_status);
 }
 
+void app_set_config_bool(const char* component, const char* key, bool value)
+{
+	if (!component || !key) return;
+	g_cfg.setBool(component, key, value);
+	g_cfg.save();
+	if (s_overlays && s_status && s_onConfigChange)
+		s_onConfigChange(*s_overlays, *s_status);
+}
+
 std::string app_get_state_json()
 {
 	// Build a tiny JSON string without extra deps
 	auto boolStr = [](bool v){ return v ? "true" : "false"; };
 	int st = s_status ? (int)(*s_status) : 0;
-	char buf[2048]; // Increased buffer size for full config
+	char buf[4096]; // Increased buffer size for full config with show_in_menu/show_in_race
 	
 	// Helper to escape string values for JSON
 	auto escapeJson = [](const std::string& str) -> std::string {
@@ -95,16 +104,17 @@ std::string app_get_state_json()
 	};
 	
 	snprintf(buf, sizeof(buf),
-		"{\"uiEdit\":%s,\"previewMode\":%s,\"connectionStatus\":\"%s\","
+		"{\"uiEdit\":%s,\"previewMode\":%s,\"connectionStatus\":\"%s\"," 
 		"\"overlays\":{"
-		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s},"
+		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s},"
 		"\"config\":{"
-		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
-		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
-		"\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
-		"\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
-		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d},"
-		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d}"
+		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_weather_type\":%d},"
+		"\"OverlayFlags\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_flag\":\"%s\"}"
 		"}}",
 		(s_uiEdit && *s_uiEdit) ? "true":"false",
 		boolStr(preview_mode_get()),
@@ -115,36 +125,58 @@ std::string app_get_state_json()
 		boolStr(g_cfg.getBool("OverlayRelative","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayCover","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayWeather","enabled",true)),
+		boolStr(g_cfg.getBool("OverlayFlags","enabled",true)),
 		// OverlayStandings config
 		boolStr(g_cfg.getBool("OverlayStandings","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayStandings","toggle_hotkey","ctrl-space")).c_str(),
 		escapeJson(g_cfg.getString("OverlayStandings","position","custom")).c_str(),
 		g_cfg.getInt("OverlayStandings","opacity",100),
+		boolStr(g_cfg.getBool("OverlayStandings","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_in_race",true)),
 		// OverlayDDU config
 		boolStr(g_cfg.getBool("OverlayDDU","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayDDU","toggle_hotkey","ctrl-1")).c_str(),
 		escapeJson(g_cfg.getString("OverlayDDU","position","custom")).c_str(),
 		g_cfg.getInt("OverlayDDU","opacity",100),
+		boolStr(g_cfg.getBool("OverlayDDU","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayDDU","show_in_race",true)),
 		// OverlayInputs config
 		boolStr(g_cfg.getBool("OverlayInputs","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayInputs","toggle_hotkey","ctrl-2")).c_str(),
 		escapeJson(g_cfg.getString("OverlayInputs","position","custom")).c_str(),
 		g_cfg.getInt("OverlayInputs","opacity",100),
+		boolStr(g_cfg.getBool("OverlayInputs","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayInputs","show_in_race",true)),
 		// OverlayRelative config
 		boolStr(g_cfg.getBool("OverlayRelative","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayRelative","toggle_hotkey","ctrl-3")).c_str(),
 		escapeJson(g_cfg.getString("OverlayRelative","position","custom")).c_str(),
 		g_cfg.getInt("OverlayRelative","opacity",100),
+		boolStr(g_cfg.getBool("OverlayRelative","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayRelative","show_in_race",true)),
 		// OverlayCover config
 		boolStr(g_cfg.getBool("OverlayCover","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayCover","toggle_hotkey","ctrl-4")).c_str(),
 		escapeJson(g_cfg.getString("OverlayCover","position","custom")).c_str(),
 		g_cfg.getInt("OverlayCover","opacity",100),
+		boolStr(g_cfg.getBool("OverlayCover","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayCover","show_in_race",true)),
 		// OverlayWeather config  
 		boolStr(g_cfg.getBool("OverlayWeather","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl-5")).c_str(),
 		escapeJson(g_cfg.getString("OverlayWeather","position","custom")).c_str(),
-		g_cfg.getInt("OverlayWeather","opacity",100)
+		g_cfg.getInt("OverlayWeather","opacity",100),
+		boolStr(g_cfg.getBool("OverlayWeather","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayWeather","show_in_race",true)),
+		g_cfg.getInt("OverlayWeather","preview_weather_type",1),
+		// OverlayFlags config
+		boolStr(g_cfg.getBool("OverlayFlags","enabled",true)),
+		escapeJson(g_cfg.getString("OverlayFlags","toggle_hotkey","ctrl-6")).c_str(),
+		escapeJson(g_cfg.getString("OverlayFlags","position","custom")).c_str(),
+		g_cfg.getInt("OverlayFlags","opacity",100),
+		boolStr(g_cfg.getBool("OverlayFlags","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayFlags","show_in_race",true)),
+		escapeJson(g_cfg.getString("OverlayFlags","preview_flag","none")).c_str()
 	);
 	return std::string(buf);
 }

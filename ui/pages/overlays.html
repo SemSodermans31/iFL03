@@ -104,6 +104,17 @@
 							<p class="text-sm text-slate-400 mt-1">Weather conditions and track information</p>
 						</div>
 					</div>
+
+					<!-- Flags Overlay -->
+					<div class="overlay-card rounded-xl border border-slate-800 bg-slate-900/60 p-4 cursor-pointer hover:bg-slate-900/80 transition-colors" data-overlay="flags">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-slate-800 rounded-lg flex items-center justify-center">
+								<span class="text-2xl">🚩</span>
+							</div>
+							<h3 class="font-semibold text-slate-200">Flags</h3>
+							<p class="text-sm text-slate-400 mt-1">Displays active iRacing session flags</p>
+						</div>
+					</div>
 				</div>
 			</div>
 
@@ -125,6 +136,30 @@
 								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
 							</span>
 						</label>
+					</div>
+
+					<!-- Show in Menu/Race Toggles -->
+					<div class="space-y-3">
+						<div class="text-sm font-medium text-slate-200 mb-2">Display Settings</div>
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Show in Menu</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="overlay-show-menu" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Show while Racing</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="overlay-show-race" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+						<div class="text-xs text-slate-400 italic">
+							Control when this overlay is visible based on your session state.
+						</div>
 					</div>
 
 					<!-- Hotkey Setting -->
@@ -151,6 +186,43 @@
 						<div class="text-xs text-slate-400 text-center">
 							<span id="opacity-value">100%</span>
 						</div>
+					</div>
+
+					<!-- Flags: Preview Flag (visible only when Flags selected) -->
+					<div id="overlay-preview-flag-row" class="space-y-2 hidden">
+						<label class="block text-sm font-medium text-slate-200">Preview Flag (Preview Mode only)</label>
+						<select id="overlay-preview-flag" class="w-full rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 text-slate-200">
+							<option value="none">None</option>
+							<option value="checkered">Checkered</option>
+							<option value="white">White</option>
+							<option value="green">Green</option>
+							<option value="yellow">Yellow</option>
+							<option value="red">Red</option>
+							<option value="blue">Blue</option>
+							<option value="debris">Debris</option>
+							<option value="crossed">Crossed</option>
+							<option value="oneLapToGreen">One Lap To Green</option>
+							<option value="tenToGo">10 Laps To Go</option>
+							<option value="fiveToGo">5 Laps To Go</option>
+							<option value="randomWaving">Random Waving</option>
+							<option value="caution">Caution</option>
+							<option value="black">Black</option>
+							<option value="disqualify">Disqualified</option>
+							<option value="furled">Furled (Cut Track)</option>
+							<option value="repair">Meatball (Required Repair)</option>
+							<option value="startReady">Start: Ready</option>
+							<option value="startSet">Start: Set</option>
+							<option value="startGo">Start: Go</option>
+						</select>
+					</div>
+
+					<!-- Weather: Preview Weather Type (visible only when Weather selected) -->
+					<div id="overlay-preview-weather-row" class="space-y-2 hidden">
+						<label class="block text-sm font-medium text-slate-200">Weather Type (Preview Mode only)</label>
+						<select id="overlay-preview-weather-type" class="w-full rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 text-slate-200">
+							<option value="0">Constant (Show Air Temp)</option>
+							<option value="1">Dynamic (Show Precipitation)</option>
+						</select>
 					</div>
 
 					<!-- Save Button -->

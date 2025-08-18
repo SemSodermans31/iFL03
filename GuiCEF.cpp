@@ -200,6 +200,39 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			if (has("\"cmd\":\"setPreviewFlag\"")) {
+				std::string value;
+				if (extractStringField(req, "value", value)) {
+					app_set_config_string("OverlayFlags", "preview_flag", value.c_str());
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"setPreviewWeatherType\"")) {
+				// Extract weather type as integer - look for "value":0 or "value":1 pattern
+				size_t valuePos = req.find("\"value\":");
+				if (valuePos != std::string::npos) {
+					size_t valueStart = valuePos + 8; // length of "value":
+					while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
+					if (valueStart < req.size() && (req[valueStart] == '0' || req[valueStart] == '1')) {
+						int weatherType = req[valueStart] - '0';
+						app_set_config_int("OverlayWeather", "preview_weather_type", weatherType);
+					}
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"setConfigBool\"")) {
+				std::string component, key;
+				bool value = false;
+				if (extractStringField(req, "component", component) && 
+					extractStringField(req, "key", key) &&
+					extractBoolField(req, "value", value)) {
+					app_set_config_bool(component.c_str(), key.c_str(), value);
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			callback->Failure(400, "unknown command");
 			return true;
 		}
