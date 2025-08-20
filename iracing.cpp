@@ -155,6 +155,8 @@ irsdkCVar ir_WindVel("WindVel");    // float[1] Wind velocity at start/finish li
 irsdkCVar ir_WindDir("WindDir");    // float[1] Wind direction at start/finish line (rad)
 irsdkCVar ir_RelativeHumidity("RelativeHumidity");    // float[1] Relative Humidity (%)
 irsdkCVar ir_FogLevel("FogLevel");    // float[1] Fog level (%)
+irsdkCVar ir_TrackWetness("TrackWetness");    // int[1] Track wetness level (0=dry, 1=slightly wet, 2=lightly wet, 3=wet, 4=very wet, 5=extremely wet)
+irsdkCVar ir_Precipitation("Precipitation");    // float[1] Precipitation intensity (0.0 to 1.0)
 irsdkCVar ir_DCLapStatus("DCLapStatus");    // int[1] Status of driver change lap requirements ()
 irsdkCVar ir_DCDriversSoFar("DCDriversSoFar");    // int[1] Number of team drivers who have run a stint ()
 irsdkCVar ir_OkToReloadTextures("OkToReloadTextures");    // bool[1] True if it is ok to reload car textures at this time ()

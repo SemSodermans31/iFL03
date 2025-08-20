@@ -30,6 +30,7 @@ SOFTWARE.
 #include <string>
 #include <memory>
 #include <wincodec.h>
+#include <cmath>
 #include "Overlay.h"
 #include "iracing.h"
 #include "Config.h"
@@ -44,7 +45,7 @@ class OverlayWeather : public Overlay
 {
     public:
 
-        const float DefaultFontSize = 24; // 16 * 1.5 = 24
+        const float DefaultFontSize = 24;
 
         OverlayWeather()
             : Overlay("OverlayWeather")
@@ -79,7 +80,6 @@ class OverlayWeather : public Overlay
 
         virtual void onEnable()
         {
-            // Initialize COM and WIC factory (COM may already be initialized; that's fine)
             (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
             HRCHECK(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory)));
             
@@ -96,18 +96,15 @@ class OverlayWeather : public Overlay
 
         virtual void onConfigChanged()
         {
-            // Calculate scaling factors based on current overlay size vs reference size
             const float2 refSize = getDefaultSize();
             
-            // Safety checks to prevent crashes
             if (m_width <= 0 || m_height <= 0 || refSize.x <= 0 || refSize.y <= 0) {
                 m_scaleFactorX = m_scaleFactorY = m_scaleFactor = 1.0f;
             } else {
                 m_scaleFactorX = (float)m_width / refSize.x;
                 m_scaleFactorY = (float)m_height / refSize.y;
-                m_scaleFactor = std::min(m_scaleFactorX, m_scaleFactorY); // Use minimum to maintain aspect ratio
+                m_scaleFactor = std::min(m_scaleFactorX, m_scaleFactorY); 
                 
-                // Clamp scale factor to reasonable bounds to prevent invalid font sizes
                 m_scaleFactor = std::max(0.1f, std::min(10.0f, m_scaleFactor));
                 m_scaleFactorX = std::max(0.1f, std::min(10.0f, m_scaleFactorX));
                 m_scaleFactorY = std::max(0.1f, std::min(10.0f, m_scaleFactorY));
@@ -148,9 +145,15 @@ class OverlayWeather : public Overlay
             }
         }
 
-        virtual void onUpdate()
-        {
-            const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+                 virtual void onUpdate()
+         {
+             // Only update weather data at specified interval to improve performance
+             const double currentTime = ir_SessionTime.getDouble();
+             if (currentTime - m_lastWeatherUpdate >= WEATHER_UPDATE_INTERVAL) {
+                 m_lastWeatherUpdate = currentTime;
+             }
+
+             const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
             const float4 textCol            = g_cfg.getFloat4( m_name, "text_col", float4(1,1,1,0.9f) );
             const float4 backgroundCol      = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
             const float4 accentCol          = float4(0.2f, 0.75f, 0.95f, 0.9f);
@@ -224,8 +227,22 @@ class OverlayWeather : public Overlay
             {
                 drawSectionBackground(m_trackWetnessBox);
                 
-                float trackWetness = useStubData ? StubDataManager::getStubTrackWetness() : getTrackWetnessValue();
-                std::string wetnessText = getTrackWetnessText(trackWetness);
+                // Normalize enum (0-7) to progress bar range (0.0-1.0) for visualization
+                float trackWetnessBar = 0.0f;
+                std::string wetnessText;
+                if (useStubData)
+                {
+                    const float stubWet = StubDataManager::getStubTrackWetness(); // 0..1
+                    trackWetnessBar = std::max(0.0f, std::min(1.0f, stubWet));
+                    const int wetEnumForText = (int)std::round(trackWetnessBar * 7.0f);
+                    wetnessText = getTrackWetnessText((float)wetEnumForText);
+                }
+                else
+                {
+                    const int wetEnum = ir_TrackWetness.getInt(); // 0..7 per IRSDK
+                    trackWetnessBar = std::max(0.0f, std::min(1.0f, (float)wetEnum / 7.0f));
+                    wetnessText = getTrackWetnessText((float)wetEnum);
+                }
 
                 // Wetness title - left aligned
                 m_brush->SetColor( finalTextCol );
@@ -262,8 +279,8 @@ class OverlayWeather : public Overlay
                     m_renderTarget->DrawRoundedRectangle( &rrBg, m_brush.Get(), outlineThickness );
                     
                     // Wetness fill
-                    if (trackWetness > 0) {
-                        D2D1_RECT_F bar = { barX, barY, barX + (barWidth * trackWetness), barY + barHeight };
+                    if (trackWetnessBar > 1) {
+                        D2D1_RECT_F bar = { barX, barY, barX + (barWidth * trackWetnessBar), barY + barHeight };
                         m_brush->SetColor( accentCol );
                         D2D1_ROUNDED_RECT rr = { bar, cornerRadius, cornerRadius };
                         m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
@@ -328,7 +345,14 @@ class OverlayWeather : public Overlay
                 drawSectionBackground(m_windBox);
                 
                 float windSpeed = useStubData ? StubDataManager::getStubWindSpeed() : ir_WindVel.getFloat();
-                float windDir = useStubData ? StubDataManager::getStubWindDirection() : ir_WindDir.getFloat();
+                // Car yaw relative to north (0 in stub)
+                const float carYaw = useStubData ? 0.0f : ir_YawNorth.getFloat();
+                // Wind direction relative to car heading so the car is static and the arrow shows flow over the car
+                float windDir = (useStubData ? StubDataManager::getStubWindDirection() : ir_WindDir.getFloat()) - carYaw;
+                // Normalize to [0, 2π] for stable trig
+                const float twoPi = (float)(2.0 * M_PI);
+                while (windDir < 0.0f) windDir += twoPi;
+                while (windDir >= twoPi) windDir -= twoPi;
 
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
@@ -339,7 +363,7 @@ class OverlayWeather : public Overlay
                 const float compassCenterX = m_windBox.x0 + m_windBox.w/2;
                 const float compassCenterY = m_windBox.y0 + m_windBox.h * 0.5f; // Center in available box space
                 const float compassRadius = std::max(22.5f, std::min(m_windBox.w, m_windBox.h) * 0.375f);
-                drawWindCompass(windDir, compassCenterX, compassCenterY, compassRadius);
+                drawWindCompass(windDir, compassCenterX, compassCenterY, compassRadius, carYaw);
 
                 // Wind speed at bottom with icon - left aligned like title
                 const float windSpeedBottomMargin = 52.5f * m_scaleFactor;
@@ -533,7 +557,7 @@ class OverlayWeather : public Overlay
         }
 
 
-        void drawWindCompass(float windDirection, float centerX, float centerY, float radius)
+        void drawWindCompass(float windDirection, float centerX, float centerY, float radius, float cardinalRotation)
         {
             const float carSize = radius * 0.7f; // Scale car size relative to compass radius
 
@@ -576,7 +600,8 @@ class OverlayWeather : public Overlay
             }
 
             for (int i = 0; i < 4; i++) {
-                float angle = (float)(i * M_PI / 2); // Fixed cardinal positions
+                // Rotate NESW by car yaw so car stays static while world directions move around it
+                float angle = (float)(i * M_PI / 2) - cardinalRotation;
                 float textX = centerX + textRadius * (float)sin(angle);
                 float textY = centerY - textRadius * (float)cos(angle);
 
@@ -604,87 +629,60 @@ class OverlayWeather : public Overlay
             const float carY = centerY - carSize * 0.5f;
             drawIcon(m_carIcon.Get(), carX, carY, carSize, carSize, true);
 
-            // Draw wind arrow pointing INWARD toward the car (fixed direction)
-            if (m_windArrowIcon.Get()) {
-                // Arrow starts fully at the edge of the compass, but ends partway toward the center (shorter arrow)
-                const float arrowStartRadius = radius;
-                const float arrowEndRadius = radius * 0.25f; // Shorter, but still starts at edge
+            const float arrowStartRadius = radius;
+            const float arrowEndRadius = radius * 0.25f; // Shorter, but still starts at edge
 
-                const float startX = centerX + arrowStartRadius * (float)sin(windDirection);
-                const float startY = centerY - arrowStartRadius * (float)cos(windDirection);
-                const float endX = centerX + arrowEndRadius * (float)sin(windDirection);
-                const float endY = centerY - arrowEndRadius * (float)cos(windDirection);
+            const float startX = centerX + arrowStartRadius * (float)sin(windDirection);
+            const float startY = centerY - arrowStartRadius * (float)cos(windDirection);
+            const float endX = centerX + arrowEndRadius * (float)sin(windDirection);
+            const float endY = centerY - arrowEndRadius * (float)cos(windDirection);
 
-                const float arrowWidth = 54.0f * m_scaleFactor;
-                const float arrowLength = (float)hypot(endX - startX, endY - startY);
+            const float arrowWidth = 54.0f * m_scaleFactor;
+            const float arrowLength = (float)hypot(endX - startX, endY - startY);
 
-                const float midX = (startX + endX) * 0.5f;
-                const float midY = (startY + endY) * 0.5f;
+            const float midX = (startX + endX) * 0.5f;
+            const float midY = (startY + endY) * 0.5f;
 
-                D2D1_MATRIX_3X2_F oldTx;
-                m_renderTarget->GetTransform(&oldTx);
-                const float angleDeg = windDirection * 180.0f / (float)M_PI + 180.0f;
-                m_renderTarget->SetTransform(oldTx * D2D1::Matrix3x2F::Rotation(angleDeg, D2D1::Point2F(midX, midY)));
+            D2D1_MATRIX_3X2_F oldTx;
+            m_renderTarget->GetTransform(&oldTx);
+            const float angleDeg = windDirection * 180.0f / (float)M_PI + 180.0f;
+            m_renderTarget->SetTransform(oldTx * D2D1::Matrix3x2F::Rotation(angleDeg, D2D1::Point2F(midX, midY)));
 
-                m_renderTarget->DrawBitmap(
-                    m_windArrowIcon.Get(),
-                    D2D1::RectF(midX - arrowWidth*0.5f, midY - arrowLength*0.5f, midX + arrowWidth*0.5f, midY + arrowLength*0.5f),
-                    0.75f // Opacity
-                );
+            m_renderTarget->DrawBitmap(
+                m_windArrowIcon.Get(),
+                D2D1::RectF(midX - arrowWidth*0.5f, midY - arrowLength*0.5f, midX + arrowWidth*0.5f, midY + arrowLength*0.5f),
+                0.75f // Opacity
+            );
 
-                m_renderTarget->SetTransform(oldTx);
-            }
-            else {
-                // Fallback to vector arrow pointing INWARD toward car
-                const float arrowStartRadius = radius * 0.85f;
-                const float arrowEndRadius = radius * 0.45f;
-
-                const float startX = centerX + arrowStartRadius * (float)sin(windDirection);
-                const float startY = centerY - arrowStartRadius * (float)cos(windDirection);
-                const float endX = centerX + arrowEndRadius * (float)sin(windDirection);
-                const float endY = centerY - arrowEndRadius * (float)cos(windDirection);
-
-                m_brush->SetColor(float4(0.2f, 0.8f, 1.0f, 0.9f));
-                const float arrowLineThickness = 6.0f * m_scaleFactor;
-                m_renderTarget->DrawLine({startX, startY}, {endX, endY}, m_brush.Get(), arrowLineThickness);
-
-                // Draw arrowhead pointing INWARD toward center
-                const float arrowHeadLength = 18 * m_scaleFactor;
-                const float arrowHeadAngle = (float)(M_PI / 6);
-
-                // Arrowhead points toward center (inward direction)
-                float headX1 = endX - arrowHeadLength * (float)sin(windDirection + arrowHeadAngle);
-                float headY1 = endY + arrowHeadLength * (float)cos(windDirection + arrowHeadAngle);
-                float headX2 = endX - arrowHeadLength * (float)sin(windDirection - arrowHeadAngle);
-                float headY2 = endY + arrowHeadLength * (float)cos(windDirection - arrowHeadAngle);
-
-                m_renderTarget->DrawLine({endX, endY}, {headX1, headY1}, m_brush.Get(), arrowLineThickness);
-                m_renderTarget->DrawLine({endX, endY}, {headX2, headY2}, m_brush.Get(), arrowLineThickness);
-            }
+            m_renderTarget->SetTransform(oldTx);
         }
 
         float getTrackWetnessValue()
         {
-            // TODO: Replace with actual iRacing track wetness telemetry when available
-            // For now, return a placeholder value
-            return 0.0f;
+            // Use iRacing's direct track wetness telemetry
+            return (float)ir_TrackWetness.getInt();
         }
 
-        std::string getTrackWetnessText(float wetness)
+        std::string getTrackWetnessText(float wetnessEnum)
         {
-            if (wetness <= 0.1f) return "Dry";
-            if (wetness <= 0.3f) return "Slightly Wet";
-            if (wetness <= 0.5f) return "Lightly Wet";
-            if (wetness <= 0.7f) return "Wet";
-            if (wetness <= 0.9f) return "Very Wet";
-            return "Extremely Wet";
+            // Map to IRSDK TrackWetness (0..7)
+            switch ((int)wetnessEnum) {
+                case 0: return "No Data Available";
+                case 1: return "Dry";
+                case 2: return "Mostly Dry";
+                case 3: return "Very Lightly Wet";
+                case 4: return "Lightly Wet";
+                case 5: return "Moderately Wet";
+                case 6: return "Very Wet";
+                case 7: return "Extremely Wet";
+                default: return "No Data Available";
+            }
         }
 
         float getPrecipitationValue()
         {
-            // TODO: Replace with actual iRacing precipitation telemetry when available
-            // For now, return a placeholder value
-            return 0.0f;
+            // Use iRacing's direct precipitation telemetry
+            return ir_Precipitation.getFloat();
         }
 
         bool shouldShowPrecipitation() const
@@ -693,8 +691,8 @@ class OverlayWeather : public Overlay
                 // In preview mode, use the preview_weather_type setting
                 return g_cfg.getInt("OverlayWeather", "preview_weather_type", 1) == 1;
             }
-            // Show precipitation if weather is dynamic (1)
-            return ir_WeatherType.getInt() == 1;
+            // Show precipitation if we detect rain intensity or meaningful wetness
+            return ir_Precipitation.getFloat() > 0.01f || ir_TrackWetness.getInt() >= 3; // >= VeryLightlyWet
         }
 
         virtual bool hasCustomBackground()
@@ -702,9 +700,13 @@ class OverlayWeather : public Overlay
             return true;
         }
 
-    protected:
+         protected:
+         // Weather data update throttling
+         static constexpr double WEATHER_UPDATE_INTERVAL = 20.0; // Update weather data every 20 seconds
+         // Weather changes are gradual in iRacing, so frequent updates aren't needed
+         double m_lastWeatherUpdate = 0.0;
 
-        // Scaling factors for dynamic sizing
+         // Scaling factors for dynamic sizing
         float m_scaleFactorX = 1.0f;
         float m_scaleFactorY = 1.0f;
         float m_scaleFactor = 1.0f;

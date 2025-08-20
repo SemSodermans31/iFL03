@@ -28,36 +28,53 @@ SOFTWARE.
 #include "Config.h"
 #include "OverlayDebug.h"
 #include "stub_data.h"
+#include <wincodec.h>
 
 class OverlayInputs : public Overlay
 {
     public:
 
-        virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
-
         OverlayInputs()
             : Overlay("OverlayInputs")
         {}
 
+        virtual void onEnable()
+        {
+            onConfigChanged();  // trigger font load
+        }
+
     protected:
+
+        virtual bool hasCustomBackground()
+        {
+            return true; // We'll draw the full background ourselves
+        }
 
         virtual float2 getDefaultSize()
         {
-            return float2(400,100);
+            return float2(600,200);
         }
 
         virtual void onConfigChanged()
         {
-            // Width might have changed, reset tracker values
-            m_throttleVtx.resize( m_width );
-            m_brakeVtx.resize( m_width );
-            m_steerVtx.resize( m_width );
-            for( int i=0; i<m_width; ++i )
+            const int horizontalWidth = (int)(m_width * 0.6f);
+            m_throttleVtx.resize( horizontalWidth );
+            m_brakeVtx.resize( horizontalWidth );
+            for( int i=0; i<horizontalWidth; ++i )
             {
                 m_throttleVtx[i].x = float(i);
                 m_brakeVtx[i].x = float(i);
-                m_steerVtx[i].x = float(i);
             }
+            
+            // Create text format for labels and values
+            const float fontSize = 14.0f;
+            HRCHECK(m_dwriteFactory->CreateTextFormat( L"Arial", NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormatBold ));
+            m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+            m_textFormatBold->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_CENTER );
+            m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+
+            // Load selected steering wheel image if any
+            loadSteeringWheelBitmap();
         }
 
         virtual void onUpdate()
@@ -65,135 +82,344 @@ class OverlayInputs : public Overlay
             const float w = (float)m_width;
             const float h = (float)m_height;
 
+            // Layout sections
+            const float horizontalWidth = w * 0.6f;  // 60% for horizontal inputs
+            const float barsWidth = w * 0.2f;        // 20% for vertical bars
+            const float wheelWidth = w * 0.2f;       // 20% for steering wheel
+            
+            const float barsStartX = horizontalWidth;
+            const float wheelStartX = horizontalWidth + barsWidth;
+
             // Make code below safe against indexing into size-1 when sizes are zero
             if( m_throttleVtx.empty() )
                 m_throttleVtx.resize( 1 );
             if( m_brakeVtx.empty() )
                 m_brakeVtx.resize( 1 );
-            if( m_steerVtx.empty() )
-                m_steerVtx.resize( 1 );
 
-            // Advance input vertices
+            // Get current input values (use stub data in preview mode)
+            const bool useStubData = StubDataManager::shouldUseStubData();
+            const float currentThrottle = useStubData ? StubDataManager::getStubThrottle() : ir_Throttle.getFloat();
+            const float currentBrake = useStubData ? StubDataManager::getStubBrake() : ir_Brake.getFloat();
+
+            // Advance input vertices for horizontal graphs
             {
-                // Use stub data in preview mode
-                const bool useStubData = StubDataManager::shouldUseStubData();
-                
-                float throttleValue, brakeValue, steerValue;
-                if (useStubData) {
-                    throttleValue = StubDataManager::getStubThrottle();
-                    brakeValue = StubDataManager::getStubBrake();
-                    steerValue = StubDataManager::getStubSteering();
-                } else {
-                    throttleValue = ir_Throttle.getFloat();
-                    brakeValue = ir_Brake.getFloat();
-                    steerValue = std::min( 1.0f, std::max( 0.0f, (ir_SteeringWheelAngle.getFloat() / ir_SteeringWheelAngleMax.getFloat()) * -0.5f + 0.5f) );
-                }
-                
                 for( int i=0; i<(int)m_throttleVtx.size()-1; ++i )
                     m_throttleVtx[i].y = m_throttleVtx[i+1].y;
-                m_throttleVtx[(int)m_throttleVtx.size()-1].y = throttleValue;
+                m_throttleVtx[(int)m_throttleVtx.size()-1].y = currentThrottle;
 
                 for( int i=0; i<(int)m_brakeVtx.size()-1; ++i )
                     m_brakeVtx[i].y = m_brakeVtx[i+1].y;
-                m_brakeVtx[(int)m_brakeVtx.size()-1].y = brakeValue;
-
-                for( int i=0; i<(int)m_steerVtx.size()-1; ++i )
-                    m_steerVtx[i].y = m_steerVtx[i+1].y;
-                m_steerVtx[(int)m_steerVtx.size()-1].y = steerValue;
+                m_brakeVtx[(int)m_brakeVtx.size()-1].y = currentBrake;
             }
 
             const float thickness = g_cfg.getFloat( m_name, "line_thickness", 2.0f );
+            
+            // Transform function for horizontal graphs
             auto vtx2coord = [&]( const float2& v )->float2 {
-                return float2( v.x+0.5f, h-0.5f*thickness - v.y*(h-thickness) );
+                float scaledX = (v.x / (float)m_throttleVtx.size()) * horizontalWidth;
+                return float2( scaledX + 0.5f, h - 0.5f*thickness - v.y*(h*0.6f-thickness) - h*0.2f );
             };
 
-            // Throttle (fill)
-            Microsoft::WRL::ComPtr<ID2D1PathGeometry1> throttleFillPath;
-            Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleFillSink;
-            m_d2dFactory->CreatePathGeometry( &throttleFillPath );
-            throttleFillPath->Open( &throttleFillSink );
-            throttleFillSink->BeginFigure( float2(0,h), D2D1_FIGURE_BEGIN_FILLED );
-            for( int i=0; i<(int)m_throttleVtx.size(); ++i )
-                throttleFillSink->AddLine( vtx2coord(m_throttleVtx[i]) );
-            throttleFillSink->AddLine( float2(m_throttleVtx[m_throttleVtx.size()-1].x+0.5f,h) );
-            throttleFillSink->EndFigure( D2D1_FIGURE_END_OPEN );
-            throttleFillSink->Close();
-
-            // Brake (fill)
-            Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeFillPath;
-            Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeFillSink;
-            m_d2dFactory->CreatePathGeometry( &brakeFillPath );
-            brakeFillPath->Open( &brakeFillSink );
-            brakeFillSink->BeginFigure( float2(0,h), D2D1_FIGURE_BEGIN_FILLED );
-            for( int i=0; i<(int)m_brakeVtx.size(); ++i )
-                brakeFillSink->AddLine( vtx2coord(m_brakeVtx[i]) );
-            brakeFillSink->AddLine( float2(m_brakeVtx[m_brakeVtx.size()-1].x+0.5f,h) );
-            brakeFillSink->EndFigure( D2D1_FIGURE_END_OPEN );
-            brakeFillSink->Close();
-
-            // Throttle (line)
-            Microsoft::WRL::ComPtr<ID2D1PathGeometry1> throttleLinePath;
-            Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleLineSink;
-            m_d2dFactory->CreatePathGeometry( &throttleLinePath );
-            throttleLinePath->Open( &throttleLineSink );
-            throttleLineSink->BeginFigure( vtx2coord(m_throttleVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
-            for( int i=1; i<(int)m_throttleVtx.size(); ++i )
-                throttleLineSink->AddLine( vtx2coord(m_throttleVtx[i]) );
-            throttleLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
-            throttleLineSink->Close();
-
-            // Brake (line)
-            Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeLinePath;
-            Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeLineSink;
-            m_d2dFactory->CreatePathGeometry( &brakeLinePath );
-            brakeLinePath->Open( &brakeLineSink );
-            brakeLineSink->BeginFigure( vtx2coord(m_brakeVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
-            for( int i=1; i<(int)m_brakeVtx.size(); ++i )
-                brakeLineSink->AddLine( vtx2coord(m_brakeVtx[i]) );
-            brakeLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
-            brakeLineSink->Close();
-
-            // Steering
-            Microsoft::WRL::ComPtr<ID2D1PathGeometry1> steeringLinePath;
-            Microsoft::WRL::ComPtr<ID2D1GeometrySink>  steeringLineSink;
-            m_d2dFactory->CreatePathGeometry( &steeringLinePath );
-            steeringLinePath->Open( &steeringLineSink );
-            steeringLineSink->BeginFigure( vtx2coord(m_steerVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
-            for( int i=1; i<(int)m_steerVtx.size(); ++i )
-                steeringLineSink->AddLine( vtx2coord(m_steerVtx[i]) );
-            steeringLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
-            steeringLineSink->Close();
-
             m_renderTarget->BeginDraw();
+            // Clear and draw custom full background with larger circular right corners
+            m_renderTarget->Clear( float4(0,0,0,0) );
+            {
+                const float cornerRadius = g_cfg.getFloat( m_name, "corner_radius", 2.0f );
+                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
+                bgColor.w *= getGlobalOpacity();
+
+                // Compute wheel radius once to align right-side rounding to the steering area (reduced by 15%)
+                const float calcWheelRadius = std::min(wheelWidth, h) * (0.45f * 0.85f);
+                const float arcRadius = h * 0.5f; // keep right corners perfectly circular
+
+                Microsoft::WRL::ComPtr<ID2D1PathGeometry> geom;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+                if (SUCCEEDED(m_d2dFactory->CreatePathGeometry(&geom)) && SUCCEEDED(geom->Open(&sink)))
+                {
+                    const float left   = 0.5f;
+                    const float top    = 0.5f;
+                    const float right  = w - 0.5f;
+                    const float bottom = h - 0.5f;
+
+                    // Start at top-left after corner radius
+                    sink->BeginFigure( float2(left + cornerRadius, top), D2D1_FIGURE_BEGIN_FILLED );
+
+                    // Top edge to before top-right corner
+                    sink->AddLine( float2(right - arcRadius, top) );
+
+                    // Top-right quarter circle
+                    {
+                        D2D1_ARC_SEGMENT arc = {};
+                        arc.point = float2(right, top + arcRadius);
+                        arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                        arc.rotationAngle = 0.0f;
+                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                        sink->AddArc(arc);
+                    }
+
+                    // Right edge to before bottom-right corner
+                    sink->AddLine( float2(right, bottom - arcRadius) );
+
+                    // Bottom-right quarter circle
+                    {
+                        D2D1_ARC_SEGMENT arc = {};
+                        arc.point = float2(right - arcRadius, bottom);
+                        arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                        arc.rotationAngle = 0.0f;
+                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                        sink->AddArc(arc);
+                    }
+
+                    // Bottom edge to before bottom-left corner
+                    sink->AddLine( float2(left + cornerRadius, bottom) );
+
+                    // Bottom-left small corner
+                    {
+                        D2D1_ARC_SEGMENT arc = {};
+                        arc.point = float2(left, bottom - cornerRadius);
+                        arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                        arc.rotationAngle = 0.0f;
+                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                        sink->AddArc(arc);
+                    }
+
+                    // Left edge to before top-left corner
+                    sink->AddLine( float2(left, top + cornerRadius) );
+
+                    // Top-left small corner back to start
+                    {
+                        D2D1_ARC_SEGMENT arc = {};
+                        arc.point = float2(left + cornerRadius, top);
+                        arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                        arc.rotationAngle = 0.0f;
+                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                        sink->AddArc(arc);
+                    }
+
+                    sink->EndFigure( D2D1_FIGURE_END_CLOSED );
+                    if (SUCCEEDED(sink->Close()))
+                    {
+                        m_brush->SetColor( bgColor );
+                        m_renderTarget->FillGeometry( geom.Get(), m_brush.Get() );
+                    }
+                }
+            }
+
+            // SECTION 1: Horizontal Throttle/Brake Graphs
+            if( !m_throttleVtx.empty() && !m_brakeVtx.empty() )
+            {
+                // Throttle (fill)
+                Microsoft::WRL::ComPtr<ID2D1PathGeometry1> throttleFillPath;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleFillSink;
+                m_d2dFactory->CreatePathGeometry( &throttleFillPath );
+                throttleFillPath->Open( &throttleFillSink );
+                throttleFillSink->BeginFigure( float2(0, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
+                for( int i=0; i<(int)m_throttleVtx.size(); ++i )
+                    throttleFillSink->AddLine( vtx2coord(m_throttleVtx[i]) );
+                throttleFillSink->AddLine( float2(horizontalWidth, h*0.8f) );
+                throttleFillSink->EndFigure( D2D1_FIGURE_END_CLOSED );
+                throttleFillSink->Close();
+
+                // Brake (fill)
+                Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeFillPath;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeFillSink;
+                m_d2dFactory->CreatePathGeometry( &brakeFillPath );
+                brakeFillPath->Open( &brakeFillSink );
+                brakeFillSink->BeginFigure( float2(0, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
+                for( int i=0; i<(int)m_brakeVtx.size(); ++i )
+                    brakeFillSink->AddLine( vtx2coord(m_brakeVtx[i]) );
+                brakeFillSink->AddLine( float2(horizontalWidth, h*0.8f) );
+                brakeFillSink->EndFigure( D2D1_FIGURE_END_CLOSED );
+                brakeFillSink->Close();
+
+                // Draw fills
+                m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_fill_col", float4(0.2f,0.45f,0.15f,0.6f) ) );
+                m_renderTarget->FillGeometry( throttleFillPath.Get(), m_brush.Get() );
+                m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_fill_col", float4(0.46f,0.01f,0.06f,0.6f) ) );
+                m_renderTarget->FillGeometry( brakeFillPath.Get(), m_brush.Get() );
+
+                // Throttle (line)
+                Microsoft::WRL::ComPtr<ID2D1PathGeometry1> throttleLinePath;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleLineSink;
+                m_d2dFactory->CreatePathGeometry( &throttleLinePath );
+                throttleLinePath->Open( &throttleLineSink );
+                throttleLineSink->BeginFigure( vtx2coord(m_throttleVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
+                for( int i=1; i<(int)m_throttleVtx.size(); ++i )
+                    throttleLineSink->AddLine( vtx2coord(m_throttleVtx[i]) );
+                throttleLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
+                throttleLineSink->Close();
+
+                // Brake (line)
+                Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeLinePath;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeLineSink;
+                m_d2dFactory->CreatePathGeometry( &brakeLinePath );
+                brakeLinePath->Open( &brakeLineSink );
+                brakeLineSink->BeginFigure( vtx2coord(m_brakeVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
+                for( int i=1; i<(int)m_brakeVtx.size(); ++i )
+                    brakeLineSink->AddLine( vtx2coord(m_brakeVtx[i]) );
+                brakeLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
+                brakeLineSink->Close();
+
+                // Draw lines
+                m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) ) );
+                m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
+                m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) ) );
+                m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
+            }
+
+            // SECTION 2: Vertical Percentage Bars
+            const float barWidth = barsWidth / 4.0f;
+            const float barHeight = h * 0.55f;
+            const float barY = h * 0.25f;
             
-            // Apply global opacity to all colors
-            const float globalOpacity = getGlobalOpacity();
+            const float clutchValue = useStubData ? StubDataManager::getStubClutch() : (1.0f - ir_Clutch.getFloat());
+            const float brakeValue = currentBrake;
+            const float throttleValue = currentThrottle;
             
-            float4 throttleFillCol = g_cfg.getFloat4( m_name, "throttle_fill_col", float4(0.2f,0.45f,0.15f,0.6f) );
-            throttleFillCol.w *= globalOpacity;
-            m_brush->SetColor( throttleFillCol );
-            m_renderTarget->FillGeometry( throttleFillPath.Get(), m_brush.Get() );
+            // Draw vertical bars
+            struct BarInfo {
+                float value;
+                float4 color;
+                float x;
+            };
             
-            float4 brakeFillCol = g_cfg.getFloat4( m_name, "brake_fill_col", float4(0.46f,0.01f,0.06f,0.6f) );
-            brakeFillCol.w *= globalOpacity;
-            m_brush->SetColor( brakeFillCol );
-            m_renderTarget->FillGeometry( brakeFillPath.Get(), m_brush.Get() );
+            BarInfo bars[] = {
+                { clutchValue, float4(0.0f, 0.5f, 1.0f, 0.8f), barsStartX + barWidth * 0.5f },
+                { brakeValue, float4(0.93f, 0.03f, 0.13f, 0.8f), barsStartX + barWidth * 1.5f },
+                { throttleValue, float4(0.38f, 0.91f, 0.31f, 0.8f), barsStartX + barWidth * 2.5f }
+            };
             
-            float4 throttleCol = g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) );
-            throttleCol.w *= globalOpacity;
-            m_brush->SetColor( throttleCol );
-            m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
+            for( int i = 0; i < 3; ++i )
+            {
+                const BarInfo& bar = bars[i];
+                
+                // Draw bar background
+                m_brush->SetColor( float4(0.2f, 0.2f, 0.2f, 0.8f) );
+                D2D1_RECT_F bgRect = { bar.x - barWidth*0.3f, barY, bar.x + barWidth*0.3f, barY + barHeight };
+                m_renderTarget->FillRectangle( bgRect, m_brush.Get() );
+                
+                // Draw bar fill
+                m_brush->SetColor( bar.color );
+                float fillHeight = barHeight * bar.value;
+                D2D1_RECT_F fillRect = { bar.x - barWidth*0.3f, barY + barHeight - fillHeight, bar.x + barWidth*0.3f, barY + barHeight };
+                m_renderTarget->FillRectangle( fillRect, m_brush.Get() );
+                
+                // Draw percentage text
+                wchar_t percentText[16];
+                swprintf_s( percentText, L"%d", (int)(bar.value * 100) );
+                m_brush->SetColor( float4(1.0f, 1.0f, 1.0f, 1.0f) );
+                D2D1_RECT_F percentRect = { bar.x - barWidth*0.5f, barY - 20, bar.x + barWidth*0.5f, barY };
+                m_renderTarget->DrawTextA( percentText, (UINT)wcslen(percentText), m_textFormatBold.Get(), &percentRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+            }
+
+            // SECTION 3: Steering Wheel with Speed/Gear or Image
+            const float wheelCenterX = wheelStartX + wheelWidth * 0.5f;
+            const float wheelCenterY = h * 0.5f;
+            const float wheelRadius = std::min(wheelWidth, h) * (0.45f * 0.85f); // Matches calcWheelRadius above
+            const float innerRadius = wheelRadius * 0.8f;
             
-            float4 brakeCol = g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) );
-            brakeCol.w *= globalOpacity;
-            m_brush->SetColor( brakeCol );
-            m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
+            // Check selected wheel mode
+            const std::string wheelMode = g_cfg.getString(m_name, "steering_wheel", "builtin");
+            const bool useImageWheel = (wheelMode != "builtin");
             
-            float4 steeringCol = g_cfg.getFloat4( m_name, "steering_col", float4(1,1,1,0.3f) );
-            steeringCol.w *= globalOpacity;
-            m_brush->SetColor( steeringCol );
-            m_renderTarget->DrawGeometry( steeringLinePath.Get(), m_brush.Get(), thickness );
+            // Draw a single thick circular ring (inner circle outward) for builtin mode only
             
+            // Draw steering indicator (rotating column)
+            const float steeringAngle = useStubData ? 
+                (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
+                ir_SteeringWheelAngle.getFloat();
+            
+            // Center column (vertical)
+            const float columnWidth = wheelRadius * 0.15f;
+            const float columnHeight = (wheelRadius - innerRadius) * 0.95f;
+            
+            // Colors
+            const float4 ringColor      = g_cfg.getFloat4( m_name, "steering_ring_col",   float4(0.3f, 0.3f, 0.3f, 1.0f) );
+            const float4 columnColor    = g_cfg.getFloat4( m_name, "steering_column_col", float4(0.93f, 0.03f, 0.13f, 1.0f) );
+            const float4 telemetryColor = g_cfg.getFloat4( m_name, "steering_text_col",   float4(1.0f, 1.0f, 1.0f, 1.0f) );
+
+            // Ring stroke so that inner edge aligns with innerRadius and outer edge with wheelRadius
+            if (!useImageWheel) {
+                const float ringStroke = std::max(1.0f, wheelRadius - innerRadius);
+                const float ringRadius = innerRadius + ringStroke * 0.5f;
+                m_brush->SetColor( ringColor );
+                D2D1_ELLIPSE ring = { {wheelCenterX, wheelCenterY}, ringRadius, ringRadius };
+                m_renderTarget->DrawEllipse( ring, m_brush.Get(), ringStroke );
+            }
+            D2D1_RECT_F columnRect = { 
+                wheelCenterX - columnWidth*0.7f,
+                wheelCenterY - wheelRadius,
+                wheelCenterX + columnWidth*0.7f,
+                wheelCenterY - wheelRadius + columnHeight
+            };
+            
+            // Create rotation matrix around wheel center (negate angle to fix inversion)
+            D2D1::Matrix3x2F rotation = D2D1::Matrix3x2F::Rotation(
+                -steeringAngle * (180.0f / 3.14159f),
+                D2D1::Point2F(wheelCenterX, wheelCenterY)
+            );
+            
+            // Apply rotation transform and draw the column or wheel image
+            D2D1_MATRIX_3X2_F previousTransform;
+            m_renderTarget->GetTransform(&previousTransform);
+            m_renderTarget->SetTransform(rotation);
+            if (useImageWheel && m_wheelBitmap) {
+                D2D1_SIZE_F bmpSize = m_wheelBitmap->GetSize();
+                float scale = 1.0f;
+                if (bmpSize.width > 0 && bmpSize.height > 0) {
+                    const float maxDim = wheelRadius * 2.0f;
+                    const float sx = maxDim / bmpSize.width;
+                    const float sy = maxDim / bmpSize.height;
+                    scale = std::min(sx, sy);
+                }
+                const float drawW = bmpSize.width * scale;
+                const float drawH = bmpSize.height * scale;
+                const float left = wheelCenterX - drawW * 0.5f;
+                const float top  = wheelCenterY - drawH * 0.5f;
+                D2D1_RECT_F dest = { left, top, left + drawW, top + drawH };
+                m_renderTarget->DrawBitmap(m_wheelBitmap.Get(), dest);
+            } else {
+                m_brush->SetColor( columnColor );
+                m_renderTarget->FillRectangle( columnRect, m_brush.Get() );
+            }
+            m_renderTarget->SetTransform(previousTransform);
+            
+            // Draw speed and gear inside wheel
+            const float speed = useStubData ? 
+                StubDataManager::getStubSpeed() :
+                ir_Speed.getFloat() * 3.6f;
+            const int gear = useStubData ? 
+                StubDataManager::getStubGear() : 
+                ir_Gear.getInt();
+            
+            // Speed text
+            wchar_t speedText[16];
+            swprintf_s( speedText, L"%.0f", speed );
+            D2D1_RECT_F speedRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 15, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 5 };
+            if (!useImageWheel) {
+                m_brush->SetColor( telemetryColor );
+                m_renderTarget->DrawTextA( speedText, (UINT)wcslen(speedText), m_textFormatBold.Get(), &speedRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+            }
+            
+            // Gear text
+            wchar_t gearText[8];
+            if( gear == -1 )
+                wcscpy_s( gearText, L"R" );
+            else if( gear == 0 )
+                wcscpy_s( gearText, L"N" );
+            else
+                swprintf_s( gearText, L"%d", gear );
+                
+            D2D1_RECT_F gearRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 5, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 25 };
+            if (!useImageWheel) {
+                m_brush->SetColor( telemetryColor );
+                m_renderTarget->DrawTextA( gearText, (UINT)wcslen(gearText), m_textFormatBold.Get(), &gearRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+            }
+
             m_renderTarget->EndDraw();
         }
 
@@ -201,5 +427,51 @@ class OverlayInputs : public Overlay
 
         std::vector<float2> m_throttleVtx;
         std::vector<float2> m_brakeVtx;
-        std::vector<float2> m_steerVtx;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatBold;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_wheelBitmap;
+
+        void loadSteeringWheelBitmap()
+        {
+            m_wheelBitmap.Reset();
+            const std::string mode = g_cfg.getString(m_name, "steering_wheel", "builtin");
+            if (mode == "builtin") return;
+            std::string fileName;
+            if (mode == "moza_ks") fileName = "assets/wheels/moza_ks.png";
+            if (mode == "moza_rs_v2") fileName = "assets/wheels/moza_rs_v2.png";
+            if (fileName.empty()) return;
+
+            auto fileExistsW = [](const std::wstring& path) -> bool {
+                DWORD a = GetFileAttributesW(path.c_str());
+                return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) == 0;
+            };
+            auto getExecutableDirW = []() -> std::wstring {
+                wchar_t path[MAX_PATH] = {0};
+                GetModuleFileNameW(NULL, path, MAX_PATH);
+                wchar_t* last = wcsrchr(path, L'\\');
+                if (last) *last = 0;
+                return std::wstring(path);
+            };
+            auto resolveAssetPath = [&](const std::wstring& relative) -> std::wstring {
+                const std::wstring exeDir = getExecutableDirW();
+                std::wstring repo = exeDir + L"\\..\\..\\" + relative;
+                if (fileExistsW(repo)) return repo;
+                std::wstring local = exeDir + L"\\" + relative;
+                if (fileExistsW(local)) return local;
+                return relative;
+            };
+
+            if (!m_renderTarget.Get()) return;
+
+            std::wstring pathW = resolveAssetPath(toWide(fileName));
+            Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
+            if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic)))) return;
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+            if (FAILED(wic->CreateDecoderFromFilename(pathW.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder))) return;
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            if (FAILED(decoder->GetFrame(0, &frame))) return;
+            Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+            if (FAILED(wic->CreateFormatConverter(&converter))) return;
+            if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return;
+            m_renderTarget->CreateBitmapFromWicBitmap(converter.Get(), nullptr, &m_wheelBitmap);
+        }
 };

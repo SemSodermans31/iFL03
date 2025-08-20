@@ -17,7 +17,7 @@ const overlayConfig = {
 	'inputs': {
 		name: 'Inputs',
 		configKey: 'OverlayInputs',
-		description: 'Controller inputs'
+		description: 'Driving inputs'
 	},
 	'relative': {
 		name: 'Relative',
@@ -38,6 +38,11 @@ const overlayConfig = {
 		name: 'Flags',
 		configKey: 'OverlayFlags',
 		description: 'Displays active iRacing session flags'
+	},
+	'delta': {
+		name: 'Delta',
+		configKey: 'OverlayDelta',
+		description: 'Lap time delta comparison to best lap'
 	}
 };
 
@@ -198,6 +203,35 @@ function setupEventListeners() {
 			}
 		});
 	}
+
+	// Delta reference mode change
+	const deltaReferenceModeSel = document.getElementById('overlay-delta-reference-mode');
+	if (deltaReferenceModeSel) {
+		deltaReferenceModeSel.addEventListener('change', function() {
+			// Send to backend only for OverlayDelta
+			if (selectedOverlay === 'delta') {
+				sendCommand('setConfigInt', {
+					component: 'OverlayDelta',
+					key: 'reference_mode',
+					value: parseInt(this.value)
+				});
+			}
+		});
+	}
+
+	// Inputs steering wheel change
+	const inputsSteeringSel = document.getElementById('overlay-inputs-steering');
+	if (inputsSteeringSel) {
+		inputsSteeringSel.addEventListener('change', function() {
+			if (selectedOverlay === 'inputs') {
+				sendCommand('setConfigString', {
+					component: 'OverlayInputs',
+					key: 'steering_wheel',
+					value: this.value
+				});
+			}
+		});
+	}
 }
 
 function selectOverlay(overlayKey) {
@@ -277,6 +311,18 @@ function updateOverlaySettings(overlayKey) {
 		}
 	}
 
+	// Inputs-specific: show steering wheel selector when Inputs overlay selected
+	const inputsSteeringRow = document.getElementById('overlay-inputs-steering-row');
+	if (inputsSteeringRow) inputsSteeringRow.classList.add('hidden');
+	if (overlayKey === 'inputs') {
+		if (inputsSteeringRow) inputsSteeringRow.classList.remove('hidden');
+		const sel = document.getElementById('overlay-inputs-steering');
+		if (sel) {
+			const cfg = currentState.config && currentState.config['OverlayInputs'];
+			sel.value = (cfg && cfg.steering_wheel) ? cfg.steering_wheel : 'builtin';
+		}
+	}
+
 	// Weather-specific: show weather type selector when Weather overlay selected
 	const previewWeatherRow = document.getElementById('overlay-preview-weather-row');
 	if (previewWeatherRow) previewWeatherRow.classList.add('hidden');
@@ -286,6 +332,19 @@ function updateOverlaySettings(overlayKey) {
 		if (sel) {
 			const cfg = currentState.config && currentState.config['OverlayWeather'];
 			if (cfg && cfg.preview_weather_type !== undefined) sel.value = cfg.preview_weather_type;
+		}
+	}
+
+	// Delta-specific: show reference mode selector when Delta overlay selected
+	const deltaReferenceRow = document.getElementById('overlay-delta-reference-row');
+	if (deltaReferenceRow) deltaReferenceRow.classList.add('hidden');
+	if (overlayKey === 'delta') {
+		if (deltaReferenceRow) deltaReferenceRow.classList.remove('hidden');
+		const sel = document.getElementById('overlay-delta-reference-mode');
+		if (sel) {
+			const cfg = currentState.config && currentState.config['OverlayDelta'];
+			if (cfg && cfg.reference_mode !== undefined) sel.value = cfg.reference_mode;
+			else sel.value = '1'; // Default to SESSION_BEST
 		}
 	}
 }

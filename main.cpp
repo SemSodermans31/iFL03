@@ -44,6 +44,7 @@ SOFTWARE.
 #include "OverlayDDU.h"
 #include "OverlayWeather.h"
 #include "OverlayFlags.h"
+#include "OverlayDelta.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
 #include "preview_mode.h"
@@ -57,7 +58,8 @@ enum class Hotkey
     Relative,
     Cover,
     Weather,
-    Flags
+    Flags,
+    Delta
 };
 
 static void registerHotkeys()
@@ -69,32 +71,37 @@ static void registerHotkeys()
     UnregisterHotKey( NULL, (int)Hotkey::Relative );
     UnregisterHotKey( NULL, (int)Hotkey::Cover );
     UnregisterHotKey( NULL, (int)Hotkey::Weather );
+    UnregisterHotKey( NULL, (int)Hotkey::Flags );
+    UnregisterHotKey( NULL, (int)Hotkey::Delta );
 
     UINT vk, mod;
 
     if( parseHotkey( g_cfg.getString("General","ui_edit_hotkey","alt-j"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::UiEdit, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayStandings","toggle_hotkey","ctrl-space"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayStandings","toggle_hotkey","ctrl+1"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Standings, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayDDU","toggle_hotkey","ctrl-1"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayDDU","toggle_hotkey","ctrl+2"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::DDU, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayInputs","toggle_hotkey","ctrl-2"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayInputs","toggle_hotkey","ctrl+3"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Inputs, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayRelative","toggle_hotkey","ctrl-3"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayRelative","toggle_hotkey","ctrl+4"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Relative, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayCover","toggle_hotkey","ctrl-4"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayCover","toggle_hotkey","ctrl+5"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Cover, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl-5"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl+6"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Weather, mod, vk );
     
-    if( parseHotkey( g_cfg.getString("OverlayFlags","toggle_hotkey","ctrl-6"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayFlags","toggle_hotkey","ctrl+7"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Flags, mod, vk );
+
+    if( parseHotkey( g_cfg.getString("OverlayDelta","toggle_hotkey","ctrl+8"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Delta, mod, vk );
 }
 
 static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus status )
@@ -185,6 +192,7 @@ int main()
     printf("    Toggle cover overlay:         %s\n", g_cfg.getString("OverlayCover","toggle_hotkey","").c_str() );
     printf("    Toggle weather overlay:       %s\n", g_cfg.getString("OverlayWeather","toggle_hotkey","").c_str() );
     printf("    Toggle flags overlay:         %s\n", g_cfg.getString("OverlayFlags","toggle_hotkey","").c_str() );
+    printf("    Toggle delta overlay:         %s\n", g_cfg.getString("OverlayDelta","toggle_hotkey","").c_str() );
     printf("\niRon will generate a file called \'config.json\' in its current directory. This file\n"\
            "stores your settings. You can edit the file at any time, even while iRon is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
@@ -202,6 +210,7 @@ int main()
     overlays.push_back( new OverlayDDU() );
     overlays.push_back( new OverlayWeather() );
     overlays.push_back( new OverlayFlags() );
+    overlays.push_back( new OverlayDelta() );
 #ifdef _DEBUG
     overlays.push_back( new OverlayDebug() );
 #endif
@@ -331,6 +340,9 @@ int main()
                         break;
                     case (int)Hotkey::Flags:
                         g_cfg.setBool( "OverlayFlags", "enabled", !g_cfg.getBool("OverlayFlags","enabled",true) );
+                        break;
+                    case (int)Hotkey::Delta:
+                        g_cfg.setBool( "OverlayDelta", "enabled", !g_cfg.getBool("OverlayDelta","enabled",true) );
                         break;
                     }
                     

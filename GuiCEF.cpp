@@ -233,6 +233,36 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			if (has("\"cmd\":\"setConfigString\"")) {
+				std::string component, key, value;
+				if (extractStringField(req, "component", component) &&
+					extractStringField(req, "key", key) &&
+					extractStringField(req, "value", value)) {
+					app_set_config_string(component.c_str(), key.c_str(), value.c_str());
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"setConfigInt\"")) {
+				std::string component, key;
+				if (extractStringField(req, "component", component) && 
+					extractStringField(req, "key", key)) {
+					// Extract integer value - look for "value":123 pattern
+					size_t valuePos = req.find("\"value\":");
+					if (valuePos != std::string::npos) {
+						size_t valueStart = valuePos + 8; // length of "value":
+						while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
+						size_t valueEnd = valueStart;
+						while (valueEnd < req.size() && (req[valueEnd] == '-' || std::isdigit((unsigned char)req[valueEnd]))) valueEnd++;
+						if (valueEnd > valueStart) {
+							int ivalue = std::stoi(req.substr(valueStart, valueEnd - valueStart));
+							app_set_config_int(component.c_str(), key.c_str(), ivalue);
+						}
+					}
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			callback->Failure(400, "unknown command");
 			return true;
 		}

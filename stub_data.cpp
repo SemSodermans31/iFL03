@@ -136,12 +136,62 @@ float StubDataManager::getStubBrake()
     return std::max(0.0f, std::min(1.0f, brake));
 }
 
+float StubDataManager::getStubClutch()
+{
+    updateAnimation();
+    // Clutch engages/disengages during gear changes
+    int gear = getStubGear();
+    static int lastGear = gear;
+    static float clutchAnimation = 0.0f;
+    
+    // Detect gear change
+    if (gear != lastGear)
+    {
+        clutchAnimation = 1.0f; // Full clutch depression during shift
+        lastGear = gear;
+    }
+    
+    // Gradually release clutch after gear change
+    clutchAnimation = std::max(0.0f, clutchAnimation - 0.05f);
+    
+    // Add some minor clutch slip for realism
+    float clutchSlip = 0.1f * std::sin(s_animationTime * 3.0f);
+    return std::max(0.0f, std::min(1.0f, clutchAnimation + clutchSlip));
+}
+
 float StubDataManager::getStubSteering()
 {
     updateAnimation();
     // Steering with cornering patterns  
     float steer = 0.5f + 0.25f * std::sin(s_animationTime * 0.5f) + 0.1f * std::sin(s_animationTime * 1.2f);
     return std::max(0.1f, std::min(0.9f, steer));
+}
+
+float StubDataManager::getStubDeltaToSessionBest()
+{
+    updateAnimation();
+    // Create realistic delta that oscillates between gaining and losing time
+    // Simulate realistic delta timing: -2 to +3 seconds range
+    float baseDelta = std::sin(s_animationTime * 0.3f) * 1.5f - 0.2f; // Oscillates between -1.7 and +1.3
+    
+    // Add some randomness and track progression simulation
+    float trackProgress = std::fmod(s_animationTime * 0.1f, 1.0f); // 0 to 1 over ~60 seconds
+    float sectorVariation = std::sin(trackProgress * 6.28318f * 3.0f) * 0.5f; // 3 sectors per lap
+    
+    return baseDelta + sectorVariation;
+}
+
+float StubDataManager::getStubSessionBestLapTime()
+{
+    // Return a realistic lap time (2 minutes 18.462 seconds)
+    return 138.462f;
+}
+
+bool StubDataManager::getStubDeltaValid()
+{
+    updateAnimation();
+    // Delta becomes valid after a few seconds of "driving"
+    return s_animationTime > 5.0f;
 }
 
 // Relative-specific stub data
@@ -217,5 +267,5 @@ float StubDataManager::getStubWindDirection()
 {
     updateAnimation();
     // Wind direction in radians, slowly rotating
-    return fmod(s_animationTime * 0.1f, 2.0f * M_PI);
+    return static_cast<float>(fmod(s_animationTime * 0.1f, 2.0f * M_PI));
 }

@@ -50,7 +50,13 @@ public:
     // Inputs-specific stub data
     static float getStubThrottle();
     static float getStubBrake();
+    static float getStubClutch();
     static float getStubSteering();
+
+    // Delta timing-specific stub data
+    static float getStubDeltaToSessionBest();
+    static float getStubSessionBestLapTime();
+    static bool getStubDeltaValid();
     
     // Relative-specific stub data
     struct RelativeInfo

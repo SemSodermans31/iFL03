@@ -224,6 +224,8 @@ extern irsdkCVar ir_WindVel;    // float[1] Wind velocity at start/finish line (
 extern irsdkCVar ir_WindDir;    // float[1] Wind direction at start/finish line (rad)
 extern irsdkCVar ir_RelativeHumidity;    // float[1] Relative Humidity (%)
 extern irsdkCVar ir_FogLevel;    // float[1] Fog level (%)
+extern irsdkCVar ir_TrackWetness;    // int[1] Track wetness level (0=dry, 1=slightly wet, 2=lightly wet, 3=wet, 4=very wet, 5=extremely wet)
+extern irsdkCVar ir_Precipitation;    // float[1] Precipitation intensity (0.0 to 1.0)
 extern irsdkCVar ir_DCLapStatus;    // int[1] Status of driver change lap requirements ()
 extern irsdkCVar ir_DCDriversSoFar;    // int[1] Number of team drivers who have run a stint ()
 extern irsdkCVar ir_OkToReloadTextures;    // bool[1] True if it is ok to reload car textures at this time ()

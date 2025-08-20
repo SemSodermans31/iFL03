@@ -178,56 +178,91 @@ private:
 			if (sel == "checkered")   return set("SESSION IS OVER","Checkered Flag", col(1,1,1));
 			if (sel == "white")       return set("ONE MORE LAP","White Flag", col(1,1,1));
 			if (sel == "green")       return set("RESUME RACING","Green Flag", col(0.1f,0.9f,0.1f));
-			if (sel == "yellow")      return set("ACCIDENT AHEAD","Yellow Flag", col(1,1,0));
+			if (sel == "yellow")      return set("CAUTION","Yellow Flag", col(1,1,0));
+			if (sel == "yellowWaving") return set("ACCIDENT AHEAD","Yellow Waving", col(1,1,0));
 			if (sel == "red")         return set("SESSION IS SUSPENDED","Red Flag", col(1,0,0));
 			if (sel == "blue")        return set("LET OTHERS BY","Blue Flag", col(0.1f,0.4f,1.0f));
 			if (sel == "debris")      return set("DEBRIS ON TRACK","Debris Flag", col(1.0f,0.5f,0.0f));
 			if (sel == "crossed")     return set("CROSSED","Crossed Flag", col(0.7f,0.7f,0.7f));
 			if (sel == "oneLapToGreen") return set("ONE LAP TO GREEN","Session Flag", col(1,1,1));
+			if (sel == "greenHeld")   return set("GREEN HELD","Green Held", col(0.1f,0.9f,0.1f));
 			if (sel == "tenToGo")     return set("10 LAPS TO GO","Session Flag", col(1,1,1));
 			if (sel == "fiveToGo")    return set("5 LAPS TO GO","Session Flag", col(1,1,1));
 			if (sel == "randomWaving") return set("RANDOM WAVING","Waving Flag", col(1,1,1));
 			if (sel == "caution")     return set("CAUTION","Caution Flag", col(1,1,0));
+			if (sel == "cautionWaving") return set("CAUTION","Caution Waving", col(1,1,0));
 			if (sel == "black")       return set("PENALTY","Black Flag", col(0,0,0));
-			if (sel == "disqualify")  return set("YOU GOT DISQUALIFIED","Disqualified Flag", col(0,0,0));
-			if (sel == "furled")      return set("YOU CUT THE TRACK","Furled Flag", col(1.0f,0.6f,0.0f));
+			if (sel == "disqualify")  return set("DISQUALIFIED","Disqualified", col(0,0,0));
+			if (sel == "furled")      return set("CUTTING TRACK","Furled Flag", col(1.0f,0.6f,0.0f));
 			if (sel == "repair")      return set("REQUIRED REPAIR","Meatball Flag", col(1.0f,0.4f,0.0f));
-			if (sel == "startReady")  return set("GET READY","Start Ready Flag", col(1,0,0));
-			if (sel == "startSet")    return set("SET","Set Flag", col(1.0f,0.9f,0.0f));
-			if (sel == "startGo")     return set("GO!","GO Flag", col(0.1f,0.9f,0.1f));
+			if (sel == "startReady")  return set("GET READY","Start Ready", col(1,0,0));
+			if (sel == "startSet")    return set("SET","Start Set", col(1.0f,0.9f,0.0f));
+			if (sel == "startGo")     return set("GO!","Start Go", col(0.1f,0.9f,0.1f));
 			out.active = false; return out;
 		}
 
 		const int flags = ir_SessionFlags.getInt();
-
+		const int sessionState = ir_SessionState.getInt();
+		
 		// Helper lambda to set and return
 		auto set = [&](const char* top, const char* bottom, const float4& c)->FlagInfo{
 			FlagInfo f; f.active=true; f.topText=top; f.bottomText=bottom; f.color=c; return f;
 		};
+		
+		// Helper to check if we're in a race session (not practice/qualify)
+		auto isRaceSession = [&]() -> bool {
+			return ir_session.sessionType == SessionType::RACE;
+		};
+		
+		// Helper to check if we're in a starting sequence
+		auto isStartingSequence = [&]() -> bool {
+			return sessionState == irsdk_StateWarmup || 
+			       sessionState == irsdk_StateParadeLaps ||
+			       sessionState == irsdk_StateGetInCar;
+		};
 
-		// Priority order (most critical first)
-		if( flags & irsdk_disqualify ) return set("YOU GOT DISQUALIFIED","Disqualified Flag", col(0,0,0));
+		// Priority order following iRacing SDK categories:
+		// 1. Driver Black Flags (highest priority - individual penalties)
+		if( flags & irsdk_disqualify ) return set("DISQUALIFIED","You are disqualified", col(0,0,0));
 		if( flags & irsdk_black )      return set("PENALTY","Black Flag", col(0,0,0));
 		if( flags & irsdk_repair )     return set("REQUIRED REPAIR","Meatball Flag", col(1.0f,0.4f,0.0f));
-		if( flags & irsdk_red )        return set("SESSION IS SUSPENDED","Red Flag", col(1,0,0));
-		if( flags & irsdk_yellowWaving ) return set("ACCIDENT AHEAD","Yellow Flag", col(1,1,0));
-		if( flags & irsdk_cautionWaving ) return set("CAUTION","Caution Flag", col(1,1,0));
+		if( flags & irsdk_furled )     return set("CUTTING TRACK","Furled Flag", col(1.0f,0.6f,0.0f));
+		
+		// 2. Critical Session Flags (session-stopping conditions)
+		if( flags & irsdk_red )        return set("SESSION SUSPENDED","Red Flag", col(1,0,0));
+		
+		// 3. Active Racing Condition Flags (immediate track conditions)
+		if( flags & irsdk_yellowWaving ) return set("ACCIDENT AHEAD","Yellow Waving", col(1,1,0));
+		if( flags & irsdk_cautionWaving ) return set("CAUTION","Caution Waving", col(1,1,0));
+		if( flags & irsdk_yellow )      return set("CAUTION","Yellow Flag", col(1,1,0));
 		if( flags & irsdk_caution )    return set("CAUTION","Caution Flag", col(1,1,0));
-		if( flags & irsdk_checkered )  return set("SESSION IS OVER","Checkered Flag", col(1,1,1));
-		if( flags & irsdk_green )      return set("RESUME RACING","Green Flag", col(0.1f,0.9f,0.1f));
-		if( flags & irsdk_greenHeld )  return set("RESUME RACING","Green Flag", col(0.1f,0.9f,0.1f));
-		if( flags & irsdk_white )      return set("ONE MORE LAP","White Flag", col(1,1,1));
-		if( flags & irsdk_oneLapToGreen ) return set("ONE LAP TO GREEN","Session Flag", col(1,1,1));
-		if( flags & irsdk_tenToGo )    return set("10 LAPS TO GO","Session Flag", col(1,1,1));
-		if( flags & irsdk_fiveToGo )   return set("5 LAPS TO GO","Session Flag", col(1,1,1));
-		if( flags & irsdk_randomWaving ) return set("RANDOM WAVING","Waving Flag", col(1,1,1));
-		if( flags & irsdk_crossed )    return set("CROSSED","Crossed Flag", col(0.7f,0.7f,0.7f));
 		if( flags & irsdk_debris )     return set("DEBRIS ON TRACK","Debris Flag", col(1.0f,0.5f,0.0f));
 		if( flags & irsdk_blue )       return set("LET OTHERS BY","Blue Flag", col(0.1f,0.4f,1.0f));
-		if( flags & irsdk_furled )     return set("YOU CUT THE TRACK","Furled Flag", col(1.0f,0.6f,0.0f));
-		if( flags & irsdk_startGo )    return set("GO!","GO Flag", col(0.1f,0.9f,0.1f));
-		if( flags & irsdk_startSet )   return set("SET","Set Flag", col(1.0f,0.9f,0.0f));
-		if( flags & irsdk_startReady ) return set("GET READY","Start Ready Flag", col(1,0,0));
+		
+		// 4. Session Status Flags (race progress indicators)
+		if( flags & irsdk_checkered )  return set("SESSION FINISHED","Checkered Flag", col(1,1,1));
+		if( flags & irsdk_white )      return set("FINAL LAP","White Flag", col(1,1,1));
+		if( flags & irsdk_green )      return set("RACING","Green Flag", col(0.1f,0.9f,0.1f));
+		if( flags & irsdk_greenHeld )  return set("GREEN HELD","Green Flag Held", col(0.1f,0.9f,0.1f));
+		
+		// 5. Start Light Sequence (during race start only)
+		if( isStartingSequence() ) {
+			if( flags & irsdk_startGo )    return set("GO!","Start Go", col(0.1f,0.9f,0.1f));
+			if( flags & irsdk_startSet )   return set("SET","Start Set", col(1.0f,0.9f,0.0f));
+			if( flags & irsdk_startReady ) return set("GET READY","Start Ready", col(1,0,0));
+		}
+		
+		// 6. Session Information Flags (context-sensitive)
+		if( isRaceSession() ) {
+			// Race-specific flags
+			if( flags & irsdk_oneLapToGreen ) return set("ONE LAP TO GREEN","Session Info", col(1,1,1));
+			if( flags & irsdk_tenToGo )    return set("10 LAPS TO GO","Session Info", col(1,1,1));
+			if( flags & irsdk_fiveToGo )   return set("5 LAPS TO GO","Session Info", col(1,1,1));
+		}
+		
+		// General flags (all session types)
+		if( flags & irsdk_randomWaving ) return set("RANDOM WAVING","Random Waving", col(1,1,1));
+		if( flags & irsdk_crossed )    return set("CROSSED","Crossed Flag", col(0.7f,0.7f,0.7f));
 
 		// No flag condition
 		out.active = false;

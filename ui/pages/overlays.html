@@ -68,7 +68,7 @@
 								<span class="text-2xl">🎮</span>
 							</div>
 							<h3 class="font-semibold text-slate-200">Inputs</h3>
-							<p class="text-sm text-slate-400 mt-1">Controller inputs</p>
+							<p class="text-sm text-slate-400 mt-1">Driving inputs</p>
 						</div>
 					</div>
 
@@ -113,6 +113,17 @@
 							</div>
 							<h3 class="font-semibold text-slate-200">Flags</h3>
 							<p class="text-sm text-slate-400 mt-1">Displays active iRacing session flags</p>
+						</div>
+					</div>
+
+					<!-- Delta Overlay -->
+					<div class="overlay-card rounded-xl border border-slate-800 bg-slate-900/60 p-4 cursor-pointer hover:bg-slate-900/80 transition-colors" data-overlay="delta">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-slate-800 rounded-lg flex items-center justify-center">
+								<span class="text-2xl">⏱️</span>
+							</div>
+							<h3 class="font-semibold text-slate-200">Delta</h3>
+							<p class="text-sm text-slate-400 mt-1">Lap time delta comparison to best lap</p>
 						</div>
 					</div>
 				</div>
@@ -223,6 +234,34 @@
 							<option value="0">Constant (Show Air Temp)</option>
 							<option value="1">Dynamic (Show Precipitation)</option>
 						</select>
+					</div>
+
+					<!-- Inputs: Steering Wheel Selection (visible only when Inputs selected) -->
+					<div id="overlay-inputs-steering-row" class="space-y-2 hidden">
+						<label class="block text-sm font-medium text-slate-200">Steering Wheel</label>
+						<select id="overlay-inputs-steering" class="w-full rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 text-slate-200">
+							<option value="builtin">Built-in</option>
+							<option value="moza_ks">Moza KS</option>
+							<option value="moza_rs_v2">Moza RS v2</option>
+						</select>
+						<div class="text-xs text-slate-400 italic">
+							Choose a steering wheel style. Images are loaded from assets/wheels.
+						</div>
+					</div>
+
+					<!-- Delta: Reference Mode (visible only when Delta selected) -->
+					<div id="overlay-delta-reference-row" class="space-y-2 hidden">
+						<label class="block text-sm font-medium text-slate-200">Reference Mode</label>
+						<select id="overlay-delta-reference-mode" class="w-full rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 text-slate-200">
+							<option value="0">All-Time Best</option>
+							<option value="1">Session Best</option>
+							<option value="2">All-Time Optimal</option>
+							<option value="3">Session Optimal</option>
+							<option value="4">Last Lap</option>
+						</select>
+						<div class="text-xs text-slate-400 italic">
+							Choose which reference lap to compare your delta timing against.
+						</div>
 					</div>
 
 					<!-- Save Button -->
