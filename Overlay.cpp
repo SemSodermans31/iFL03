@@ -36,6 +36,16 @@ static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 {
     Overlay* o = (Overlay*)GetWindowLongPtr( hwnd, GWLP_USERDATA );
 
+    // Always forward mouse wheel to overlays (even outside UI edit)
+    if( o && msg == WM_MOUSEWHEEL )
+    {
+        const int delta = GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_DELTA;
+        const int x = GET_X_LPARAM(lparam);
+        const int y = GET_Y_LPARAM(lparam);
+        o->handleMouseWheel( delta, x, y );
+        return 0;
+    }
+
     if( !o || !o->isUiEditEnabled() )
         return DefWindowProc( hwnd, msg, wparam, lparam );
 
@@ -443,4 +453,6 @@ void Overlay::onConfigChanged() {}
 void Overlay::onSessionChanged() {}
 float2 Overlay::getDefaultSize() { return float2(400,300); }
 bool Overlay::hasCustomBackground() { return false; }
+
+void Overlay::onMouseWheel( int /*delta*/, int /*x*/, int /*y*/ ) {}
 

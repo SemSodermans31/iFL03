@@ -66,9 +66,18 @@ class OverlayInputs : public Overlay
                 m_brakeVtx[i].x = float(i);
             }
             
-            // Create text format for labels and values
-            const float fontSize = 14.0f;
-            HRCHECK(m_dwriteFactory->CreateTextFormat( L"Arial", NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormatBold ));
+            // Create text format for labels and values with dynamic font configuration
+            const std::string font = g_cfg.getString(m_name, "font", "Waukegan LDO");
+            const float fontSize = g_cfg.getFloat(m_name, "font_size", 14.0f);
+            const int fontWeight = g_cfg.getInt(m_name, "font_weight", 700); // Bold by default
+            const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
+
+            // Convert font style string to enum
+            DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+            if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+            else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
+
+            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormatBold ));
             m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
             m_textFormatBold->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_CENTER );
             m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );

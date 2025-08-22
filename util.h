@@ -32,6 +32,8 @@ SOFTWARE.
 #include <windows.h>
 #include <d2d1_3.h>
 #include <dwrite.h>
+#include <dwrite_1.h>
+#include <wrl.h>
 #include <unordered_map>
 #include <ctype.h>
 
@@ -296,9 +298,9 @@ class TextCache
         // Assumption: textFormat is set to DWRITE_PARAGRAPH_ALIGNMENT_CENTER, so ycenter +/- fontSize is enough vertical room in all
         // cases. I.e. we only care about rendering single-line text.
         //
-        void render( ID2D1RenderTarget* renderTarget, const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, float ycenter, ID2D1SolidColorBrush* brush, DWRITE_TEXT_ALIGNMENT align )
+        void render( ID2D1RenderTarget* renderTarget, const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, float ycenter, ID2D1SolidColorBrush* brush, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
-            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align );
+            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align, characterSpacing );
             if( !textLayout )
                 return;
 
@@ -311,9 +313,9 @@ class TextCache
         //
         // Same assumptions as render().
         //
-        float2 getExtent( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align )
+        float2 getExtent( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
-            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align );
+            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align, characterSpacing );
             if( !textLayout )
                 return float2(0,0);
 
@@ -325,7 +327,7 @@ class TextCache
 
     private:
 
-        IDWriteTextLayout* getOrCreateTextLayout( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align )
+        IDWriteTextLayout* getOrCreateTextLayout( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
             if( xmax < xmin )
                 return nullptr;
@@ -341,6 +343,7 @@ class TextCache
             hash ^= (unsigned)(uint64_t(textFormat) >> 32);
             hash ^= *((unsigned*)&width);
             hash ^= (unsigned)align;
+            hash ^= *((unsigned*)&characterSpacing);
 
             IDWriteTextLayout* textLayout = nullptr;
 
@@ -349,6 +352,18 @@ class TextCache
             if( it == m_cache.end() )
             {
                 m_factory->CreateTextLayout( str, len, textFormat, width, fontSize*2, &textLayout );
+                
+                // Apply character spacing if specified
+                if( characterSpacing != 0.0f && textLayout )
+                {
+                    Microsoft::WRL::ComPtr<IDWriteTextLayout1> textLayout1;
+                    if( SUCCEEDED(textLayout->QueryInterface(__uuidof(IDWriteTextLayout1), &textLayout1)) )
+                    {
+                        DWRITE_TEXT_RANGE textRange = { 0, (UINT32)len };
+                        textLayout1->SetCharacterSpacing( characterSpacing, characterSpacing, 0, textRange );
+                    }
+                }
+                
                 m_cache.insert( std::make_pair(hash, textLayout) );
             }
             else
@@ -363,11 +378,24 @@ class TextCache
         IDWriteFactory*                                      m_factory = nullptr;
 };
 
-inline float2 computeTextExtent( const wchar_t* str, IDWriteFactory* factory, IDWriteTextFormat* textFormat )
+inline float2 computeTextExtent( const wchar_t* str, IDWriteFactory* factory, IDWriteTextFormat* textFormat, float characterSpacing = 0.0f )
 {
     IDWriteTextLayout* textLayout = nullptr;
 
     factory->CreateTextLayout( str, (int)wcslen(str), textFormat, 99999, 99999, &textLayout );
+    
+    // Apply character spacing if specified
+    if( characterSpacing != 0.0f && textLayout )
+    {
+        Microsoft::WRL::ComPtr<IDWriteTextLayout1> textLayout1;
+        if( SUCCEEDED(textLayout->QueryInterface(__uuidof(IDWriteTextLayout1), &textLayout1)) )
+        {
+            const int len = (int)wcslen( str );
+            DWRITE_TEXT_RANGE textRange = { 0, (UINT32)len };
+            textLayout1->SetCharacterSpacing( characterSpacing, characterSpacing, 0, textRange );
+        }
+    }
+    
     DWRITE_TEXT_METRICS m = {};
     textLayout->GetMetrics( &m );
 

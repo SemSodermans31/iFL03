@@ -114,25 +114,31 @@ class OverlayWeather : public Overlay
             {
                 m_text.reset( m_dwriteFactory.Get() );
 
-                const std::string font = g_cfg.getString( m_name, "font", "Arial" );
+                const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
                 const float baseFontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-                const float scaledFontSize = std::max(6.0f, std::min(200.0f, baseFontSize * m_scaleFactor)); // Clamp font size to reasonable bounds
+                const int fontWeight = g_cfg.getInt( m_name, "font_weight", 900 );
+                const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
+                m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+                DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+                if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+                else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
+                const float scaledFontSize = std::max(6.0f, std::min(200.0f, baseFontSize * m_scaleFactor));
                 
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, scaledFontSize, L"en-us", &m_textFormat ));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, scaledFontSize, L"en-us", &m_textFormat ));
                 m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, scaledFontSize, L"en-us", &m_textFormatBold ));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, scaledFontSize, L"en-us", &m_textFormatBold ));
                 m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
                 const float smallFontSize = std::max(4.0f, std::min(160.0f, scaledFontSize*0.8f));
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, smallFontSize, L"en-us", &m_textFormatSmall ));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, smallFontSize, L"en-us", &m_textFormatSmall ));
                 m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
                 const float largeFontSize = std::max(8.0f, std::min(300.0f, scaledFontSize*1.5f));
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, largeFontSize, L"en-us", &m_textFormatLarge ));
+                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, largeFontSize, L"en-us", &m_textFormatLarge ));
                 m_textFormatLarge->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
                 m_textFormatLarge->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
             }
@@ -161,6 +167,7 @@ class OverlayWeather : public Overlay
             // Apply global opacity first; then derive text colors
             const float globalOpacity = getGlobalOpacity();
             const float4 finalTextCol = float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity);
+            
             // All text white per requested style. Keep an accent color for wetness bar and arrow
             const float4 tempCol            = finalTextCol;
             const float4 trackTempCol       = finalTextCol;
@@ -205,7 +212,7 @@ class OverlayWeather : public Overlay
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), L"TRACK TEMP", m_textFormatBold.Get(), 
-                              m_trackTempBox.x0 + titlePadding, m_trackTempBox.x1 - titleMargin, m_trackTempBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_trackTempBox.x0 + titlePadding, m_trackTempBox.x1 - titleMargin, m_trackTempBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
 
                 // Temperature value - larger, centered
                 m_brush->SetColor( trackTempCol );
@@ -220,7 +227,7 @@ class OverlayWeather : public Overlay
                 // Adjust text position to be after the icon
                 const float textOffset = iconX + iconSize + valuePadding;
                 m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
-                              textOffset, m_trackTempBox.x1 - valuePadding, tempValueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              textOffset, m_trackTempBox.x1 - valuePadding, tempValueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
             }
 
             // Track Wetness Section
@@ -247,7 +254,7 @@ class OverlayWeather : public Overlay
                 // Wetness title - left aligned
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), L"TRACK WETNESS", m_textFormatBold.Get(), 
-                              m_trackWetnessBox.x0 + titlePadding, m_trackWetnessBox.x1 - titleMargin, m_trackWetnessBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_trackWetnessBox.x0 + titlePadding, m_trackWetnessBox.x1 - titleMargin, m_trackWetnessBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
 
                 // Progress bar showing wetness level
                 {
@@ -290,7 +297,7 @@ class OverlayWeather : public Overlay
                 // Wetness text description with increased padding from graph
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), toWide(wetnessText).c_str(), m_textFormatBold.Get(), 
-                              m_trackWetnessBox.x0 + valuePadding, m_trackWetnessBox.x1 - valuePadding, m_trackWetnessBox.y0 + m_trackWetnessBox.h * 0.85f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                              m_trackWetnessBox.x0 + valuePadding, m_trackWetnessBox.x1 - valuePadding, m_trackWetnessBox.y0 + m_trackWetnessBox.h * 0.85f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
 
             // Precipitation/Air Temperature Section
@@ -302,7 +309,7 @@ class OverlayWeather : public Overlay
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), showPrecip ? L"PRECIPITATION" : L"AIR TEMP", m_textFormatBold.Get(), 
-                              m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
 
                 const float valueY = m_precipitationBox.y0 + m_precipitationBox.h * 0.65f;
                 const float iconX = m_precipitationBox.x0 + titlePadding; // Align with title
@@ -319,7 +326,7 @@ class OverlayWeather : public Overlay
                     swprintf( s, _countof(s), L"%.0f%%", precipitation * 100.0f );
                     const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
                     m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
-                                  m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                                  m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 } else {
                     // Show air temperature
                     float airTemp = useStubData ? StubDataManager::getStubAirTemp() : ir_AirTemp.getFloat();
@@ -336,7 +343,7 @@ class OverlayWeather : public Overlay
                     swprintf( s, _countof(s), L"%.1f%lc%c", airTemp, degree, imperial ? 'F' : 'C' );
                     const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
                     m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
-                                  m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                                  m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 }
             }
 
@@ -357,12 +364,17 @@ class OverlayWeather : public Overlay
                 // Title - left aligned, larger and bolder with more room from edge
                 m_brush->SetColor( finalTextCol );
                 m_text.render( m_renderTarget.Get(), L"WIND", m_textFormatBold.Get(), 
-                              m_windBox.x0 + titlePadding, m_windBox.x1 - titleMargin, m_windBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_windBox.x0 + titlePadding, m_windBox.x1 - titleMargin, m_windBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
 
                 // Draw compass - dynamically positioned and sized with safety checks
                 const float compassCenterX = m_windBox.x0 + m_windBox.w/2;
                 const float compassCenterY = m_windBox.y0 + m_windBox.h * 0.5f; // Center in available box space
                 const float compassRadius = std::max(22.5f, std::min(m_windBox.w, m_windBox.h) * 0.375f);
+                
+                D2D1_ELLIPSE compassCircle = { {compassCenterX, compassCenterY}, compassRadius, compassRadius };
+                m_brush->SetColor(float4(0.1f, 0.1f, 0.1f, 1.0f));
+                m_renderTarget->FillEllipse(&compassCircle, m_brush.Get());
+                
                 drawWindCompass(windDir, compassCenterX, compassCenterY, compassRadius, carYaw);
 
                 // Wind speed at bottom with icon - left aligned like title
@@ -387,7 +399,7 @@ class OverlayWeather : public Overlay
                 const float windTextOffset = 75.0f * m_scaleFactor;
                 m_brush->SetColor( windCol );
                 m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
-                              m_windBox.x0 + windTextOffset, m_windBox.x1 - titleMargin, windSpeedY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                              m_windBox.x0 + windTextOffset, m_windBox.x1 - titleMargin, windSpeedY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
             }
 
             m_renderTarget->EndDraw();
@@ -563,7 +575,7 @@ class OverlayWeather : public Overlay
 
             // Draw compass circle
             D2D1_ELLIPSE compassCircle = { {centerX, centerY}, radius, radius };
-            m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, 1.0f));
+            m_brush->SetColor(float4(0.3f, 0.3f, 0.3f, 1.0f));
             const float compassLineThickness = 3.0f * m_scaleFactor;
             m_renderTarget->DrawEllipse(&compassCircle, m_brush.Get(), compassLineThickness);
 
@@ -731,4 +743,5 @@ class OverlayWeather : public Overlay
 
         Microsoft::WRL::ComPtr<IWICImagingFactory> m_wicFactory;
         TextCache m_text;
+        float m_fontSpacing = 0.0f;
 };

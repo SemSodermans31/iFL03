@@ -69,16 +69,22 @@ protected:
 
 		// Fonts
 		m_text.reset( m_dwriteFactory.Get() );
-		const std::string font = g_cfg.getString( m_name, "font", "Arial" );
+		const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
 		const float baseSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+		const int fontWeight = g_cfg.getInt( m_name, "font_weight", 700 );
+		const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
+		m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+		DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+		if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+		else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
 		const float size = std::max(8.0f, std::min(220.0f, baseSize * m_scaleFactor));
 
-		HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size*1.5f, L"en-us", &m_textFormatBold ));
+		HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, size*1.5f, L"en-us", &m_textFormatBold ));
 		m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
 		m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
 
-		HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, size*1.5f, L"en-us", &m_textFormatLarge ));
+		HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, size*1.5f, L"en-us", &m_textFormatLarge ));
 		m_textFormatLarge->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
 		m_textFormatLarge->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 	}
@@ -133,7 +139,7 @@ protected:
 			topTextCol.w = globalOpacity;
 			m_brush->SetColor( topTextCol );
 			const float yTop = padding + topH * 0.52f;
-			m_text.render( m_renderTarget.Get(), sTop, m_textFormatBold.Get(), r.left + padding, r.right - padding, yTop, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+			m_text.render( m_renderTarget.Get(), sTop, m_textFormatBold.Get(), r.left + padding, r.right - padding, yTop, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 		}
 
 		// BOTTOM BAND: background = flag color, text = black or white for contrast
@@ -149,7 +155,7 @@ protected:
 			bottomTextCol.w = globalOpacity;
 			m_brush->SetColor( bottomTextCol );
 			const float yBottom = r.top + (r.bottom - r.top) * 0.52f;
-			m_text.render( m_renderTarget.Get(), sBottom, m_textFormatLarge.Get(), r.left + padding, r.right - padding, yBottom, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+			m_text.render( m_renderTarget.Get(), sBottom, m_textFormatLarge.Get(), r.left + padding, r.right - padding, yBottom, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 		}
 
 		m_renderTarget->EndDraw();
@@ -279,4 +285,5 @@ protected:
 	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatBold;
 	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatLarge;
 	TextCache m_text;
+	float m_fontSpacing = 0.0f;
 };

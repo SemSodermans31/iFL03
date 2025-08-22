@@ -33,6 +33,7 @@ SOFTWARE.
 #include <deque>
 #include <vector>
 #include <dwrite.h>
+#include <dwrite_1.h>
 
 class OverlayDelta : public Overlay
 {
@@ -83,31 +84,39 @@ protected:
 
     virtual void onConfigChanged()
     {
+        const std::string font = g_cfg.getString(m_name, "font", "Consolas");
         const float titleSize = g_cfg.getFloat(m_name, "title_font_size", 16.0f);
         const float deltaSize = g_cfg.getFloat(m_name, "delta_font_size", 32.0f);
         const float smallSize = g_cfg.getFloat(m_name, "small_font_size", 14.0f);
+        const int fontWeight = g_cfg.getInt(m_name, "font_weight", 500);
+        const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
         
         m_referenceMode = (ReferenceMode)g_cfg.getInt(m_name, "reference_mode", 1); // Default to session best
         m_trendSamples = g_cfg.getInt(m_name, "trend_samples", 10);
 
+        // Convert font style string to enum
+        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
+
         // Create text formats
         HRCHECK(m_dwriteFactory->CreateTextFormat(
-            L"Consolas", NULL,
-            DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+            toWide(font).c_str(), NULL,
+            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
             titleSize, L"en-us", &m_titleFormat));
         m_titleFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         m_titleFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
         HRCHECK(m_dwriteFactory->CreateTextFormat(
-            L"Consolas", NULL,
-            DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+            toWide(font).c_str(), NULL,
+            DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
             deltaSize, L"en-us", &m_deltaFormat));
         m_deltaFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         m_deltaFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
         HRCHECK(m_dwriteFactory->CreateTextFormat(
-            L"Consolas", NULL,
-            DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+            toWide(font).c_str(), NULL,
+            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
             smallSize, L"en-us", &m_smallFormat));
         m_smallFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         m_smallFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
@@ -289,7 +298,7 @@ protected:
 
     void drawCard(float x, float y, float width, float height, const float4& bgColor = float4(0.0f, 0.0f, 0.0f, 0.85f))
     {
-        const float cornerRadius = g_cfg.getFloat(m_name, "corner_radius", 6.0f);
+        const float cornerRadius = height * 0.5f;
         
         m_brush->SetColor(bgColor);
         
@@ -307,28 +316,36 @@ protected:
 
     void createScaledTextFormats(float scale)
     {
+        const std::string font = g_cfg.getString(m_name, "font", "Consolas");
         const float titleSize = g_cfg.getFloat(m_name, "title_font_size", 16.0f) * scale;
         const float deltaSize = g_cfg.getFloat(m_name, "delta_font_size", 32.0f) * scale;
         const float smallSize = g_cfg.getFloat(m_name, "small_font_size", 14.0f) * scale;
+        const int fontWeight = g_cfg.getInt(m_name, "font_weight", 500);
+        const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
+
+        // Convert font style string to enum
+        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
 
         // Create scaled text formats
         HRCHECK(m_dwriteFactory->CreateTextFormat(
-            L"Consolas", NULL,
-            DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+            toWide(font).c_str(), NULL,
+            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
             titleSize, L"en-us", &m_scaledTitleFormat));
         m_scaledTitleFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         m_scaledTitleFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
         HRCHECK(m_dwriteFactory->CreateTextFormat(
-            L"Consolas", NULL,
-            DWRITE_FONT_WEIGHT_BOLD, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+            toWide(font).c_str(), NULL,
+            DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
             deltaSize, L"en-us", &m_scaledDeltaFormat));
         m_scaledDeltaFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         m_scaledDeltaFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
 
         HRCHECK(m_dwriteFactory->CreateTextFormat(
-            L"Consolas", NULL,
-            DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL,
+            toWide(font).c_str(), NULL,
+            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
             smallSize, L"en-us", &m_scaledSmallFormat));
         m_scaledSmallFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
         m_scaledSmallFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
@@ -442,6 +459,8 @@ protected:
         const float columnWidth = (width - (3.0f * padding)) / 2; // Split into two columns with padding
         const float leftX = x + padding;
         const float rightX = x + (2.0f * padding) + columnWidth;
+        const float panelCenterY = y + height * 0.5f;
+        const float innerSpacing = 6.0f * scale; // spacing between time and its label
         
         // Reference lap time section (left side)
         float referenceLapTime = getReferenceLapTime();
@@ -455,8 +474,11 @@ protected:
             
             float timeHeight = 25.0f * scale;
             float labelHeight = 15.0f * scale;
-            float timeY = y + (15.0f * scale);
-            float labelY = y + (42.0f * scale);
+            // Vertically center the time + label block within the panel
+            const float totalBlockH = timeHeight + innerSpacing + labelHeight;
+            const float blockTop = panelCenterY - (totalBlockH * 0.5f);
+            float timeY = blockTop;
+            float labelY = blockTop + timeHeight + innerSpacing;
             
             drawText(timeBuffer, leftX, timeY, columnWidth, timeHeight, m_scaledDeltaFormat.Get(), timeColor);
             
@@ -482,8 +504,11 @@ protected:
                 
                 float timeHeight = 25.0f * scale;
                 float labelHeight = 15.0f * scale;
-                float timeY = y + (15.0f * scale);
-                float labelY = y + (42.0f * scale);
+                // Vertically center the time + label block within the panel
+                const float totalBlockH = timeHeight + innerSpacing + labelHeight;
+                const float blockTop = panelCenterY - (totalBlockH * 0.5f);
+                float timeY = blockTop;
+                float labelY = blockTop + timeHeight + innerSpacing;
                 
                 drawText(timeBuffer, rightX, timeY, columnWidth, timeHeight, m_scaledDeltaFormat.Get(), predictedColor);
                 drawText(L"PREDICTED", rightX, labelY, columnWidth, labelHeight, m_scaledSmallFormat.Get(), textColor);
@@ -555,7 +580,9 @@ protected:
         const float infoX = circleX + circleRadius + (20.0f * scale);
         const float infoWidth = (float)m_width - infoX - padding;
         const float infoHeight = 100.0f * scale;
-        const float infoY = circleY - infoHeight / 2;
+        // Allow fine-tuning of info panel vertical positioning relative to the circle center
+        const float infoYOffset = g_cfg.getFloat(m_name, "info_vertical_offset", 0.0f) * scale; // +down, -up
+        const float infoY = circleY - infoHeight / 2 + infoYOffset;
 
         // Create scaled text formats
         createScaledTextFormats(scale);

@@ -64,11 +64,19 @@ class OverlayRelative : public Overlay
             const std::string font = g_cfg.getString( m_name, "font", "Microsoft YaHei UI" );
             const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
             const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
+            const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
+            m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+
+            // Convert font style string to enum
+            DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+            if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+            else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
+
+            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
             m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
             m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
+            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
             m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
             m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
@@ -273,7 +281,7 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( col );
                     swprintf( s, _countof(s), L"P%d", position );
                     m_textFormat->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_TRAILING );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
                 }
 
                 // Car number
@@ -291,7 +299,7 @@ class OverlayRelative : public Overlay
                     float4 numberTextCol = carNumberTextCol;
                     numberTextCol.w *= globalOpacity;
                     m_brush->SetColor( numberTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // Name
@@ -299,7 +307,7 @@ class OverlayRelative : public Overlay
                     clm = m_columns.get( (int)Columns::NAME );
                     swprintf( s, _countof(s), L"%S", car.userName.c_str() );
                     m_brush->SetColor( col );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 }
 
                 // Delta
@@ -310,7 +318,7 @@ class OverlayRelative : public Overlay
                     else
                         swprintf( s, _countof(s), L"%.1f", ci.delta );
                     m_brush->SetColor( col );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
                 }
 
                 // Pit age
@@ -328,7 +336,7 @@ class OverlayRelative : public Overlay
                         swprintf( s, _countof(s), L"%d", ci.pitAge );
                         m_renderTarget->DrawRectangle( &r, m_brush.Get() );
                     }
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // License without SR
@@ -344,7 +352,7 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( c );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( licenseTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // License with SR
@@ -360,7 +368,7 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( c );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( licenseTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // Irating
@@ -374,7 +382,7 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( iratingBgCol );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( iratingTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
             }
 
@@ -458,4 +466,5 @@ class OverlayRelative : public Overlay
 
         ColumnLayout m_columns;
         TextCache    m_text;
+        float m_fontSpacing = 0.0f;
 };

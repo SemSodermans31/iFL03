@@ -60,28 +60,34 @@ protected:
     {
         m_text.reset( m_dwriteFactory.Get() );
 
-        const std::string font = g_cfg.getString( m_name, "font", "Microsoft YaHei UI" );
+        const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
         const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-        const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
-        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
+        const int fontWeight = g_cfg.getInt( m_name, "font_weight", 700 );
+        const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
+        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
+        
+        m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize, L"en-us", &m_textFormat ));
         m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
         m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
-        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
+        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
         m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
         m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
         // Determine widths of text columns
         m_columns.reset();
-        m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
-        m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
+        m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+        m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
         m_columns.add( (int)Columns::NAME,       0, fontSize/2 );
-        m_columns.add( (int)Columns::PIT,        computeTextExtent( L"P.Age", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
-        m_columns.add( (int)Columns::LICENSE,    computeTextExtent( L"A 4.44", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/6 );
-        m_columns.add( (int)Columns::IRATING,    computeTextExtent( L"999.9k", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/6 );
-        m_columns.add( (int)Columns::BEST,       computeTextExtent( L"999.99.999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
-        m_columns.add( (int)Columns::LAST,       computeTextExtent( L"999.99.999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
-        m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"9999.9999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
+        m_columns.add( (int)Columns::PIT,        computeTextExtent( L"P.Age", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+        m_columns.add( (int)Columns::LICENSE,    computeTextExtent( L"A 4.44", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, fontSize/6 );
+        m_columns.add( (int)Columns::IRATING,    computeTextExtent( L"999.9k", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, fontSize/6 );
+        m_columns.add( (int)Columns::BEST,       computeTextExtent( L"999.99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+        m_columns.add( (int)Columns::LAST,       computeTextExtent( L"999.99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+        m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"9999.9999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
     }
 
     virtual void onUpdate()
@@ -224,44 +230,56 @@ protected:
         // Headers
         clm = m_columns.get( (int)Columns::POSITION );
         swprintf( s, _countof(s), L"Pos." );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::CAR_NUMBER );
         swprintf( s, _countof(s), L"No." );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::NAME );
         swprintf( s, _countof(s), L"Driver" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::PIT );
         swprintf( s, _countof(s), L"P.Age" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::LICENSE );
         swprintf( s, _countof(s), L"SR" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::IRATING );
         swprintf( s, _countof(s), L"IR" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::BEST );
         swprintf( s, _countof(s), L"Best" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::LAST );
         swprintf( s, _countof(s), L"Last" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::DELTA );
         swprintf( s, _countof(s), L"Delta" );
-        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+        m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
+
+        // Determine paging and clamp scroll
+        int totalRows = (int)carInfo.size();
+        int visibleRows = std::max( 0, (int)((ybottom - 2*yoff) / lineHeight) - 1 );
+        if( visibleRows < 0 ) visibleRows = 0;
+        if( m_maxScrollRow != std::max(0, totalRows - visibleRows) )
+            m_maxScrollRow = std::max( 0, totalRows - visibleRows );
+        if( m_scrollRow > m_maxScrollRow ) m_scrollRow = m_maxScrollRow;
+        if( m_scrollRow < 0 ) m_scrollRow = 0;
 
         // Content
-        for( int i=0; i<(int)carInfo.size(); ++i )
+        for( int i=m_scrollRow; i<totalRows; ++i )
         {
-            y = 2*yoff + lineHeight/2 + (i+1)*lineHeight;
+            const int drawIndex = i - m_scrollRow;
+            if( drawIndex >= visibleRows )
+                break;
+            y = 2*yoff + lineHeight/2 + (drawIndex+1)*lineHeight;
 
             if( y+lineHeight/2 > ybottom )
                 break;
@@ -291,7 +309,7 @@ protected:
                 clm = m_columns.get( (int)Columns::POSITION );
                 m_brush->SetColor( textCol );
                 swprintf( s, _countof(s), L"P%d", ci.position );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
             }
 
             // Car number
@@ -305,7 +323,7 @@ protected:
                 m_brush->SetColor( textCol );
                 m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                 m_brush->SetColor( carNumberTextCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
 
             // Name
@@ -313,7 +331,7 @@ protected:
                 clm = m_columns.get( (int)Columns::NAME );
                 m_brush->SetColor( textCol );
                 swprintf( s, _countof(s), L"%S", car.userName.c_str() );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
+                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
             }
 
             // Pit age
@@ -332,7 +350,7 @@ protected:
                     swprintf( s, _countof(s), L"%d", ci.pitAge );
                     m_renderTarget->DrawRectangle( &r, m_brush.Get() );
                 }
-                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
 
             // License/SR
@@ -348,7 +366,7 @@ protected:
                 m_brush->SetColor( c );
                 m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                 m_brush->SetColor( licenseTextCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
 
             // Irating
@@ -362,7 +380,7 @@ protected:
                 m_brush->SetColor( iratingBgCol );
                 m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                 m_brush->SetColor( iratingTextCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
 
             // Best
@@ -372,7 +390,7 @@ protected:
                 if( ci.best > 0 )
                     str = formatLaptime( ci.best );
                 m_brush->SetColor( ci.hasFastestLap ? fastestLapCol : otherCarCol );
-                m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
             }
 
             // Last
@@ -382,7 +400,7 @@ protected:
                 if( ci.last > 0 )
                     str = formatLaptime( ci.last );
                 m_brush->SetColor( otherCarCol );
-                m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
             }
 
             // Delta
@@ -394,8 +412,34 @@ protected:
                 else
                     swprintf( s, _countof(s), L"%.03f", ci.delta );
                 m_brush->SetColor( otherCarCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
             }
+        }
+
+        // Scrollbar
+        if( totalRows > visibleRows && visibleRows > 0 )
+        {
+            const float trackLeft  = (float)m_width - 6.0f;
+            const float trackRight = (float)m_width - 3.0f;
+            const float trackTop   = 2*yoff + lineHeight;
+            const float trackBot   = ybottom;
+            const float trackH     = std::max( 0.0f, trackBot - trackTop );
+            const float ratio      = (float)visibleRows / (float)totalRows;
+            const float thumbH     = std::max( 12.0f, trackH * ratio );
+            const float maxThumbTravel = std::max( 0.0f, trackH - thumbH );
+            const float scrollRatio = (m_maxScrollRow>0) ? ((float)m_scrollRow / (float)m_maxScrollRow) : 0.0f;
+            const float thumbTop  = trackTop + maxThumbTravel * scrollRatio;
+            const float thumbBot  = thumbTop + thumbH;
+
+            float4 trackCol = headerCol; trackCol.a *= 0.20f * globalOpacity;
+            float4 thumbCol = headerCol; thumbCol.a *= 0.45f * globalOpacity;
+
+            D2D1_RECT_F track = { trackLeft, trackTop, trackRight, trackBot };
+            D2D1_RECT_F thumb = { trackLeft, thumbTop, trackRight, thumbBot };
+            m_brush->SetColor( trackCol );
+            m_renderTarget->FillRectangle( &track, m_brush.Get() );
+            m_brush->SetColor( thumbCol );
+            m_renderTarget->FillRectangle( &thumb, m_brush.Get() );
         }
         
         // Footer
@@ -415,7 +459,7 @@ protected:
             swprintf( s, _countof(s), L"SoF: %d      Track Temp: %.1f�%c      Air Temp: %.1f�%c      Setup: %s      Subsession: %d", ir_session.sof, trackTemp, tempUnit, airTemp, tempUnit, ir_session.isFixedSetup?L"fixed":L"open", ir_session.subsessionId );
             y = m_height - (m_height-ybottom)/2;
             m_brush->SetColor( headerCol );
-            m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff, (float)m_width-2*xoff, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+            m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff, (float)m_width-2*xoff, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
         }
 
         m_renderTarget->EndDraw();
@@ -426,6 +470,16 @@ protected:
         return true;
     }
 
+    virtual void onMouseWheel( int delta, int /*x*/, int /*y*/ )
+    {
+        // Positive delta means wheel up -> scroll up
+        const int step = 1;
+        m_scrollRow -= delta * step;
+        if( m_scrollRow < 0 ) m_scrollRow = 0;
+        if( m_scrollRow > m_maxScrollRow ) m_scrollRow = m_maxScrollRow;
+        update();
+    }
+
 protected:
 
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;
@@ -433,4 +487,7 @@ protected:
 
     ColumnLayout m_columns;
     TextCache    m_text;
+    int          m_scrollRow = 0;
+    int          m_maxScrollRow = 0;
+    float        m_fontSpacing = 0.0f;
 };

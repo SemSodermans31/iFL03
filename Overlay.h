@@ -31,6 +31,7 @@ SOFTWARE.
 #include <d2d1_3.h>
 #include <dcomp.h>
 #include <dwrite.h>
+#include <dwrite_1.h>
 #include <wrl.h>
 #include "util.h"
 
@@ -59,6 +60,8 @@ class Overlay
         void            setWindowPosAndSize( int x, int y, int w, int h, bool callSetWindowPos=true );
         void            saveWindowPosAndSize();
         
+        void            handleMouseWheel( int delta, int x, int y ) { onMouseWheel( delta, x, y ); }
+
         float           getGlobalOpacity() const;
         void            applyPositionSetting();
 
@@ -71,6 +74,7 @@ class Overlay
         virtual void    onSessionChanged();
         virtual float2  getDefaultSize();
         virtual bool    hasCustomBackground();
+        virtual void    onMouseWheel( int delta, int x, int y );
 
         std::string     m_name;
         HWND            m_hwnd = 0;
