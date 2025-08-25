@@ -166,6 +166,11 @@ protected:
                 if( ir_session.sessionType==SessionType::RACE && ir_SessionState.getInt()<=irsdk_StateWarmup || ir_session.sessionType==SessionType::QUALIFY && ci.best<=0 )
                     ci.best = car.qualTime;
 
+                if (ir_CarIdxTrackSurface.getInt(i) == irsdk_NotInWorld) {
+                    ci.best = car.fastestTime;
+                    ci.last = car.lastTime;
+                }
+
                 carInfo.push_back( ci );
 
                 if( ci.best > 0 && ci.best < fastestLapTime ) {

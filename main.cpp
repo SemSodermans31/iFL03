@@ -45,6 +45,7 @@ SOFTWARE.
 #include "OverlayWeather.h"
 #include "OverlayFlags.h"
 #include "OverlayDelta.h"
+#include "OverlayRadar.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
 #include "preview_mode.h"
@@ -59,7 +60,8 @@ enum class Hotkey
     Cover,
     Weather,
     Flags,
-    Delta
+    Delta, 
+    Radar
 };
 
 static void registerHotkeys()
@@ -73,6 +75,7 @@ static void registerHotkeys()
     UnregisterHotKey( NULL, (int)Hotkey::Weather );
     UnregisterHotKey( NULL, (int)Hotkey::Flags );
     UnregisterHotKey( NULL, (int)Hotkey::Delta );
+    UnregisterHotKey( NULL, (int)Hotkey::Radar );
 
     UINT vk, mod;
 
@@ -102,6 +105,9 @@ static void registerHotkeys()
 
     if( parseHotkey( g_cfg.getString("OverlayDelta","toggle_hotkey","ctrl+8"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Delta, mod, vk );
+
+    if( parseHotkey( g_cfg.getString("OverlayRadar","toggle_hotkey","ctrl+9"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Radar, mod, vk );
 }
 
 static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus status )
@@ -193,6 +199,7 @@ int main()
     printf("    Toggle weather overlay:       %s\n", g_cfg.getString("OverlayWeather","toggle_hotkey","").c_str() );
     printf("    Toggle flags overlay:         %s\n", g_cfg.getString("OverlayFlags","toggle_hotkey","").c_str() );
     printf("    Toggle delta overlay:         %s\n", g_cfg.getString("OverlayDelta","toggle_hotkey","").c_str() );
+    printf("    Toggle radar overlay:         %s\n", g_cfg.getString("OverlayRadar","toggle_hotkey","").c_str() );
     printf("\niRon will generate a file called \'config.json\' in its current directory. This file\n"\
            "stores your settings. You can edit the file at any time, even while iRon is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
@@ -211,6 +218,11 @@ int main()
     overlays.push_back( new OverlayWeather() );
     overlays.push_back( new OverlayFlags() );
     overlays.push_back( new OverlayDelta() );
+#ifdef IRON_USE_CEF
+    overlays.push_back( new OverlayRadar() );
+#else
+    overlays.push_back( new OverlayRadar() );
+#endif
 #ifdef _DEBUG
     overlays.push_back( new OverlayDebug() );
 #endif
@@ -343,6 +355,9 @@ int main()
                         break;
                     case (int)Hotkey::Delta:
                         g_cfg.setBool( "OverlayDelta", "enabled", !g_cfg.getBool("OverlayDelta","enabled",true) );
+                        break;
+                    case (int)Hotkey::Radar:
+                        g_cfg.setBool( "OverlayRadar", "enabled", !g_cfg.getBool("OverlayRadar","enabled",true) );
                         break;
                     }
                     

@@ -43,6 +43,11 @@ const overlayConfig = {
 		name: 'Delta',
 		configKey: 'OverlayDelta',
 		description: 'Lap time delta comparison to best lap'
+	},
+	'radar': {
+		name: 'Radar',
+		configKey: 'OverlayRadar',
+		description: 'Proximity radar for nearby cars'
 	}
 };
 

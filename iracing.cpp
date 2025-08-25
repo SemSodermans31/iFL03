@@ -525,6 +525,12 @@ ConnectionStatus ir_tick()
                     else if( sessionNameStr == "RACE" )
                         ir_session.cars[carIdx].racePosition = pos;
                 }
+                
+                sprintf(path, "SessionInfo:Sessions:SessionNum:{%d}ResultsPositions:Position:{%d}LastTime:", session, pos);   
+                parseYamlFloat(sessionYaml, path, &ir_session.cars[carIdx].lastTime);
+
+                sprintf(path, "SessionInfo:Sessions:SessionNum:{%d}ResultsPositions:Position:{%d}FastestTime:", session, pos);
+                parseYamlFloat(sessionYaml, path, &ir_session.cars[carIdx].fastestTime);
             }
         }
 
