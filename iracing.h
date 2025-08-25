@@ -51,15 +51,20 @@ enum class SessionType
 static const char* const SessionTypeStr[] = {"UNKNOWN","PRACTICE","QUALIFY","RACE"};
 
 struct Car
-{    
+{
     std::string     userName;
     int             carNumber = 0;
     std::string     carNumberStr;
+    std::string     carName;
+    int             carID = 0;
     std::string     licenseStr;
     char            licenseChar = 'R';
     float           licenseSR = 0;
     std::string     licenseColStr;
     float4          licenseCol = float4(0,0,0,1);
+    std::string     classColStr;
+    float4          classCol = float4(0,0,0,1);
+    int             classId = 0;
     int             irating = 0;
     int             isSelf = 0;
     int             isPaceCar = 0;
