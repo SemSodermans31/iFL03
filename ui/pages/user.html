@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>iRacing Overlay GUI - User</title>
+	<title>iUP - User</title>
 	<link rel="stylesheet" href="../dist/styles.css" />
 </head>
 <body class="min-h-dvh bg-slate-950 text-slate-100 flex">
@@ -36,14 +36,119 @@
 		</header>
 
 		<main class="mx-auto max-w-4xl px-4 py-6 space-y-6">
-			<!-- Empty main content area for now -->
-			<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-8">
-				<div class="text-center text-slate-400">
-					<h2 class="text-xl font-semibold mb-2">User Settings</h2>
-					<p>User-specific settings and preferences will be available here.</p>
+			<!-- Current Car Status -->
+			<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+				<h2 class="text-lg font-semibold mb-4 text-slate-100">Current Car</h2>
+				<div class="flex items-center justify-between mb-4">
+					<div>
+						<div class="text-sm text-slate-400">Car</div>
+						<div class="text-lg font-medium text-slate-100" id="currentCarName">No car detected</div>
+					</div>
+					<div>
+						<div class="text-sm text-slate-400">Active Config</div>
+						<div class="text-lg font-medium text-slate-100" id="currentCarConfig">Default</div>
+					</div>
+				</div>
+				<div class="flex gap-3">
+					<button id="saveCurrentCarConfig" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed" disabled>
+						Save Config for Current Car
+					</button>
+					<button id="loadCurrentCarConfig" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed" disabled>
+						Load Config for Current Car
+					</button>
 				</div>
 			</section>
+
+			<!-- Car Config Management -->
+			<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-6">
+				<h2 class="text-lg font-semibold mb-4 text-slate-100">Car-Specific Configurations</h2>
+				
+				<!-- Car Selection -->
+				<div class="mb-6">
+					<label for="carSelect" class="block text-sm font-medium text-slate-300 mb-2">Select Car</label>
+					<select id="carSelect" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+						<option value="">Select a car...</option>
+					</select>
+				</div>
+
+				<!-- Config Actions -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+					<div class="space-y-3">
+						<button id="loadSelectedConfig" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed" disabled>
+							Load Selected Car Config
+						</button>
+						<button id="saveAsNewConfig" class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+							Save Current as New Car Config
+						</button>
+					</div>
+					<div class="space-y-3">
+						<button id="copyConfig" class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed" disabled>
+							Copy Config to Another Car
+						</button>
+						<button id="deleteConfig" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-slate-600 disabled:cursor-not-allowed" disabled>
+							Delete Selected Config
+						</button>
+					</div>
+				</div>
+
+				<!-- Available Configs -->
+				<div>
+					<h3 class="text-sm font-medium text-slate-300 mb-3">Available Car Configurations</h3>
+					<div id="availableConfigs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+						<!-- Config cards will be populated here -->
+					</div>
+				</div>
+			</section>
+
+			<!-- Status Messages -->
+			<div id="statusMessage" class="hidden rounded-lg p-4">
+				<div id="statusText" class="text-sm font-medium"></div>
+			</div>
 		</main>
+
+		<!-- Copy Config Modal -->
+		<div id="copyModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+			<div class="bg-slate-900 rounded-lg p-6 w-full max-w-md mx-4">
+				<h3 class="text-lg font-semibold text-slate-100 mb-4">Copy Configuration</h3>
+				<div class="mb-4">
+					<label for="copyFromCar" class="block text-sm font-medium text-slate-300 mb-2">From</label>
+					<select id="copyFromCar" class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100">
+						<option value="">Default Config</option>
+					</select>
+				</div>
+				<div class="mb-6">
+					<label for="copyToCar" class="block text-sm font-medium text-slate-300 mb-2">To</label>
+					<input type="text" id="copyToCar" placeholder="Enter car name..." class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+				</div>
+				<div class="flex gap-3">
+					<button id="confirmCopy" class="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg transition-colors">
+						Copy
+					</button>
+					<button id="cancelCopy" class="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
+						Cancel
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Save As Modal -->
+		<div id="saveAsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+			<div class="bg-slate-900 rounded-lg p-6 w-full max-w-md mx-4">
+				<h3 class="text-lg font-semibold text-slate-100 mb-4">Save Configuration</h3>
+				<div class="mb-6">
+					<label for="saveAsCarName" class="block text-sm font-medium text-slate-300 mb-2">Car Name</label>
+					<input type="text" id="saveAsCarName" placeholder="Enter car name..." class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+				</div>
+				<div class="flex gap-3">
+					<button id="confirmSaveAs" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+						Save
+					</button>
+					<button id="cancelSaveAs" class="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
+						Cancel
+					</button>
+				</div>
+			</div>
+		</div>
 	</div>
 	<script src="../scripts/user.js"></script>
 </body>

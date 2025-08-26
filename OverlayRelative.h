@@ -26,6 +26,7 @@ SOFTWARE.
 
 #include <vector>
 #include <algorithm>
+#include <string>
 #include "Overlay.h"
 #include "iracing.h"
 #include "Config.h"
@@ -94,8 +95,8 @@ class OverlayRelative : public Overlay
             if( g_cfg.getBool(m_name,"show_irating",true) )
                 m_columns.add( (int)Columns::IRATING,       computeTextExtent( L"999.9k", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/8 );
 
-            // iRating prediction column (estimated gain/loss)
-            if( g_cfg.getBool(m_name, "show_ir_pred", false) ) {
+            // iRating prediction column (estimated gain/loss) - only show in race sessions
+            if( g_cfg.getBool(m_name, "show_ir_pred", false) && ir_session.sessionType == SessionType::RACE ) {
                 const float irPredScale = g_cfg.getFloat( m_name, "ir_pred_col_scale", 1.0f );
                 m_columns.add( (int)Columns::IR_PRED,    computeTextExtent( L"+999", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x * irPredScale, fontSize/8 );
             }
@@ -110,17 +111,22 @@ class OverlayRelative : public Overlay
         }
 
         virtual void onUpdate()
-        {            
+        {
             struct CarInfo {
                 int     carIdx = 0;
                 float   delta = 0;
+                float   lapDistPct = 0;
+                int     wrappedSum = 0;
                 int     lapDelta = 0;
                 int     pitAge = 0;
-                float   lastLapTime = 0;
+                float   last = 0;
             };
             std::vector<CarInfo> relatives;
             relatives.reserve( IR_MAX_CARS );
-
+            const float ownClassEstLaptime = ir_session.cars[ir_session.driverCarIdx].carClassEstLapTime;
+            const int lapcountSelf = ir_Lap.getInt();
+            const float selfLapDistPct = ir_LapDistPct.getFloat();
+            const float SelfEstLapTime = ir_CarIdxEstTime.getFloat(ir_session.driverCarIdx);
             // Use stub data in preview mode
             const bool useStubData = StubDataManager::shouldUseStubData();
             if (useStubData) {
@@ -140,79 +146,89 @@ class OverlayRelative : public Overlay
                     ci.lapDelta = rel.lapDelta;
                     ci.pitAge = rel.pitAge;
                     if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(rel.carIdx)) {
-                        ci.lastLapTime = sc->lastLapTime;
+                        ci.last = sc->lastLapTime;
                     } else {
-                        ci.lastLapTime = 0.0f;
+                        ci.last = 0.0f;
                     }
                     relatives.push_back(ci);
                 }
             } else {
                 // Populate cars with the ones for which a relative/delta comparison is valid
                 for( int i=0; i<IR_MAX_CARS; ++i )
-            {
-                const Car& car = ir_session.cars[i];
-
-                const int lapcountS = ir_CarIdxLap.getInt(ir_session.driverCarIdx);
-                const int lapcountC = ir_CarIdxLap.getInt(i);
-
-                if( lapcountC >= 0 && !car.isSpectator && car.carNumber>=0 )
                 {
-                    // Add the pace car only under yellow or initial pace lap
-                    if( car.isPaceCar && !(ir_SessionFlags.getInt() & (irsdk_caution|irsdk_cautionWaving)) && !ir_isPreStart() )
-                        continue;
+                    const Car& car = ir_session.cars[i];
 
-                    // If the other car is up to half a lap in front, we consider the delta 'ahead', otherwise 'behind'.
+                    const int lapcountCar = ir_CarIdxLap.getInt(i);
 
-                    float delta = 0;
-                    int   lapDelta = lapcountC - lapcountS;
-
-                    const float L = ir_estimateLaptime();
-                    const float C = ir_CarIdxEstTime.getFloat(i);
-                    const float S = ir_CarIdxEstTime.getFloat(ir_session.driverCarIdx);
-
-                    // Does the delta between us and the other car span across the start/finish line?
-                    const bool wrap = fabsf(ir_CarIdxLapDistPct.getFloat(i) - ir_CarIdxLapDistPct.getFloat(ir_session.driverCarIdx)) > 0.5f;
-
-                    if( wrap )
+                    if( lapcountCar >= 0 && !car.isSpectator && car.carNumber>=0 )
                     {
-                        delta     = S > C ? (C-S)+L : (C-S)-L;
-                        lapDelta += S > C ? -1 : 1;
-                    }
-                    else
-                    {
-                        delta = C - S;
-                    }
+                        // Add the pace car only under yellow or initial pace lap
+                        if( car.isPaceCar && !(ir_SessionFlags.getInt() & (irsdk_caution|irsdk_cautionWaving)) && !ir_isPreStart() )
+                            continue;
 
-                    // Assume no lap delta when not in a race, because we don't want to show drivers as lapped/lapping there.
-                    // Also reset it during initial pacing, since iRacing for some reason starts counting
-                    // during the pace lap but then resets the counter a couple seconds in, confusing the logic.
-                    // And consider the pace car in the same lap as us, too.
-                    if( ir_session.sessionType!=SessionType::RACE || ir_isPreStart() || car.isPaceCar )
-                    {
-                        lapDelta = 0;
-                    }
+                        // If the other car is up to half a lap in front, we consider the delta 'ahead', otherwise 'behind'.
 
-                    CarInfo ci;
-                    ci.carIdx = i;
-                    ci.delta = delta;
-                    ci.lapDelta = lapDelta;
-                    ci.pitAge = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
-                    ci.lastLapTime = ir_CarIdxLastLapTime.getFloat(i);
-                    relatives.push_back( ci );
+                        float delta = 0;
+                        int   lapDelta = lapcountCar - lapcountSelf;
+
+                        const float LClassRatio = car.carClassEstLapTime / ownClassEstLaptime;
+                        const float CarEstLapTime = ir_CarIdxEstTime.getFloat(i) / LClassRatio;
+                        const float carLapDistPct = ir_CarIdxLapDistPct.getFloat(i);
+
+                        // Does the delta between us and the other car span across the start/finish line?
+                        const bool wrap = fabsf(carLapDistPct - selfLapDistPct) > 0.5f;
+                        int wrappedSum = 0;
+
+                        if( wrap )
+                        {
+                            if (selfLapDistPct > carLapDistPct) {
+                                delta = (CarEstLapTime - SelfEstLapTime) + ownClassEstLaptime;
+                                lapDelta += -1;
+                                wrappedSum = 1;
+                            }
+                            else {
+                                delta = (CarEstLapTime - SelfEstLapTime) - ownClassEstLaptime;
+                                lapDelta += 1;
+                                wrappedSum = -1;
+                            }
+
+                        }
+                        else
+                        {
+                            delta = CarEstLapTime - SelfEstLapTime;
+                        }
+
+                        // Assume no lap delta when not in a race, because we don't want to show drivers as lapped/lapping there.
+                        // Also reset it during initial pacing, since iRacing for some reason starts counting
+                        // during the pace lap but then resets the counter a couple seconds in, confusing the logic.
+                        // And consider the pace car in the same lap as us, too.
+                        if( ir_session.sessionType!=SessionType::RACE || ir_isPreStart() || car.isPaceCar )
+                        {
+                            lapDelta = 0;
+                        }
+
+                        CarInfo ci;
+                        ci.carIdx = i;
+                        ci.delta = delta;
+                        ci.lapDelta = lapDelta;
+                        ci.lapDistPct = ir_CarIdxLapDistPct.getFloat(i);
+                        ci.wrappedSum = wrappedSum;
+                        ci.pitAge = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
+                        ci.last = ir_CarIdxLastLapTime.getFloat(i);
+                        relatives.push_back( ci );
+                    }
                 }
             }
-            }
 
-            // Sort by delta
+            // Sort by lap % completed, in case deltas are a bit desynced
             std::sort( relatives.begin(), relatives.end(), 
-                []( const CarInfo& a, const CarInfo&b ) { return a.delta > b.delta; } );
+                []( const CarInfo& a, const CarInfo&b ) {return a.lapDistPct + a.wrappedSum > b.lapDistPct + b.wrappedSum ;} );
 
             // Locate our driver's index in the new array
             int selfCarInfoIdx = -1;
-            int driverCarIdx = useStubData ? 1 : ir_session.driverCarIdx; // "You" is at index 1 in stub data
             for( int i=0; i<(int)relatives.size(); ++i )
             {
-                if( relatives[i].carIdx == driverCarIdx ) {
+                if( relatives[i].carIdx == ir_session.driverCarIdx ) {
                     selfCarInfoIdx = i;
                     break;
                 }
@@ -360,13 +376,11 @@ class OverlayRelative : public Overlay
                     rr.rect = { r.left-2, r.top+1, r.right+2, r.bottom-1 };
                     rr.radiusX = 3;
                     rr.radiusY = 3;
-                    float4 bgCol = car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol:carNumberBgCol));
-                    bgCol.w *= globalOpacity;
-                    m_brush->SetColor( bgCol );
+                    float4 color = car.classCol;
+                    color.a = licenseBgAlpha;
+                    m_brush->SetColor( car.isSelf ? color : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol: color)) );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
-                    float4 numberTextCol = carNumberTextCol;
-                    numberTextCol.w *= globalOpacity;
-                    m_brush->SetColor( numberTextCol );
+                    m_brush->SetColor( carNumberTextCol );
                     m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
@@ -442,8 +456,8 @@ class OverlayRelative : public Overlay
                     m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
-                // iRating prediction
-                if( clm = m_columns.get( (int)Columns::IR_PRED ) )
+                // iRating prediction - only show in race sessions
+                if( (clm = m_columns.get( (int)Columns::IR_PRED )) && ir_session.sessionType == SessionType::RACE )
                 {
                     const int irDelta = predictIrDeltaFor(ci.carIdx);
                     swprintf( s, _countof(s), L"%+d", irDelta );
@@ -462,26 +476,47 @@ class OverlayRelative : public Overlay
                 }
 
                 // Last
-                if( (clm = m_columns.get((int)Columns::LAST)) )
                 {
+                    clm = m_columns.get((int)Columns::LAST);
                     str.clear();
-                    if (ci.lastLapTime > 0)
-                        str = formatLaptime(ci.lastLapTime);
+                    if (ci.last > 0)
+                        str = formatLaptime(ci.last);
                     m_brush->SetColor(col);
-                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
                 }
 
                 // Delta
                 {
-                    clm = m_columns.get( (int)Columns::DELTA );
-                    if( ci.lapDelta )
-                        swprintf( s, _countof(s), L"%+dL  %.1f", ci.lapDelta, ci.delta );
-                    else
-                        swprintf( s, _countof(s), L"%.1f", ci.delta );
-                    m_brush->SetColor( col );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
+                    clm = m_columns.get((int)Columns::DELTA);
+                    swprintf(s, _countof(s), L"%.1f", ci.delta);
+                    m_brush->SetColor(col);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
                 }
             }
+
+           /* // Footer
+            {
+                float trackTemp = ir_TrackTempCrew.getFloat();
+                char  tempUnit = 'C';
+
+                double sessionTime = ir_SessionTimeRemain.getDouble();
+                int laps = std::max(ir_CarIdxLap.getInt(ir_session.driverCarIdx), ir_CarIdxLapCompleted.getInt(ir_session.driverCarIdx));
+
+                const bool   sessionIsTimeLimited = ir_SessionLapsTotal.getInt() == 32767 && ir_SessionTimeRemain.getDouble() < 48.0 * 3600.0;  // most robust way I could find to figure out whether this is a time-limited session (info in session string is often misleading)
+                const int    remainingLaps = sessionIsTimeLimited ? int(0.5 + sessionTime / ir_estimateLaptime()) : (ir_SessionLapsRemainEx.getInt() != 32767 ? ir_SessionLapsRemainEx.getInt() : -1);
+
+                const int    hours = int(sessionTime / 3600.0);
+                const int    mins = int(sessionTime / 60.0) % 60;
+                const int    secs = (int)fmod(sessionTime, 60.0);
+
+                m_brush->SetColor(float4(1, 1, 1, 0.4f));
+                m_renderTarget->DrawLine(float2(0, ybottom), float2((float)m_width, ybottom), m_brush.Get());
+                swprintf(s, _countof(s), L"SoF: %d      Track Temp: %.1f°%c      Session end: %d:%02d:%02d       Laps: %d/%d", ir_session.sof, trackTemp, tempUnit, hours, mins, secs, laps, remainingLaps);
+                y = m_height - (m_height - ybottom) / 2;
+                m_brush->SetColor(headerCol);
+                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff, (float)m_width - 2 * xoff, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            }
+            */
 
             // Minimap
             if( minimapEnabled )

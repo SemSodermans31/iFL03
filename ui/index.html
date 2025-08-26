@@ -3,8 +3,9 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>iRacing Overlay GUI</title>
+	<title>iUP - Home</title>
 	<link rel="stylesheet" href="dist/styles.css" />
+	<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 </head>
 <body class="min-h-dvh bg-slate-950 text-slate-100 flex">
 	<!-- Sidebar -->
@@ -27,23 +28,103 @@
 	<div class="flex-1 flex flex-col">
 		<header class="sticky top-0 z-10 border-b border-slate-800 bg-slate-900/80 backdrop-blur">
 			<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
-				<h1 class="text-lg font-semibold tracking-tight">iRacing Overlay GUI</h1>
+				<h1 class="text-lg font-semibold tracking-tight">iUP</h1>
 				<span id="conn" class="inline-flex items-center gap-2 text-sm text-slate-300">
 					<span class="size-2 rounded-full bg-slate-500" id="connDot"></span>
+					<span class="text-sm text-slate-400">iRacing status:</span>
 					<span id="connText">UNKNOWN</span>
 				</span>
 			</div>
 		</header>
 
-		<main class="mx-auto max-w-4xl px-4 py-6 space-y-6">
-			<!-- Empty main content area for now -->
-			<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-8">
-				<div class="text-center text-slate-400">
-					<h2 class="text-xl font-semibold mb-2">Welcome to iRacing Overlay GUI</h2>
-					<p>Select an option from the sidebar to get started.</p>
+		<!-- Hero header -->
+		<header class="relative border-b border-slate-800">
+			<div class="relative h-56 overflow-hidden">
+				<div class="absolute inset-0 bg-cover bg-center" style="background-image: url('../assets/max.jpg');"></div>
+				<div class="absolute inset-0 bg-slate-950/60"></div>
+				<div class="relative h-full mx-auto max-w-6xl px-4 flex items-end pb-6">
+					<h2 class="text-4xl font-extrabold tracking-tight">iUP Overlays</h2>
 				</div>
-			</section>
+			</div>
+		</header>
+
+		<main class="flex-1 flex">
+			<!-- Left main content -->
+			<div class="flex-1 p-6">
+				<!-- Empty main content area for now -->
+				<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-8">
+					<div class="text-center text-slate-400">
+						<h2 class="text-xl font-semibold mb-2">Welcome to iUP</h2>
+						<p>Select an option from the sidebar to get started.</p>
+					</div>
+				</section>
+			</div>
+
+			<!-- Right sidebar (1/3 width) -->
+			<aside class="w-1/3 bg-slate-900 border-l border-slate-800 p-4">
+				<div class="space-y-4">
+					<!-- App version and update -->
+					<div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+						<div class="flex items-center justify-between">
+							<div>
+								<div class="text-sm text-slate-400">Version</div>
+								<div class="text-lg font-semibold text-slate-200" id="app-version">0.0.1</div>
+							</div>
+							<button id="btn-update" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+								Update
+							</button>
+						</div>
+					</div>
+
+					<!-- Social links -->
+					<div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+						<div class="text-sm font-medium text-slate-200 mb-3">Links</div>
+						<div class="flex flex-wrap gap-2">
+							<a href="https://instagram.com/sem_sodermans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 hover:bg-slate-800">
+								<!-- Instagram icon -->
+								<i class="fa-brands fa-instagram"></i>
+								<span class="text-slate-200">Instagram</span>
+							</a>
+							<a href="https://linkedin.com/in/sem-sodermans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 hover:bg-slate-800">
+								<!-- LinkedIn icon -->
+								<i class="fa-brands fa-linkedin"></i>
+								<span class="text-slate-200">LinkedIn</span>
+							</a>
+							<a href="https://paypal.me/sems0drmans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2 hover:bg-slate-800">
+								<!-- PayPal icon -->
+								<i class="fa-brands fa-paypal"></i>
+								<span class="text-slate-200">PayPal</span>
+							</a>
+						</div>
+					</div>
+
+					<!-- News and release notes -->
+					<div class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+						<div class="flex items-center justify-between mb-2">
+							<div class="text-sm font-medium text-slate-200">News</div>
+							<button id="btn-release-notes" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed">
+								Release Notes
+							</button>
+						</div>
+						<div class="text-sm text-slate-400">What has changed in the latest version?</div>
+					</div>
+				</div>
+			</aside>
 		</main>
+
+		<!-- Release Notes Modal -->
+		<div id="release-notes-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+			<div id="release-notes-backdrop" class="absolute inset-0 bg-slate-950/70"></div>
+			<div id="release-notes-dialog" class="relative z-10 w-1/3 h-[75dvh] bg-slate-900 border border-slate-800 rounded-xl shadow-lg flex flex-col">
+				<div class="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+					<h3 class="text-lg font-semibold text-slate-200">Release Notes</h3>
+					<button id="btn-close-release-notes" class="rounded-md px-2 py-1 text-slate-300 hover:bg-slate-800">✕</button>
+				</div>
+				<div id="release-notes-content" class="p-4 text-sm text-slate-300 flex-1 overflow-y-auto">
+					Loading...
+				</div>
+			</div>
+		</div>
 	</div>
 	<script src="index.js"></script>
 </body>

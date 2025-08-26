@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>iRacing Overlay GUI - Overlays</title>
+	<title>iUP - Overlays</title>
 	<link rel="stylesheet" href="../dist/styles.css" />
 </head>
 <body class="min-h-dvh bg-slate-950 text-slate-100 flex">
@@ -137,12 +137,23 @@
 							<p class="text-sm text-slate-400 mt-1">Proximity radar for nearby cars</p>
 						</div>
 					</div>
+
+					<!-- Track Map Overlay -->
+					<div class="overlay-card rounded-xl border border-slate-800 bg-slate-900/60 p-4 cursor-pointer hover:bg-slate-900/80 transition-colors" data-overlay="track">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-slate-800 rounded-lg flex items-center justify-center">
+								<span class="text-2xl">🗺️</span>
+							</div>
+							<h3 class="font-semibold text-slate-200">Track Map</h3>
+							<p class="text-sm text-slate-400 mt-1">Track map with live car position</p>
+						</div>
+					</div>
 				</div>
 			</div>
 
 			<!-- Right Sidebar for Overlay Settings -->
-			<aside id="overlay-settings" class="w-80 bg-slate-900 border-l border-slate-800 p-4 hidden">
-				<div class="space-y-4">
+			<aside id="overlay-settings" class="w-80 bg-slate-900 border-l border-slate-800 hidden flex flex-col">
+				<div class="flex-1 overflow-y-auto p-4 space-y-4">
 					<!-- Overlay Title -->
 					<div class="border-b border-slate-800 pb-3">
 						<h2 id="overlay-title" class="text-lg font-semibold text-slate-200">Overlay Settings</h2>
@@ -273,6 +284,119 @@
 						<div class="text-xs text-slate-400 italic">
 							Choose which reference lap to compare your delta timing against.
 						</div>
+					</div>
+
+					<!-- Track: Show Other Cars (visible only when Track selected) -->
+					<div id="overlay-track-cars-row" class="space-y-3 hidden">
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Show Other Cars</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="track-show-other-cars" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+						<div class="text-xs text-slate-400 italic">
+							Display other cars on the track map. Pace/safety cars appear in yellow/orange, regular opponents in red.
+						</div>
+					</div>
+
+					<!-- Standings: Column Toggles (visible only when Standings selected) -->
+					<div id="overlay-standings-columns-row" class="space-y-3 hidden">
+						<div class="text-sm font-medium text-slate-200 mb-2">Column Visibility</div>
+						<div class="text-xs text-slate-400 italic mb-3">
+							Control which columns are displayed in the standings overlay. Position, Number, Name are always shown.
+						</div>
+						
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Pit Age</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-pit" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">License/SR</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-license" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">iRating</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-irating" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Car Brand</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-car-brand" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Positions +/-</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-positions-gained" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Gap</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-gap" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Best Lap</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-best" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Last Lap</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-lap-time" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Delta</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-delta" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+
+						<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+							<span class="text-slate-200">Last 5 Avg</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="standings-show-l5" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-indigo-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
 					</div>
 
 					<!-- Save Button -->

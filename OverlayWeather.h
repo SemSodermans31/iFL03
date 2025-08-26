@@ -33,6 +33,7 @@ SOFTWARE.
 #include <cmath>
 #include "Overlay.h"
 #include "iracing.h"
+#include "Units.h"
 #include "Config.h"
 #include "OverlayDebug.h"
 #include "stub_data.h"
@@ -176,7 +177,7 @@ class OverlayWeather : public Overlay
 
             // Use stub data in preview mode
             const bool useStubData = StubDataManager::shouldUseStubData();
-            const bool imperial = useStubData ? false : (ir_DisplayUnits.getInt() == 0);
+            const bool imperial = isImperialUnits();
 
             wchar_t s[512];
 

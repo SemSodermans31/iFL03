@@ -29,10 +29,13 @@ SOFTWARE.
 #pragma comment(lib,"dwrite.lib")
 
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <string>
 #include <vector>
+#include <deque>
+#include <map>
+#include <set>
+#include <stdlib.h>
+#include <stdio.h>
 #include <windows.h>
 #include "iracing.h"
 #include "Config.h"
@@ -46,6 +49,7 @@ SOFTWARE.
 #include "OverlayFlags.h"
 #include "OverlayDelta.h"
 #include "OverlayRadar.h"
+#include "OverlayTrack.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
 #include "preview_mode.h"
@@ -62,6 +66,7 @@ enum class Hotkey
     Flags,
     Delta, 
     Radar
+    , Track
 };
 
 static void registerHotkeys()
@@ -76,6 +81,7 @@ static void registerHotkeys()
     UnregisterHotKey( NULL, (int)Hotkey::Flags );
     UnregisterHotKey( NULL, (int)Hotkey::Delta );
     UnregisterHotKey( NULL, (int)Hotkey::Radar );
+    UnregisterHotKey( NULL, (int)Hotkey::Track );
 
     UINT vk, mod;
 
@@ -108,6 +114,9 @@ static void registerHotkeys()
 
     if( parseHotkey( g_cfg.getString("OverlayRadar","toggle_hotkey","ctrl+9"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Radar, mod, vk );
+
+    if( parseHotkey( g_cfg.getString("OverlayTrack","toggle_hotkey","ctrl+0"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Track, mod, vk );
 }
 
 static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus status )
@@ -208,12 +217,20 @@ int main()
     printf("\nHappy Racing!\n");
     printf("====================================================================================\n\n");
 
+    // Preload car brand icons once
+    std::map<std::string, IWICFormatConverter*> carBrandIcons;
+    const bool carBrandIconsLoaded = loadCarBrandIcons(carBrandIcons);
+
     // Create overlays
     std::vector<Overlay*> overlays;
     overlays.push_back( new OverlayCover() );
     overlays.push_back( new OverlayRelative() );
     overlays.push_back( new OverlayInputs() );
-    overlays.push_back( new OverlayStandings() );
+    {
+        auto* st = new OverlayStandings();
+        st->setCarBrandIcons(carBrandIcons, carBrandIconsLoaded);
+        overlays.push_back(st);
+    }
     overlays.push_back( new OverlayDDU() );
     overlays.push_back( new OverlayWeather() );
     overlays.push_back( new OverlayFlags() );
@@ -223,6 +240,7 @@ int main()
 #else
     overlays.push_back( new OverlayRadar() );
 #endif
+    overlays.push_back( new OverlayTrack() );
 #ifdef _DEBUG
     overlays.push_back( new OverlayDebug() );
 #endif
@@ -358,6 +376,9 @@ int main()
                         break;
                     case (int)Hotkey::Radar:
                         g_cfg.setBool( "OverlayRadar", "enabled", !g_cfg.getBool("OverlayRadar","enabled",true) );
+                        break;
+                    case (int)Hotkey::Track:
+                        g_cfg.setBool( "OverlayTrack", "enabled", !g_cfg.getBool("OverlayTrack","enabled",true) );
                         break;
                     }
                     

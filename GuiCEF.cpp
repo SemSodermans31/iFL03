@@ -11,10 +11,15 @@
 #include "include/cef_browser.h"
 #include "include/cef_sandbox_win.h"
 #include "include/cef_v8.h"
+#include "include/cef_context_menu_handler.h"
+#include "include/cef_keyboard_handler.h"
+#include "include/cef_dom.h"
+#include <shellapi.h>
 #include "include/base/cef_build.h"
 #include "include/base/cef_ref_counted.h"
 #include "include/wrapper/cef_message_router.h"
 #include "AppControl.h"
+#include "Config.h"
 
 namespace {
 	static const wchar_t* kGuiWndClass = L"iRonGuiWindow";
@@ -22,6 +27,16 @@ namespace {
 	CefRefPtr<CefBrowser> g_browser;
 	CefRefPtr<CefMessageRouterBrowserSide> g_router;
 	CefRefPtr<CefMessageRouterRendererSide> g_router_renderer;
+    static std::atomic<bool> g_editableFocused{false};
+    static const UINT WM_TRAYICON = WM_APP + 1;
+    static bool g_trayIconAdded = false;
+
+	static void OpenUrlWithShellExecute(const std::string& urlUtf8)
+	{
+		if (urlUtf8.empty()) return;
+		std::wstring urlW = CefString(urlUtf8);
+		ShellExecuteW(NULL, L"open", urlW.c_str(), NULL, NULL, SW_SHOWNORMAL);
+	}
 
 	LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
@@ -55,13 +70,23 @@ namespace {
 		return DefWindowProcW(hwnd, msg, wparam, lparam);
 	}
 
-	class SimpleClient : public CefClient, public CefLifeSpanHandler, public CefDisplayHandler, public CefRequestHandler {
+	class SimpleClient : public CefClient, public CefLifeSpanHandler, public CefDisplayHandler, public CefRequestHandler, public CefContextMenuHandler, public CefKeyboardHandler {
 	public:
 		SimpleClient() {}
 
 		CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override { return this; }
 		CefRefPtr<CefDisplayHandler> GetDisplayHandler() override { return this; }
 		CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
+		CefRefPtr<CefContextMenuHandler> GetContextMenuHandler() override { return this; }
+		CefRefPtr<CefKeyboardHandler> GetKeyboardHandler() override { return this; }
+
+		static void OpenInDefaultBrowser(const std::string& urlUtf8)
+		{
+			// Only attempt for http/https/mailto
+			if (!(urlUtf8.rfind("http://", 0) == 0 || urlUtf8.rfind("https://", 0) == 0 || urlUtf8.rfind("mailto:", 0) == 0))
+				return;
+			OpenUrlWithShellExecute(urlUtf8);
+		}
 
 		bool OnBeforeBrowse(CefRefPtr<CefBrowser> browser,
 			CefRefPtr<CefFrame> frame,
@@ -72,6 +97,48 @@ namespace {
 			if (g_router.get()) g_router->OnBeforeBrowse(browser, frame);
 			return false;
 		}
+
+		// Disable right-click context menu entirely
+		void OnBeforeContextMenu(CefRefPtr<CefBrowser> browser,
+			CefRefPtr<CefFrame> frame,
+			CefRefPtr<CefContextMenuParams> params,
+			CefRefPtr<CefMenuModel> model) override
+		{
+			if (model.get()) model->Clear();
+		}
+
+		// Block browser shortcuts; allow typing only when an editable field has focus
+		bool OnPreKeyEvent(CefRefPtr<CefBrowser> browser,
+			const CefKeyEvent& event,
+			CefEventHandle os_event,
+			bool* is_keyboard_shortcut) override
+		{
+			if (is_keyboard_shortcut) *is_keyboard_shortcut = false;
+			if (event.type != KEYEVENT_RAWKEYDOWN && event.type != KEYEVENT_KEYDOWN && event.type != KEYEVENT_CHAR)
+				return false;
+
+			const int key = event.windows_key_code;
+			const bool ctrl  = (event.modifiers & EVENTFLAG_CONTROL_DOWN) != 0;
+			const bool shift = (event.modifiers & EVENTFLAG_SHIFT_DOWN) != 0;
+			const bool alt   = (event.modifiers & EVENTFLAG_ALT_DOWN) != 0;
+
+			// Always block common browser shortcuts
+			if (key == VK_F5 || key == VK_F11 || key == VK_F12) return true;
+			if (ctrl && (key == 'R' || key == VK_BROWSER_REFRESH)) return true;
+			if (ctrl && shift && (key == 'I' || key == VK_F12)) return true;
+			if (ctrl && (key == 'L' || key == 'T' || key == 'N' || key == 'W')) return true; // location/new tab/new window/close
+			if (alt && key == VK_LEFT) return true;
+			if (alt && key == VK_RIGHT) return true;
+
+			// If no editable element is focused, swallow all keyboard input
+			if (!event.focus_on_editable_field)
+				return true;
+
+			// Otherwise allow typing into inputs
+			return false;
+		}
+
+		// Note: We rely on JS interception and OnBeforeBrowse for external links
 
 		void OnAfterCreated(CefRefPtr<CefBrowser> browser) override {
 			g_browser = browser;
@@ -137,6 +204,15 @@ namespace {
 			if (has("\"cmd\":\"getState\"")) {
 				callback->Success(app_get_state_json());
 				return true;
+			}
+			if (has("\"cmd\":\"openExternal\"")) {
+				// { cmd: "openExternal", url: "https://..." }
+				std::string url;
+				if (extractStringField(req, "url", url)) {
+					OpenUrlWithShellExecute(url);
+					callback->Success(app_get_state_json());
+					return true;
+				}
 			}
 			if (has("\"cmd\":\"setUiEdit\"")) {
 				bool on = false; (void)extractBoolField(req, "on", on);
@@ -263,6 +339,68 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			if (has("\"cmd\":\"loadCarConfig\"")) {
+				std::string carName;
+				if (extractStringField(req, "carName", carName)) {
+					if (g_cfg.loadCarConfig(carName)) {
+						app_handleConfigChange_external();
+						callback->Success(app_get_state_json());
+					} else {
+						callback->Failure(400, "failed to load car config");
+					}
+				} else {
+					callback->Failure(400, "carName required");
+				}
+				return true;
+			}
+			if (has("\"cmd\":\"saveCarConfig\"")) {
+				std::string carName;
+				if (extractStringField(req, "carName", carName)) {
+					if (g_cfg.saveCarConfig(carName)) {
+						callback->Success(app_get_state_json());
+					} else {
+						callback->Failure(400, "failed to save car config");
+					}
+				} else {
+					callback->Failure(400, "carName required");
+				}
+				return true;
+			}
+			if (has("\"cmd\":\"copyCarConfig\"")) {
+				std::string fromCar, toCar;
+				if (extractStringField(req, "fromCar", fromCar) &&
+					extractStringField(req, "toCar", toCar)) {
+					if (g_cfg.copyConfigToCar(fromCar, toCar)) {
+						callback->Success(app_get_state_json());
+					} else {
+						callback->Failure(400, "failed to copy car config");
+					}
+				} else {
+					callback->Failure(400, "fromCar and toCar required");
+				}
+				return true;
+			}
+			if (has("\"cmd\":\"deleteCarConfig\"")) {
+				std::string carName;
+				if (extractStringField(req, "carName", carName)) {
+					if (g_cfg.deleteCarConfig(carName)) {
+						callback->Success(app_get_state_json());
+					} else {
+						callback->Failure(400, "failed to delete car config");
+					}
+				} else {
+					callback->Failure(400, "carName required");
+				}
+				return true;
+			}
+			if (has("\"cmd\":\"resetConfig\"")) {
+				// Remove config.json to reset to defaults, then reload and propagate
+				DeleteFileW(L"config.json");
+				g_cfg.load();
+				app_handleConfigChange_external();
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			callback->Failure(400, "unknown command");
 			return true;
 		}
@@ -333,7 +471,7 @@ namespace {
 
 static bool g_cefInitialized = false;
 
-static std::wstring getExecutableDirW()
+static std::wstring getExecutableDirW_CEF()
 {
 	wchar_t path[MAX_PATH] = {0};
 	GetModuleFileNameW(NULL, path, MAX_PATH);
@@ -364,7 +502,7 @@ static void createParentWindow()
 
 	RECT r = { 100, 100, 100 + 1920, 100 + 1080 };
 	AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, FALSE, 0);
-	g_parentHwnd = CreateWindowExW(0, kGuiWndClass, L"iRacing Overlay GUI", WS_OVERLAPPEDWINDOW,
+	g_parentHwnd = CreateWindowExW(0, kGuiWndClass, L"iUP", WS_OVERLAPPEDWINDOW,
 		r.left, r.top, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), NULL);
 	
 	ShowWindow(g_parentHwnd, SW_SHOW);
@@ -389,7 +527,7 @@ bool cefInitialize()
 	settings.log_severity = LOGSEVERITY_DISABLE;
 
 	// Set a cache path so cookies/local storage persist
-	const std::wstring exeDir = getExecutableDirW();
+	const std::wstring exeDir = getExecutableDirW_CEF();
 	CefString(&settings.cache_path) = exeDir + L"\\cef_cache";
 
 	g_client = new SimpleClient();
@@ -417,7 +555,7 @@ void cefCreateMainWindow()
 	// Try to load UI from the repo root first (..\\..\\ui),
 	// fall back to the copied UI next to the executable (..\\ui),
 	// else fall back to about:blank.
-	std::wstring exeDir = getExecutableDirW();
+	std::wstring exeDir = getExecutableDirW_CEF();
 	std::wstring candidateRepo = exeDir + L"\\..\\..\\ui\\index.html";
 	std::wstring candidateLocal = exeDir + L"\\ui\\index.html";
 

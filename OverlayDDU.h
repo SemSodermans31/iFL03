@@ -29,6 +29,7 @@ SOFTWARE.
 #include <deque>
 #include "Overlay.h"
 #include "iracing.h"
+#include "Units.h"
 #include "Config.h"
 #include "OverlayDebug.h"
 #include "stub_data.h"
@@ -228,7 +229,7 @@ class OverlayDDU : public Overlay
             }
             
             const int  carIdx   = useStubData ? 0 : ir_session.driverCarIdx;
-            const bool imperial = useStubData ? true : (ir_DisplayUnits.getInt() == 0);
+            const bool imperial = isImperialUnits();
 
             const DWORD tickCount = GetTickCount();
 

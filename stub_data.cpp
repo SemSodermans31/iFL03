@@ -20,7 +20,7 @@ void StubDataManager::initialize()
     // Define realistic F1-style driver data
     s_stubCars = {
         // name,       carNum, lic, iRating, isSelf, isBuddy, isFlagged, pos, bestLap,  lastLap,   lapCount, pitAge
-        {"You",        "77",   'A', 2156,    true,   false,   false,     2,   84.567f,  84.623f,   12,       15},
+        {"You",        "31",   'C', 2156,    true,   false,   false,     2,   84.567f,  84.623f,   12,       15},
         {"Hamilton",   "44",   'A', 3245,    false,  true,    false,     6,   84.734f,  84.801f,   12,       16}, 
         {"Verstappen", "1",    'A', 4789,    false,  false,   false,     5,   84.456f,  84.512f,   12,       14},
         {"Leclerc",    "16",   'A', 3891,    false,  false,   false,     3,   84.321f,  84.389f,   13,       17}, // Fastest lap
@@ -44,6 +44,41 @@ void StubDataManager::populateSessionCars()
     
     initialize();
     
+    // Ensure a sensible session context for preview
+    ir_session.sessionType = SessionType::PRACTICE;
+    ir_session.driverCarIdx = -1;
+
+    // Some simple demo colors for car classes and license grades
+    auto makeColor = [](float r, float g, float b){ return float4(r, g, b, 1.0f); };
+    const float4 classColors[] = {
+        makeColor(0.20f, 0.60f, 0.95f),
+        makeColor(0.95f, 0.50f, 0.20f),
+        makeColor(0.30f, 0.85f, 0.30f),
+        makeColor(0.80f, 0.30f, 0.80f),
+        makeColor(0.95f, 0.85f, 0.20f),
+        makeColor(0.95f, 0.30f, 0.30f),
+        makeColor(0.30f, 0.30f, 0.95f),
+        makeColor(0.30f, 0.85f, 0.80f)
+    };
+    auto licenseColorFor = [&](char lic)->float4{
+        switch(lic){
+            case 'A': return makeColor(0.10f, 0.45f, 0.95f); // blue-ish
+            case 'B': return makeColor(0.15f, 0.70f, 0.20f); // green-ish
+            case 'C': return makeColor(0.95f, 0.80f, 0.10f); // yellow-ish
+            case 'D': return makeColor(0.95f, 0.55f, 0.10f); // orange-ish
+            default:  return makeColor(0.50f, 0.50f, 0.50f);
+        }
+    };
+    auto licenseSrFor = [&](char lic)->float{
+        switch(lic){
+            case 'A': return 4.50f;
+            case 'B': return 3.50f;
+            case 'C': return 2.50f;
+            case 'D': return 1.50f;
+            default:  return 0.0f;
+        }
+    };
+
     // Clear existing car data and populate with stub data
     for (size_t i = 0; i < s_stubCars.size() && i < IR_MAX_CARS; ++i)
     {
@@ -51,17 +86,44 @@ void StubDataManager::populateSessionCars()
         Car& car = const_cast<Car&>(ir_session.cars[i]);
         
         car.userName = stubCar.name;
+        car.teamName = stubCar.name;  // Also set teamName for name display
         car.carNumberStr = stubCar.carNumber;
         car.carNumber = std::stoi(stubCar.carNumber);
         car.licenseChar = stubCar.license;
+        car.licenseSR = licenseSrFor(stubCar.license);
+        car.licenseCol = licenseColorFor(stubCar.license);
         car.irating = stubCar.irating;
         car.isSelf = stubCar.isSelf ? 1 : 0;
         car.isPaceCar = 0;
         car.isSpectator = 0;
         car.isBuddy = stubCar.isBuddy ? 1 : 0;
         car.isFlagged = stubCar.isFlagged ? 1 : 0;
+        car.classCol = classColors[i % (sizeof(classColors)/sizeof(classColors[0]))];
+        
+        // Assign car brands for icon display in preview mode (names chosen to match available PNG files)
+        const char* carBrands[] = {
+            "Ferrari 488", "Mercedes AMG", "BMW M4", "McLaren 720S",
+            "Aston Martin Vantage", "Alpine A110", "Ford GT", "Porsche 911",
+            "Alfa Romeo Giulia", "Chevrolet Corvette", "Audi R8", "Lamborghini Huracan",
+            "Toyota Supra", "Mazda MX-5", "Subaru BRZ", "Honda NSX",
+            "Volvo XC90", "Tesla Model S", "VW Golf", "Mini Cooper"
+        };
+        car.carName = carBrands[i % (sizeof(carBrands)/sizeof(carBrands[0]))];
+        car.carID = (int)i + 1;  // Unique car ID for icon mapping
+        car.practice.position = (int)i + 1;
+        car.qualy.position = (int)i + 1;
+        car.race.position = stubCar.position > 0 ? stubCar.position : (int)i + 1;
+        car.practice.lastTime = stubCar.lastLapTime;
+        car.practice.fastestTime = stubCar.bestLapTime;
         car.lastLapInPits = stubCar.lapCount - stubCar.pitAge;
+
+        if (car.isSelf)
+            ir_session.driverCarIdx = (int)i;
     }
+
+    // Fallback if none marked self
+    if (ir_session.driverCarIdx < 0 && !s_stubCars.empty())
+        ir_session.driverCarIdx = 0;
 }
 
 const std::vector<StubDataManager::StubCar>& StubDataManager::getStubCars()

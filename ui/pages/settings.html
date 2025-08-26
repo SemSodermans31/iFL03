@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>iRacing Overlay GUI - Settings</title>
+	<title>iUP - Settings</title>
 	<link rel="stylesheet" href="../dist/styles.css" />
 </head>
 <body class="min-h-dvh bg-slate-950 text-slate-100 flex">
@@ -51,12 +51,25 @@
 					<div class="text-sm text-slate-400">
 						Reduces update frequency to 30Hz for better performance on slower systems.
 					</div>
+
+					<!-- Units: Metric vs Imperial -->
+					<label class="flex items-center justify-between gap-4 rounded-lg border border-slate-800/70 bg-slate-900/40 px-3 py-2">
+						<span class="text-slate-200">Units</span>
+						<select id="sel_units" class="rounded-md bg-slate-900/60 border border-slate-800 px-2 py-1 text-slate-200">
+							<option value="metric">Metric (km/h, °C)</option>
+							<option value="imperial">Imperial (mph, °F)</option>
+						</select>
+					</label>
+
 				</div>
 			</section>
 
-			<!-- Save Button -->
+			<!-- Save / Reset -->
 			<section class="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-				<div class="flex justify-end">
+				<div class="flex items-center justify-between">
+					<button id="btn-reset-defaults" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-600 focus:ring-offset-2 focus:ring-offset-slate-900">
+						Revert to Defaults
+					</button>
 					<button id="save_settings" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-slate-900">
 						Save Settings
 					</button>

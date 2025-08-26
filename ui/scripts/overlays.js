@@ -48,6 +48,11 @@ const overlayConfig = {
 		name: 'Radar',
 		configKey: 'OverlayRadar',
 		description: 'Proximity radar for nearby cars'
+	},
+	'track': {
+		name: 'Track Map',
+		configKey: 'OverlayTrack',
+		description: 'Track map with live car position'
 	}
 };
 
@@ -237,6 +242,49 @@ function setupEventListeners() {
 			}
 		});
 	}
+
+	// Standings column toggles
+	const columnToggles = [
+		{ id: 'standings-show-pit', key: 'show_pit' },
+		{ id: 'standings-show-license', key: 'show_license' },
+		{ id: 'standings-show-irating', key: 'show_irating' },
+		{ id: 'standings-show-car-brand', key: 'show_car_brand' },
+		{ id: 'standings-show-positions-gained', key: 'show_positions_gained' },
+		{ id: 'standings-show-gap', key: 'show_gap' },
+		{ id: 'standings-show-best', key: 'show_best' },
+		{ id: 'standings-show-lap-time', key: 'show_lap_time' },
+		{ id: 'standings-show-delta', key: 'show_delta' },
+		{ id: 'standings-show-l5', key: 'show_L5' }
+	];
+
+	columnToggles.forEach(toggle => {
+		const element = document.getElementById(toggle.id);
+		if (element) {
+			element.addEventListener('change', function() {
+				if (selectedOverlay === 'standings') {
+					sendCommand('setConfigBool', {
+						component: 'OverlayStandings',
+						key: toggle.key,
+						value: this.checked
+					});
+				}
+			});
+		}
+	});
+
+	// Track: Show Other Cars toggle
+	const trackShowOtherCarsToggle = document.getElementById('track-show-other-cars');
+	if (trackShowOtherCarsToggle) {
+		trackShowOtherCarsToggle.addEventListener('change', function() {
+			if (selectedOverlay === 'track') {
+				sendCommand('setConfigBool', {
+					component: 'OverlayTrack',
+					key: 'show_other_cars',
+					value: this.checked
+				});
+			}
+		});
+	}
 }
 
 function selectOverlay(overlayKey) {
@@ -350,6 +398,53 @@ function updateOverlaySettings(overlayKey) {
 			const cfg = currentState.config && currentState.config['OverlayDelta'];
 			if (cfg && cfg.reference_mode !== undefined) sel.value = cfg.reference_mode;
 			else sel.value = '1'; // Default to SESSION_BEST
+		}
+	}
+
+	// Standings-specific: show column toggles when Standings overlay selected
+	const standingsColumnsRow = document.getElementById('overlay-standings-columns-row');
+	if (standingsColumnsRow) standingsColumnsRow.classList.add('hidden');
+	if (overlayKey === 'standings') {
+		if (standingsColumnsRow) standingsColumnsRow.classList.remove('hidden');
+		
+		// Update column toggle states from config
+		const cfg = currentState.config && currentState.config['OverlayStandings'];
+		if (cfg) {
+			const columnToggles = [
+				{ id: 'standings-show-pit', key: 'show_pit', defaultValue: true },
+				{ id: 'standings-show-license', key: 'show_license', defaultValue: true },
+				{ id: 'standings-show-irating', key: 'show_irating', defaultValue: true },
+				{ id: 'standings-show-car-brand', key: 'show_car_brand', defaultValue: true },
+				{ id: 'standings-show-positions-gained', key: 'show_positions_gained', defaultValue: true },
+				{ id: 'standings-show-gap', key: 'show_gap', defaultValue: true },
+				{ id: 'standings-show-best', key: 'show_best', defaultValue: true },
+				{ id: 'standings-show-lap-time', key: 'show_lap_time', defaultValue: true },
+				{ id: 'standings-show-delta', key: 'show_delta', defaultValue: true },
+				{ id: 'standings-show-l5', key: 'show_L5', defaultValue: true }
+			];
+
+			columnToggles.forEach(toggle => {
+				const element = document.getElementById(toggle.id);
+				if (element) {
+					element.checked = cfg[toggle.key] !== undefined ? cfg[toggle.key] : toggle.defaultValue;
+				}
+			});
+		}
+	}
+
+	// Track-specific: show other cars toggle when Track overlay selected
+	const trackCarsRow = document.getElementById('overlay-track-cars-row');
+	if (trackCarsRow) trackCarsRow.classList.add('hidden');
+	if (overlayKey === 'track') {
+		if (trackCarsRow) trackCarsRow.classList.remove('hidden');
+		
+		// Update show other cars toggle state from config
+		const cfg = currentState.config && currentState.config['OverlayTrack'];
+		if (cfg) {
+			const showOtherCarsToggle = document.getElementById('track-show-other-cars');
+			if (showOtherCarsToggle) {
+				showOtherCarsToggle.checked = cfg.show_other_cars !== undefined ? cfg.show_other_cars : false;
+			}
 		}
 	}
 }

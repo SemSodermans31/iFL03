@@ -28,6 +28,25 @@ function setupEventListeners() {
 			saveAllSettings();
 		});
 	}
+
+	// Units selector
+	const unitsSel = document.getElementById('sel_units');
+	if (unitsSel) {
+		unitsSel.addEventListener('change', function() {
+			sendCommand('setConfigString', { component: 'General', key: 'units', value: this.value });
+		});
+	}
+
+
+	// Reset to defaults
+	const resetBtn = document.getElementById('btn-reset-defaults');
+	if (resetBtn) {
+		resetBtn.addEventListener('click', function() {
+			if (confirm('Revert all settings to defaults?')) {
+				sendCommand('resetConfig', {});
+			}
+		});
+	}
 }
 
 function requestState() {
@@ -58,6 +77,13 @@ function updateUI() {
 	if (performanceModeCheckbox && currentState.config) {
 		performanceModeCheckbox.checked = currentState.config.General?.performance_mode_30hz || false;
 	}
+
+	// Update units
+	const unitsSel = document.getElementById('sel_units');
+	if (unitsSel && currentState.config) {
+		unitsSel.value = currentState.config.General?.units || 'metric';
+	}
+
 }
 
 function updateConnectionStatus(status) {
@@ -119,6 +145,13 @@ function saveAllSettings() {
 	if (performanceModeCheckbox) {
 		settings.performance_mode_30hz = performanceModeCheckbox.checked;
 	}
+
+	// Units
+	const unitsSel = document.getElementById('sel_units');
+	if (unitsSel) {
+		sendCommand('setConfigString', { component: 'General', key: 'units', value: unitsSel.value });
+	}
+
 	
 	// Send save command
 	sendCommand('saveSettings', settings);

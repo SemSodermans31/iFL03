@@ -37,6 +37,16 @@ class Config
 
         bool                        load();
         bool                        save();
+        
+        // Car-specific config methods
+        bool                        loadCarConfig( const std::string& carName );
+        bool                        saveCarConfig( const std::string& carName );
+        bool                        hasCarConfig( const std::string& carName );
+        bool                        copyConfigToCar( const std::string& fromCar, const std::string& toCar );
+        std::vector<std::string>    getAvailableCarConfigs();
+        bool                        deleteCarConfig( const std::string& carName );
+        std::string                 getCurrentCarName() const { return m_currentCarName; }
+        void                        setCurrentCarName( const std::string& carName ) { m_currentCarName = carName; }
 
         void                        watchForChanges();
         bool                        hasChanged();
@@ -56,11 +66,14 @@ class Config
 
         picojson::object&           getOrInsertComponent( const std::string& component, bool* existed=nullptr );
         picojson::value&            getOrInsertValue( const std::string& component, const std::string& key, bool* existed=nullptr );
+        std::string                 sanitizeCarName( const std::string& carName ) const;
+        std::string                 getCarConfigFilename( const std::string& carName ) const;
 
         picojson::object    m_pj;
         std::atomic<bool>   m_hasChanged = false;
         std::thread         m_configWatchThread;
         std::string         m_filename = "config.json";
+        std::string         m_currentCarName;
 };
 
 extern Config        g_cfg;

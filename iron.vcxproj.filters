@@ -98,6 +98,9 @@
     <ClInclude Include="GuiCEF.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="OverlayTrack.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="LICENSE" />

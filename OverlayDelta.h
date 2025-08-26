@@ -24,13 +24,13 @@ SOFTWARE.
 
 #pragma once
 
+#include <deque>
 #include "Overlay.h"
 #include "iracing.h"
 #include "Config.h"
 #include "util.h"
 #include "preview_mode.h"
 #include "stub_data.h"
-#include <deque>
 #include <vector>
 #include <dwrite.h>
 #include <dwrite_1.h>
@@ -451,9 +451,6 @@ protected:
         const float4 timeColor = float4(1.0f, 1.0f, 1.0f, 1.0f);
         const float4 predictedColor = float4(0.0f, 1.0f, 0.3f, 1.0f);
         
-        // Background
-        drawCard(x, y, width, height, bgColor);
-        
         // Calculate column widths for side-by-side layout (scaled padding)
         const float padding = 8.0f * scale;
         const float columnWidth = (width - (3.0f * padding)) / 2; // Split into two columns with padding
@@ -479,6 +476,9 @@ protected:
             const float blockTop = panelCenterY - (totalBlockH * 0.5f);
             float timeY = blockTop;
             float labelY = blockTop + timeHeight + innerSpacing;
+            // Draw background pill only when content exists
+            const float cardVPad = 6.0f * scale;
+            drawCard(leftX, blockTop - cardVPad, columnWidth, totalBlockH + (2.0f * cardVPad), bgColor);
             
             drawText(timeBuffer, leftX, timeY, columnWidth, timeHeight, m_scaledDeltaFormat.Get(), timeColor);
             
@@ -509,6 +509,9 @@ protected:
                 const float blockTop = panelCenterY - (totalBlockH * 0.5f);
                 float timeY = blockTop;
                 float labelY = blockTop + timeHeight + innerSpacing;
+                // Draw background pill only when content exists
+                const float cardVPad = 6.0f * scale;
+                drawCard(rightX, blockTop - cardVPad, columnWidth, totalBlockH + (2.0f * cardVPad), bgColor);
                 
                 drawText(timeBuffer, rightX, timeY, columnWidth, timeHeight, m_scaledDeltaFormat.Get(), predictedColor);
                 drawText(L"PREDICTED", rightX, labelY, columnWidth, labelHeight, m_scaledSmallFormat.Get(), textColor);

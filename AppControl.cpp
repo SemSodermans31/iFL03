@@ -1,6 +1,8 @@
 #include "AppControl.h"
 #include "Config.h"
 #include "preview_mode.h"
+#include "iracing.h"
+#include "stub_data.h"
 #include <cassert>
 
 extern Config g_cfg;
@@ -89,7 +91,24 @@ std::string app_get_state_json()
 	// Build a tiny JSON string without extra deps
 	auto boolStr = [](bool v){ return v ? "true" : "false"; };
 	int st = s_status ? (int)(*s_status) : 0;
-	char buf[4096]; // Increased buffer size for full config with show_in_menu/show_in_race
+	
+	// Get current car information
+	std::string currentCarName = "";
+	if (StubDataManager::shouldUseStubData()) {
+		// Use stub data for preview mode
+		StubDataManager::populateSessionCars();
+		if (ir_session.driverCarIdx >= 0 && ir_session.driverCarIdx < IR_MAX_CARS) {
+			currentCarName = ir_session.cars[ir_session.driverCarIdx].carName;
+		}
+	} else if (ir_session.driverCarIdx >= 0 && ir_session.driverCarIdx < IR_MAX_CARS) {
+		// Use real iRacing data
+		currentCarName = ir_session.cars[ir_session.driverCarIdx].carName;
+	}
+	
+	// Get available car configs
+	std::vector<std::string> availableCarConfigs = g_cfg.getAvailableCarConfigs();
+	
+	char buf[8192]; // Increased buffer size for full config with car info
 	
 	// Helper to escape string values for JSON
 	auto escapeJson = [](const std::string& str) -> std::string {
@@ -103,23 +122,37 @@ std::string app_get_state_json()
 		return escaped;
 	};
 	
+	// Build car configs JSON array
+	std::string carConfigsJson = "[";
+	for (size_t i = 0; i < availableCarConfigs.size(); ++i) {
+		if (i > 0) carConfigsJson += ",";
+		carConfigsJson += "\"" + escapeJson(availableCarConfigs[i]) + "\"";
+	}
+	carConfigsJson += "]";
+	
 	snprintf(buf, sizeof(buf),
 		"{\"uiEdit\":%s,\"previewMode\":%s,\"connectionStatus\":\"%s\"," 
+		"\"currentCar\":\"%s\",\"currentCarConfig\":\"%s\",\"availableCarConfigs\":%s,"
 		"\"overlays\":{"
-		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s,\"OverlayDelta\":%s},"
-		"\"config\":{"
-		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s,\"OverlayDelta\":%s,\"OverlayRadar\":%s,\"OverlayTrack\":%s},"
+		"\"config\":{\"General\":{\"units\":\"%s\",\"performance_mode_30hz\":%s},"
+		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s},"
 		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
 		"\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"steering_wheel\":\"%s\"},"
 		"\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
 		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
 		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_weather_type\":%d},"
 		"\"OverlayFlags\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_flag\":\"%s\"},"
-		"\"OverlayDelta\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"reference_mode\":%d}"
+		"\"OverlayDelta\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"reference_mode\":%d},"
+		"\"OverlayRadar\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
+		"\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_other_cars\":%s}"
 		"}}",
 		(s_uiEdit && *s_uiEdit) ? "true":"false",
 		boolStr(preview_mode_get()),
 		ConnectionStatusStr[st],
+		escapeJson(currentCarName).c_str(),
+		escapeJson(g_cfg.getCurrentCarName()).c_str(),
+		carConfigsJson.c_str(),
 		boolStr(g_cfg.getBool("OverlayStandings","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayDDU","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayInputs","enabled",true)),
@@ -128,6 +161,10 @@ std::string app_get_state_json()
 		boolStr(g_cfg.getBool("OverlayWeather","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayFlags","enabled",true)),
 		boolStr(g_cfg.getBool("OverlayDelta","enabled",true)),
+		boolStr(g_cfg.getBool("OverlayRadar","enabled",true)),
+		boolStr(g_cfg.getBool("OverlayTrack","enabled",true)),
+		escapeJson(g_cfg.getString("General","units","metric")).c_str(),
+		boolStr(g_cfg.getBool("General","performance_mode_30hz",false)),
 		// OverlayStandings config
 		boolStr(g_cfg.getBool("OverlayStandings","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayStandings","toggle_hotkey","ctrl+1")).c_str(),
@@ -135,6 +172,16 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayStandings","opacity",100),
 		boolStr(g_cfg.getBool("OverlayStandings","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_pit",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_license",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_irating",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_car_brand",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_positions_gained",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_gap",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_best",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_lap_time",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_delta",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_L5",true)),
 		// OverlayDDU config
 		boolStr(g_cfg.getBool("OverlayDDU","enabled",true)),
 		escapeJson(g_cfg.getString("OverlayDDU","toggle_hotkey","ctrl+2")).c_str(),
@@ -187,7 +234,22 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayDelta","opacity",100),
 		boolStr(g_cfg.getBool("OverlayDelta","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayDelta","show_in_race",true)),
-		g_cfg.getInt("OverlayDelta","reference_mode",1)
+		g_cfg.getInt("OverlayDelta","reference_mode",1),
+		// OverlayRadar config
+		boolStr(g_cfg.getBool("OverlayRadar","enabled",true)),
+		escapeJson(g_cfg.getString("OverlayRadar","toggle_hotkey","ctrl+9")).c_str(),
+		escapeJson(g_cfg.getString("OverlayRadar","position","custom")).c_str(),
+		g_cfg.getInt("OverlayRadar","opacity",100),
+		boolStr(g_cfg.getBool("OverlayRadar","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayRadar","show_in_race",true)),
+		// OverlayTrack config
+		boolStr(g_cfg.getBool("OverlayTrack","enabled",true)),
+		escapeJson(g_cfg.getString("OverlayTrack","toggle_hotkey","ctrl+0")).c_str(),
+		escapeJson(g_cfg.getString("OverlayTrack","position","custom")).c_str(),
+		g_cfg.getInt("OverlayTrack","opacity",100),
+		boolStr(g_cfg.getBool("OverlayTrack","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayTrack","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayTrack","show_other_cars",false))
 	);
 	return std::string(buf);
 }
