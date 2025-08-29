@@ -301,6 +301,20 @@
 						</div>
 					</div>
 
+					<!-- Track: Track Width (visible only when Track selected) -->
+					<div id="overlay-track-width-row" class="hidden space-y-3">
+						<div class="rounded-lg border border-slate-800/70 bg-slate-900/40 p-3">
+							<div class="flex items-center justify-between mb-2">
+								<label for="track-width-slider" class="text-slate-200">Track Width</label>
+								<span class="text-sm text-slate-400" id="track-width-value">6.0</span>
+							</div>
+							<input type="range" id="track-width-slider"	min="1.0" max="20.0" step="0.5" value="6.0"	class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-600 hover:accent-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+						</div>
+						<p class="text-xs text-slate-400 italic">
+							Adjust the thickness of the track path on the map. Range: 1.0 to 20.0 pixels.
+						</p>
+					</div>
+
 					<!-- Standings: Column Toggles (visible only when Standings selected) -->
 					<div id="overlay-standings-columns-row" class="space-y-3 hidden">
 						<div class="text-sm font-medium text-slate-200 mb-2">Column Visibility</div>

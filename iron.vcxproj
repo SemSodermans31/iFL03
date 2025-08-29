@@ -194,12 +194,16 @@
     <ClInclude Include="AppControl.h" />
     <ClInclude Include="preview_mode.h" />
     <ClInclude Include="stub_data.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".gitignore" />
     <None Include="config.json" />
     <None Include="LICENSE" />
     <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="iron.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

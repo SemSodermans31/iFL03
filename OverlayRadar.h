@@ -51,10 +51,10 @@ class OverlayRadar : public Overlay
 
         virtual void onConfigChanged()
         {
-            // Load settings
-            m_maxRangeM     = g_cfg.getFloat(m_name, "max_range_m", 10.0f);
-            m_yellowRangeM  = g_cfg.getFloat(m_name, "yellow_range_m", 5.0f);
-            m_redRangeM     = g_cfg.getFloat(m_name, "red_range_m", 2.0f);
+            // Load settings - using fixed ranges for Racelab-style radar
+            m_maxRangeM     = 8.0f;  // Fixed 8m detection range
+            m_yellowRangeM  = 8.0f;  // Yellow zone from 8m to 2m
+            m_redRangeM     = 2.0f;  // Red zone from 2m to 0m
             m_carScale      = g_cfg.getFloat(m_name, "car_scale", 1.0f);
             m_showBG        = g_cfg.getBool (m_name, "show_background", true);
 
@@ -75,7 +75,12 @@ class OverlayRadar : public Overlay
 
         virtual void onUpdate()
         {
-            // Build simplified proximity measures instead of per-car dots
+            // Enhanced Racelab-style proximity radar with animated side positioning
+            // - Shows guide lines at 8m front/back and 2m left/right
+            // - Colors only appear when opponents are within detection range
+            // - Animated red blocks move along sides to show exact lateral positions
+            // - Yellow zones (8-2m) and red zones (0-2m) for front/back
+            // - Only red zones for sides, positioned based on detected car locations
             struct Blip { float dx; float dy; };
             std::vector<Blip> blips; // used only to synthesize preview distances
             blips.reserve(8);
@@ -85,29 +90,43 @@ class OverlayRadar : public Overlay
             const int selfIdx = useStubData ? 0 : ir_session.driverCarIdx;
             const float selfSpeed = std::max( 5.0f, ir_Speed.getFloat() ); // m/s
 
-            float minAhead = 1e9f, minBehind = 1e9f;
+            // Raw, instantaneous measures this frame
+            float minAheadNow = 1e9f, minBehindNow = 1e9f;
             bool hasLeft = false, hasRight = false;
+            float minLeftDist = 1e9f, minRightDist = 1e9f;  // Track closest side distances
+            float leftCarPos = 0.0f, rightCarPos = 0.0f;   // Track lateral position (-1 to 1, where 0 is alongside driver)
 
             if (useStubData)
             {
-                // Simple demo: a few cars around
-                blips.push_back({ -1.5f,  3.0f }); // front-left
-                blips.push_back({  1.0f,  5.0f }); // front-right
-                blips.push_back({ -0.8f, -2.0f }); // rear-left
-                blips.push_back({  0.6f, -6.0f }); // rear-right
+                // Enhanced demo: cars positioned to demonstrate lateral animation
+                blips.push_back({ -1.5f,  1.0f }); // close front-left (will show red block on left)
+                blips.push_back({  2.0f,  3.0f }); // front-right (will show yellow zone)
+                blips.push_back({ -1.2f, -1.5f }); // close rear-left (will show red block on left)
+                blips.push_back({  1.8f, -4.0f }); // rear-right (will show yellow zone)
 
                 for (const Blip& b : blips)
                 {
-                    if (b.dy > 0) minAhead = std::min(minAhead, b.dy);
-                    if (b.dy < 0) minBehind = std::min(minBehind, -b.dy);
-                    if (b.dx < -0.5f && fabsf(b.dy) <= m_yellowRangeM) hasLeft = true;
-                    if (b.dx >  0.5f && fabsf(b.dy) <= m_yellowRangeM) hasRight = true;
+                    if (b.dy > 0) minAheadNow = std::min(minAheadNow, b.dy);
+                    if (b.dy < 0) minBehindNow = std::min(minBehindNow, -b.dy);
+                    if (b.dx < -0.5f && fabsf(b.dy) <= 2.0f) {
+                        hasLeft = true;
+                        minLeftDist = std::min(minLeftDist, -b.dx);
+                        // Calculate lateral position relative to driver (-1 = far left, 0 = alongside, 1 = far right)
+                        leftCarPos = std::max(leftCarPos, std::min(1.0f, (b.dx + 2.0f) / 4.0f)); // Scale to -1 to 1 range
+                    }
+                    if (b.dx >  0.5f && fabsf(b.dy) <= 2.0f) {
+                        hasRight = true;
+                        minRightDist = std::min(minRightDist, b.dx);
+                        // Calculate lateral position relative to driver (-1 = far left, 0 = alongside, 1 = far right)
+                        rightCarPos = std::min(rightCarPos, std::max(-1.0f, (b.dx - 2.0f) / 4.0f)); // Scale to -1 to 1 range
+                    }
                 }
             }
             else if (selfIdx >= 0)
             {
-                const float L = ir_estimateLaptime();
-                const float S = ir_CarIdxEstTime.getFloat(selfIdx);
+                const float trackLenM = ir_session.trackLengthMeters;
+                const float selfPct = ir_CarIdxLapDistPct.getFloat(selfIdx);
+                const float selfEst = ir_CarIdxEstTime.getFloat(selfIdx);
                 for (int i=0; i<IR_MAX_CARS; ++i)
                 {
                     if (i == selfIdx) continue;
@@ -116,32 +135,72 @@ class OverlayRadar : public Overlay
 
                     float delta = 0.0f;
                     int lapDelta = ir_CarIdxLap.getInt(i) - ir_CarIdxLap.getInt(selfIdx);
-                    const float C = ir_CarIdxEstTime.getFloat(i);
-                    const bool wrap = fabsf(ir_CarIdxLapDistPct.getFloat(i) - ir_CarIdxLapDistPct.getFloat(selfIdx)) > 0.5f;
-                    if (wrap)
+                    if (lapDelta != 0) continue; // only same lap
+
+                    // Prefer lap percent * track length when available, otherwise fallback to EstTime * speed
+                    float alongM = 0.0f; // forward(+)/back(-) in meters
+                    const float otherPct = ir_CarIdxLapDistPct.getFloat(i);
+                    if (trackLenM > 0.1f)
                     {
-                        delta     = S > C ? (C-S)+L : (C-S)-L;
-                        lapDelta += S > C ? -1 : 1;
+                        float dPct = otherPct - selfPct;
+                        if (fabsf(dPct) > 0.5f) dPct += (dPct > 0 ? -1.0f : 1.0f);
+                        alongM = dPct * trackLenM;
                     }
                     else
                     {
-                        delta = C - S;
+                        const float otherEst = ir_CarIdxEstTime.getFloat(i);
+                        const bool wrap = fabsf(otherPct - selfPct) > 0.5f;
+                        if (wrap)
+                        {
+                            const float L = ir_estimateLaptime();
+                            delta     = selfEst > otherEst ? (otherEst-selfEst)+L : (otherEst-selfEst)-L;
+                            lapDelta += selfEst > otherEst ? -1 : 1;
+                        }
+                        else
+                        {
+                            delta = otherEst - selfEst;
+                        }
+                        alongM = delta * selfSpeed;
                     }
 
-                    if (lapDelta != 0) continue; // only same lap
-
-                    const float alongM = delta * selfSpeed; // forward(+)/back(-) in meters
-                    if (alongM > 0) minAhead = std::min(minAhead, alongM);
-                    else            minBehind = std::min(minBehind, -alongM);
+                    // Account for own car half-length to avoid early triggers
+                    const float halfLen = m_carLengthM * 0.5f;
+                    if (alongM > 0) minAheadNow = std::min(minAheadNow, std::max(0.0f, alongM - halfLen));
+                    else            minBehindNow = std::min(minBehindNow, std::max(0.0f, -alongM - halfLen));
                 }
 
-                // Side awareness from iRacing aggregate
+                // Side awareness from iRacing aggregate - enhanced lateral positioning
                 int clr = ir_CarLeftRight.getInt();
                 hasLeft  = (clr == irsdk_LRCarLeft || clr == irsdk_LR2CarsLeft || clr == irsdk_LRCarLeftRight);
                 hasRight = (clr == irsdk_LRCarRight || clr == irsdk_LR2CarsRight || clr == irsdk_LRCarLeftRight);
+
+                // Estimate lateral positions and distances based on iRacing side detection
+                if (hasLeft) {
+                    minLeftDist = 1.5f;   // Estimate close distance
+                    // Estimate lateral position - cars detected on left are typically alongside or slightly ahead/behind
+                    leftCarPos = 0.0f;    // Assume cars are alongside (0 = direct lateral position)
+                    // For 2 cars on left, spread them out a bit
+                    if (clr == irsdk_LR2CarsLeft) {
+                        leftCarPos = -0.3f; // Slightly offset for multiple cars
+                    }
+                }
+                if (hasRight) {
+                    minRightDist = 1.5f;  // Estimate close distance
+                    // Estimate lateral position - cars detected on right are typically alongside or slightly ahead/behind
+                    rightCarPos = 0.0f;   // Assume cars are alongside (0 = direct lateral position)
+                    // For 2 cars on right, spread them out a bit
+                    if (clr == irsdk_LR2CarsRight) {
+                        rightCarPos = 0.3f; // Slightly offset for multiple cars
+                    }
+                }
             }
 
-            // Rendering
+            // Smoothing and sticky timers
+            const float now = ir_SessionTime.getFloat();
+            auto smooth = [](float prev, float cur, float alpha){ return (prev > 1e8f) ? cur : (prev + alpha * (cur - prev)); };
+            m_frontDistSm = smooth(m_frontDistSm, minAheadNow, 0.3f);
+            m_rearDistSm  = smooth(m_rearDistSm,  minBehindNow, 0.3f);
+
             const float globalOpacity = getGlobalOpacity();
 
             const float2 size = float2((float)m_width, (float)m_height);
@@ -168,19 +227,37 @@ class OverlayRadar : public Overlay
                 m_renderTarget->FillEllipse(&e, m_brush.Get());
             }
 
-            // Decide which zones to light up
-            const bool frontYellow = (minAhead <= m_yellowRangeM);
-            const bool frontRed    = (minAhead <= m_redRangeM);
-            const bool rearYellow  = (minBehind <= m_yellowRangeM);
-            const bool rearRed     = (minBehind <= m_redRangeM);
+            // Decide which zones to light up - Racelab style
+            // Only show colors if opponents are within the 16m total range (8m front + 8m back)
+            const bool hasOpponentsInRange = (m_frontDistSm <= 8.0f || m_rearDistSm <= 8.0f);
+            
+            // Front/back zones
+            bool frontYellowInst = hasOpponentsInRange && (m_frontDistSm <= 8.0f && m_frontDistSm > 2.0f);
+            bool frontRedInst    = hasOpponentsInRange && (m_frontDistSm <= 2.0f);
+            bool rearYellowInst  = hasOpponentsInRange && (m_rearDistSm  <= 8.0f && m_rearDistSm  > 2.0f);
+            bool rearRedInst     = hasOpponentsInRange && (m_rearDistSm  <= 2.0f);
 
-            // Side zones: use iRacing side alerts if available; escalate to red if very close ahead/behind
-            const bool leftYellow  = hasLeft;
-            const bool rightYellow = hasRight;
-            const bool leftRed     = hasLeft  && (frontRed || rearRed);
-            const bool rightRed    = hasRight && (frontRed || rearRed);
+            // Sticky timers
+            const float stickRed = 0.20f;   // seconds
+            const float stickYellow = 0.15f;
+            if (frontRedInst)   m_frontRedUntil   = std::max(m_frontRedUntil,   now + stickRed);
+            if (rearRedInst)    m_rearRedUntil    = std::max(m_rearRedUntil,    now + stickRed);
+            if (frontYellowInst) m_frontYellowUntil = std::max(m_frontYellowUntil, now + stickYellow);
+            if (rearYellowInst)  m_rearYellowUntil  = std::max(m_rearYellowUntil,  now + stickYellow);
 
-            // Draw proximity rectangles around the car (no opponent dots)
+            const bool frontRed   = now <= m_frontRedUntil   || frontRedInst;
+            const bool rearRed    = now <= m_rearRedUntil    || rearRedInst;
+            const bool frontYellow= now <= m_frontYellowUntil|| frontYellowInst;
+            const bool rearYellow = now <= m_rearYellowUntil || rearYellowInst;
+
+            // Side zones: only red when within 2m, no yellow for sides
+            const float closeAlong = std::min(m_frontDistSm, m_rearDistSm);
+            const bool leftRed     = hasLeft  && (closeAlong <= 2.5f);
+            const bool rightRed    = hasRight && (closeAlong <= 2.5f);
+            const bool leftYellow  = false;  // No yellow for sides in Racelab style
+            const bool rightYellow = false; // No yellow for sides in Racelab style
+
+            // Draw guide lines and proximity zones
             const float pxPerM = radius / std::max(1.0f, m_maxRangeM);
             const float carWpx = m_carWidthM * pxPerM;
             const float carLpx = m_carLengthM * pxPerM;
@@ -188,43 +265,127 @@ class OverlayRadar : public Overlay
             const float halfL = carLpx * 0.5f;
 
             auto fillRect = [&](float l, float t, float r, float b, const float4& c){ D2D1_RECT_F rr = { l,t,r,b }; m_brush->SetColor(c); m_renderTarget->FillRectangle(&rr, m_brush.Get()); };
+            auto drawLine = [&](float x1, float y1, float x2, float y2, const float4& c, float width = 1.0f) {
+                m_brush->SetColor(c);
+                m_renderTarget->DrawLine(D2D1::Point2F(x1, y1), D2D1::Point2F(x2, y2), m_brush.Get(), width);
+            };
 
-            // Front zones
+            // Draw guide lines with fading opacity
+            const float4 guideLineCol = float4(1.0f, 1.0f, 1.0f, 0.5f * globalOpacity); // 50% opacity white
+            
+            // Vertical line: 8m front and back
+            const float frontLineY = cy - halfL - (8.0f * pxPerM);
+            const float rearLineY = cy + halfL + (8.0f * pxPerM);
+            drawLine(cx, cy - halfL, cx, frontLineY, guideLineCol, 1.5f);  // Front line
+            drawLine(cx, cy + halfL, cx, rearLineY, guideLineCol, 1.5f);   // Rear line
+            
+            // Horizontal lines: 2m left and right at car front/back
+            const float leftLineX = cx - (2.0f * pxPerM);
+            const float rightLineX = cx + (2.0f * pxPerM);
+            drawLine(leftLineX, cy - halfL, rightLineX, cy - halfL, guideLineCol, 1.5f);  // Front horizontal
+            drawLine(leftLineX, cy + halfL, rightLineX, cy + halfL, guideLineCol, 1.5f);  // Rear horizontal
+
+            // Helpers for radial gradient wedges fading to the outside of the circle
+            auto makeRadialBrush = [&](float innerR, float outerR, const float4& baseCol, Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush>& outBrush)
+            {
+                const float a0 = baseCol.w; // base alpha already includes globalOpacity
+                const float innerPos = std::max(0.0f, std::min(1.0f, innerR / radius));
+                const float outerPos = std::max(innerPos, std::min(1.0f, outerR / radius));
+
+                D2D1_GRADIENT_STOP stops[3];
+                stops[0].position = 0.0f;            stops[0].color = D2D1::ColorF(baseCol.x, baseCol.y, baseCol.z, 0.0f);
+                stops[1].position = innerPos;        stops[1].color = D2D1::ColorF(baseCol.x, baseCol.y, baseCol.z, a0);
+                stops[2].position = outerPos;        stops[2].color = D2D1::ColorF(baseCol.x, baseCol.y, baseCol.z, 0.0f);
+
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> gsc;
+                m_renderTarget->CreateGradientStopCollection(stops, 3, &gsc);
+
+                D2D1_RADIAL_GRADIENT_BRUSH_PROPERTIES props = D2D1::RadialGradientBrushProperties(D2D1::Point2F(cx, cy), D2D1::Point2F(0,0), radius, radius);
+                D2D1_BRUSH_PROPERTIES brushProps = D2D1::BrushProperties(1.0f, D2D1::Matrix3x2F::Identity());
+                m_renderTarget->CreateRadialGradientBrush(props, brushProps, gsc.Get(), &outBrush);
+            };
+
+            auto polarPoint = [&](float r, float ang) -> D2D1_POINT_2F {
+                return D2D1::Point2F(cx + r * sinf(ang), cy - r * cosf(ang));
+            };
+
+            auto fillRingSector = [&](float angCenter, float halfAng, float innerR, float outerR, ID2D1Brush* brush)
+            {
+                Microsoft::WRL::ComPtr<ID2D1PathGeometry> geo;
+                Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+                m_d2dFactory->CreatePathGeometry(&geo);
+                geo->Open(&sink);
+
+                const float a0 = angCenter - halfAng;
+                const float a1 = angCenter + halfAng;
+
+                sink->BeginFigure(polarPoint(outerR, a0), D2D1_FIGURE_BEGIN_FILLED);
+                sink->AddArc(D2D1::ArcSegment(polarPoint(outerR, a1), D2D1::SizeF(outerR, outerR), 0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+                sink->AddLine(polarPoint(innerR, a1));
+                sink->AddArc(D2D1::ArcSegment(polarPoint(innerR, a0), D2D1::SizeF(innerR, innerR), 0.0f, D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+                sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+                sink->Close();
+
+                m_renderTarget->FillGeometry(geo.Get(), brush);
+            };
+
+            const float PI = 3.1415926535f;
+
+            // Compute half-angles so the sector matches car width/length near the inner radius
+            const float innerFrontR = std::max(1.0f, halfL);
+            const float innerSideR  = std::max(1.0f, halfW);
+            const float frontHalfAng = std::max(0.20f, atanf(std::max(0.1f, (halfW*0.9f)) / innerFrontR));
+            const float sideHalfAng  = std::max(0.20f, atanf(std::max(0.1f, (halfL*0.9f)) / innerSideR));
+
+            // Front zones as ring sectors with radial fading
             if (frontYellow) {
-                const float len = m_yellowRangeM * pxPerM;
-                fillRect(cx - halfW*0.9f, cy - halfL - len, cx + halfW*0.9f, cy - halfL, yellowCol);
+                Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
+                const float innerR = halfL + 2.0f * pxPerM;
+                const float outerR = halfL + 8.0f * pxPerM;
+                makeRadialBrush(innerR, outerR, yellowCol, brush);
+                fillRingSector(0.0f, frontHalfAng, innerR, outerR, brush.Get());
             }
             if (frontRed) {
-                const float len = m_redRangeM * pxPerM;
-                fillRect(cx - halfW*0.9f, cy - halfL - len, cx + halfW*0.9f, cy - halfL, redCol);
+                Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
+                const float innerR = halfL;
+                const float outerR = halfL + 2.0f * pxPerM;
+                makeRadialBrush(innerR, outerR, redCol, brush);
+                fillRingSector(0.0f, frontHalfAng, innerR, outerR, brush.Get());
             }
 
-            // Rear zones
+            // Rear zones as ring sectors with radial fading
             if (rearYellow) {
-                const float len = m_yellowRangeM * pxPerM;
-                fillRect(cx - halfW*0.9f, cy + halfL, cx + halfW*0.9f, cy + halfL + len, yellowCol);
+                Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
+                const float innerR = halfL + 2.0f * pxPerM;
+                const float outerR = halfL + 8.0f * pxPerM;
+                makeRadialBrush(innerR, outerR, yellowCol, brush);
+                fillRingSector(PI, frontHalfAng, innerR, outerR, brush.Get());
             }
             if (rearRed) {
-                const float len = m_redRangeM * pxPerM;
-                fillRect(cx - halfW*0.9f, cy + halfL, cx + halfW*0.9f, cy + halfL + len, redCol);
+                Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
+                const float innerR = halfL;
+                const float outerR = halfL + 2.0f * pxPerM;
+                makeRadialBrush(innerR, outerR, redCol, brush);
+                fillRingSector(PI, frontHalfAng, innerR, outerR, brush.Get());
             }
 
-            // Left/right zones
-            if (leftYellow) {
-                const float len = m_yellowRangeM * pxPerM;
-                fillRect(cx - halfW - len, cy - halfL, cx - halfW, cy + halfL, yellowCol);
-            }
+            // Left/right zones as ring sectors with radial fading, centered on +/-90°
             if (leftRed) {
-                const float len = m_redRangeM * pxPerM;
-                fillRect(cx - halfW - len, cy - halfL, cx - halfW, cy + halfL, redCol);
-            }
-            if (rightYellow) {
-                const float len = m_yellowRangeM * pxPerM;
-                fillRect(cx + halfW, cy - halfL, cx + halfW + len, cy + halfL, yellowCol);
+                Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
+                const float innerR = halfW;
+                const float outerR = halfW + 2.0f * pxPerM;
+                makeRadialBrush(innerR, outerR, redCol, brush);
+                // Slightly bias sector center up/down based on along position estimate
+                const float angCenter = -PI * 0.5f + (leftCarPos * 0.15f);
+                fillRingSector(angCenter, sideHalfAng, innerR, outerR, brush.Get());
             }
             if (rightRed) {
-                const float len = m_redRangeM * pxPerM;
-                fillRect(cx + halfW, cy - halfL, cx + halfW + len, cy + halfL, redCol);
+                Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
+                const float innerR = halfW;
+                const float outerR = halfW + 2.0f * pxPerM;
+                makeRadialBrush(innerR, outerR, redCol, brush);
+                const float angCenter =  PI * 0.5f + (rightCarPos * 0.15f);
+                fillRingSector(angCenter, sideHalfAng, innerR, outerR, brush.Get());
             }
 
             // Draw self car glyph
@@ -253,14 +414,22 @@ class OverlayRadar : public Overlay
         }
 
     private:
-        // Settings
-        float m_maxRangeM = 10.0f;
-        float m_yellowRangeM = 5.0f;
-        float m_redRangeM = 2.0f;
+        // Settings - Fixed ranges for Racelab-style radar
+        float m_maxRangeM = 8.0f;   // Fixed 8m detection range
+        float m_yellowRangeM = 8.0f; // Yellow zone from 8m to 2m 
+        float m_redRangeM = 2.0f;    // Red zone from 2m to 0m
         float m_carScale = 1.0f;
         bool  m_showBG = true;
         float m_carWidthM = 2.0f;
         float m_carLengthM = 4.5f;
+
+        // Smoothed distances and sticky timers
+        float m_frontDistSm = 1e9f;
+        float m_rearDistSm  = 1e9f;
+        float m_frontRedUntil = 0.0f;
+        float m_rearRedUntil  = 0.0f;
+        float m_frontYellowUntil = 0.0f;
+        float m_rearYellowUntil  = 0.0f;
 
         // Text helpers (for future labels)
         Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;

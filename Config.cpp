@@ -205,6 +205,12 @@ void Config::setString( const std::string& component, const std::string& key, co
     pjcomp[key].set<std::string>( v );
 }
 
+void Config::setFloat( const std::string& component, const std::string& key, float v )
+{
+    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    pjcomp[key].set<double>( static_cast<double>(v) );
+}
+
 picojson::object& Config::getOrInsertComponent( const std::string& component, bool* existed )
 {
     auto it = m_pj.insert(std::make_pair(component,picojson::object()));

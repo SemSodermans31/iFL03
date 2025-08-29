@@ -61,6 +61,7 @@ class Config
         void                        setInt( const std::string& component, const std::string& key, int v );
         void                        setBool( const std::string& component, const std::string& key, bool v );
         void                        setString( const std::string& component, const std::string& key, const std::string& v );
+        void                        setFloat( const std::string& component, const std::string& key, float v );
 
     private:
 

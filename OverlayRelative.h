@@ -29,6 +29,7 @@ SOFTWARE.
 #include <string>
 #include "Overlay.h"
 #include "iracing.h"
+#include "ClassColors.h"
 #include "Config.h"
 #include "stub_data.h"
 
@@ -376,10 +377,17 @@ class OverlayRelative : public Overlay
                     rr.rect = { r.left-2, r.top+1, r.right+2, r.bottom-1 };
                     rr.radiusX = 3;
                     rr.radiusY = 3;
-                    float4 color = car.classCol;
-                    color.a = licenseBgAlpha;
-                    m_brush->SetColor( car.isSelf ? color : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol: color)) );
+
+                    // Use centralized class colors for background
+                    int classId = car.classId;
+                    float4 bg = car.isSelf ? ClassColors::self()
+                                : (car.isPaceCar ? ClassColors::paceCar()
+                                   : ClassColors::get(classId));
+                    bg.a = licenseBgAlpha;
+                    m_brush->SetColor( bg );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
+
+                    // Car number text color
                     m_brush->SetColor( carNumberTextCol );
                     m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }

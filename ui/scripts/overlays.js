@@ -285,6 +285,22 @@ function setupEventListeners() {
 			}
 		});
 	}
+
+	// Track: Track Width slider
+	const trackWidthSlider = document.getElementById('track-width-slider');
+	if (trackWidthSlider) {
+		trackWidthSlider.addEventListener('input', function() {
+			if (selectedOverlay === 'track') {
+				const value = parseFloat(this.value);
+				document.getElementById('track-width-value').textContent = value.toFixed(1);
+				sendCommand('setConfigFloat', {
+					component: 'OverlayTrack',
+					key: 'track_width',
+					value: value
+				});
+			}
+		});
+	}
 }
 
 function selectOverlay(overlayKey) {
@@ -432,18 +448,30 @@ function updateOverlaySettings(overlayKey) {
 		}
 	}
 
-	// Track-specific: show other cars toggle when Track overlay selected
+	// Track-specific: show other cars toggle and track width slider when Track overlay selected
 	const trackCarsRow = document.getElementById('overlay-track-cars-row');
+	const trackWidthRow = document.getElementById('overlay-track-width-row');
 	if (trackCarsRow) trackCarsRow.classList.add('hidden');
+	if (trackWidthRow) trackWidthRow.classList.add('hidden');
 	if (overlayKey === 'track') {
 		if (trackCarsRow) trackCarsRow.classList.remove('hidden');
-		
+		if (trackWidthRow) trackWidthRow.classList.remove('hidden');
+
 		// Update show other cars toggle state from config
 		const cfg = currentState.config && currentState.config['OverlayTrack'];
 		if (cfg) {
 			const showOtherCarsToggle = document.getElementById('track-show-other-cars');
 			if (showOtherCarsToggle) {
 				showOtherCarsToggle.checked = cfg.show_other_cars !== undefined ? cfg.show_other_cars : false;
+			}
+
+			// Update track width slider from config
+			const trackWidthSlider = document.getElementById('track-width-slider');
+			const trackWidthValue = document.getElementById('track-width-value');
+			if (trackWidthSlider && trackWidthValue) {
+				const trackWidth = cfg.track_width !== undefined ? cfg.track_width : 6.0;
+				trackWidthSlider.value = trackWidth;
+				trackWidthValue.textContent = trackWidth.toFixed(1);
 			}
 		}
 	}

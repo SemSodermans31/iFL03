@@ -2,6 +2,7 @@
 
 #ifdef IRON_USE_CEF
 #include <windows.h>
+#include "resource.h"
 #include <string>
 #include <utility>
 #include <cstdint>
@@ -339,6 +340,26 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			if (has("\"cmd\":\"setConfigFloat\"")) {
+				std::string component, key;
+				if (extractStringField(req, "component", component) &&
+					extractStringField(req, "key", key)) {
+					// Extract float value - look for "value":123.45 pattern
+					size_t valuePos = req.find("\"value\":");
+					if (valuePos != std::string::npos) {
+						size_t valueStart = valuePos + 8; // length of "value":
+						while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
+						size_t valueEnd = valueStart;
+						while (valueEnd < req.size() && (req[valueEnd] == '-' || req[valueEnd] == '.' || std::isdigit((unsigned char)req[valueEnd]))) valueEnd++;
+						if (valueEnd > valueStart) {
+							float fvalue = std::stof(req.substr(valueStart, valueEnd - valueStart));
+							app_set_config_float(component.c_str(), key.c_str(), fvalue);
+						}
+					}
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			if (has("\"cmd\":\"loadCarConfig\"")) {
 				std::string carName;
 				if (extractStringField(req, "carName", carName)) {
@@ -496,8 +517,8 @@ static void createParentWindow()
 	wc.lpszClassName = kGuiWndClass;
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+	wc.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
+	wc.hIconSm = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON1));
 	RegisterClassExW(&wc);
 
 	RECT r = { 100, 100, 100 + 1920, 100 + 1080 };

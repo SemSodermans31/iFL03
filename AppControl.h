@@ -27,6 +27,7 @@ void app_toggle_overlay(const char* sectionKey);
 void app_set_config_string(const char* component, const char* key, const char* value);
 void app_set_config_int(const char* component, const char* key, int value);
 void app_set_config_bool(const char* component, const char* key, bool value);
+void app_set_config_float(const char* component, const char* key, float value);
 
 // Build current state JSON for the GUI
 std::string app_get_state_json();

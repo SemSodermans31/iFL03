@@ -15,6 +15,7 @@ Copyright (c) 2025
 #include "iracing.h"
 #include "Config.h"
 #include "util.h"
+#include "ClassColors.h"
 #include "stub_data.h"
 
 class OverlayTrack : public Overlay
@@ -30,8 +31,9 @@ public:
 protected:
 
     virtual void onEnable()
-    {
+    {   
         loadPathFromJson();
+        onConfigChanged();
         m_autoOffset = 0.0f;
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
@@ -43,6 +45,7 @@ protected:
         m_autoOffset = 0.0f;
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
+        m_text.reset();
     }
 
     virtual void onSessionChanged()
@@ -55,7 +58,25 @@ protected:
 
     virtual void onConfigChanged()
     {
-        // Nothing yet; reserved for future config
+        m_text.reset( m_dwriteFactory.Get() );
+
+        const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
+        const float fontSize = g_cfg.getFloat( m_name, "font_size", 16.0f );
+        const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
+        const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
+
+        // Convert font style string to enum
+        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
+        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
+        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
+
+        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
+        m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+        m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+
+        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.7f, L"en-us", &m_textFormatSmall ));
+        m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+        m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
     }
 
     virtual float2 getDefaultSize()
@@ -70,16 +91,29 @@ protected:
 
     virtual void onUpdate()
     {
-        const float4 bgCol = float4(0.05f, 0.05f, 0.05f, 0.65f * getGlobalOpacity());
-        const float4 trackCol = float4(0.8f, 0.8f, 0.8f, 0.9f * getGlobalOpacity());
-        const float4 markerCol = g_cfg.getFloat4(m_name, "self_col", float4(0.94f, 0.67f, 0.13f, 1));
-        const float4 outlineCol = float4(0.2f, 0.8f, 0.2f, 0.9f * getGlobalOpacity());
+        // Cache global opacity to avoid multiple function calls
+        const float globalOpacity = getGlobalOpacity();
+
+        // Pre-compute colors with opacity applied
+        const float4 bgCol = float4(0.05f, 0.05f, 0.05f, 0.65f * globalOpacity);
+        const float4 trackCol = float4(0.8f, 0.8f, 0.8f, 0.9f * globalOpacity);
+        const float4 markerCol = ClassColors::self();
+        const float4 outlineCol = float4(0.2f, 0.8f, 0.2f, 0.9f * globalOpacity);
+
+        // Update animation once per frame if using stub data
+        if (StubDataManager::shouldUseStubData()) {
+            StubDataManager::updateAnimation();
+        }
 
         // Determine current lap percentage
         float pct = 0.0f;
         if (StubDataManager::shouldUseStubData()) {
             static float s_p = 0.0f;
-            s_p += 0.0025f; if (s_p >= 1.0f) s_p -= 1.0f;
+            // Vary speed slightly to simulate realistic racing (slowed down 5x)
+            float baseSpeed = 0.0005f; // 0.0025f / 5
+            float speedVariation = 0.0001f * std::sin(StubDataManager::getAnimationTime() * 0.06f); // 0.0005f / 5, 0.3f / 5
+            s_p += baseSpeed + speedVariation;
+            if (s_p >= 1.0f) s_p -= 1.0f;
             pct = s_p;
         } else {
             int self = ir_session.driverCarIdx;
@@ -118,10 +152,12 @@ protected:
         // Use full overlay area
         D2D1_RECT_F dest = { 0, 0, (float)m_width, (float)m_height };
 
+        // Cache overlay dimensions to avoid repeated calculations
+        const float overlayW = dest.right - dest.left;
+        const float overlayH = dest.bottom - dest.top;
+
         // Background panel (subtle)
-        m_brush->SetColor(bgCol);
-        D2D1_ROUNDED_RECT rr; rr.rect = dest; rr.radiusX = 8; rr.radiusY = 8;
-        m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+        // Removed background fill for full transparency
 
         // Scale and draw track path to fill the overlay area
         if (m_trackPath.size() >= 2)
@@ -144,8 +180,6 @@ protected:
 
             const float pathW = maxX - minX;
             const float pathH = maxY - minY;
-            const float overlayW = dest.right - dest.left;
-            const float overlayH = dest.bottom - dest.top;
 
             // Scale to fit overlay while preserving aspect ratio
             const float scale = std::min(overlayW / pathW, overlayH / pathH);
@@ -183,13 +217,17 @@ protected:
                         sink->EndFigure(D2D1_FIGURE_END_CLOSED);
                         sink->Close();
                         
+                        // Get configurable track width
+                        const float trackWidth = g_cfg.getFloat(m_name, "track_width", 6.0f);
+                        const float outlineWidth = trackWidth * 2.0f; // Outline is twice as thick
+
                         // Draw black outline first (thicker)
-                        m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * getGlobalOpacity()));
-                        m_renderTarget->DrawGeometry(pathGeometry.Get(), m_brush.Get(), 12.0f);
-                        
-                        // Draw white track path on top (thinner)
+                        m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * globalOpacity));
+                        m_renderTarget->DrawGeometry(pathGeometry.Get(), m_brush.Get(), outlineWidth);
+
+                        // Draw white track path on top (configurable width)
                         m_brush->SetColor(trackCol);
-                        m_renderTarget->DrawGeometry(pathGeometry.Get(), m_brush.Get(), 6.0f);
+                        m_renderTarget->DrawGeometry(pathGeometry.Get(), m_brush.Get(), trackWidth);
                     }
                 }
             }
@@ -201,11 +239,12 @@ protected:
         }
 
         // Draw start/finish lines
-        if (!m_extendedLines.empty() && m_trackPath.size() >= 2) {
-            const float4 lineCol = float4(1.0f, 1.0f, 1.0f, 0.9f * getGlobalOpacity());
+        if (m_trackPath.size() >= 2) {
+            const float4 lineCol = float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity);
             m_brush->SetColor(lineCol);
             
-            for (float linePos : m_extendedLines) {
+            auto drawLineAt = [&](float linePos)
+            {
                 float2 pos = computeMarkerPosition(linePos);
                 
                 // Apply same scaling as track path
@@ -244,7 +283,7 @@ protected:
                 }
                 
                 // Draw line perpendicular to track direction
-                const float lineLength = std::min(dest.right - dest.left, dest.bottom - dest.top) * 0.03f;
+                const float lineLength = std::min(overlayW, overlayH) * 0.06f;
                 const float halfLen = lineLength * 0.5f;
                 const float x1 = centerX + dir.x * halfLen;
                 const float y1 = centerY + dir.y * halfLen;
@@ -252,6 +291,16 @@ protected:
                 const float y2 = centerY - dir.y * halfLen;
                 
                 m_renderTarget->DrawLine(float2(x1, y1), float2(x2, y2), m_brush.Get(), 2.0f);
+            };
+
+            if (!m_extendedLines.empty())
+            {
+                for (float linePos : m_extendedLines) drawLineAt(linePos);
+            }
+            else
+            {
+                // Default: draw start/finish at beginning of path
+                drawLineAt(0.0f);
             }
         }
 
@@ -260,7 +309,7 @@ protected:
             const float4 opponentCol = g_cfg.getFloat4(m_name, "opponent_col", float4(0.8f, 0.2f, 0.2f, 1)); // Red
             const float4 paceCarCol = g_cfg.getFloat4(m_name, "pace_car_col", float4(1.0f, 1.0f, 0.0f, 1)); // Yellow
             const float4 safetyCarCol = g_cfg.getFloat4(m_name, "safety_car_col", float4(1.0f, 0.5f, 0.0f, 1)); // Orange
-            const float4 carOutlineCol = float4(0.0f, 0.0f, 0.0f, 0.8f * getGlobalOpacity());
+            const float4 carOutlineCol = float4(0.0f, 0.0f, 0.0f, 0.8f * globalOpacity);
             
             int selfIdx = ir_session.driverCarIdx;
             
@@ -269,17 +318,26 @@ protected:
                 
                 float carPct = 0.0f;
                 if (StubDataManager::shouldUseStubData()) {
-                    // Generate some fake car positions for preview
-                    static float s_offset[64] = {0};
+                    // Generate animated car positions for preview
+                    static float s_baseOffset[64] = {0};
+                    static float s_speed[64] = {0};
                     static bool s_init = false;
                     if (!s_init) {
                         for (int j = 0; j < 64; ++j) {
-                            s_offset[j] = (float)j * 0.05f;
-                            while (s_offset[j] >= 1.0f) s_offset[j] -= 1.0f;
+                            s_baseOffset[j] = (float)j * 0.12f; // Spread cars around track
+                            while (s_baseOffset[j] >= 1.0f) s_baseOffset[j] -= 1.0f;
+                            // Give each car slightly different speeds for realistic racing (slowed down 5x)
+                            s_speed[j] = 0.0004f + (float)(j % 5) * 0.0001f; // 0.002-0.004 units per frame / 5
                         }
                         s_init = true;
                     }
-                    if (i < 64) carPct = s_offset[i];
+                    
+                    if (i < 64) {
+                        // Animate car position with individual speeds
+                        s_baseOffset[i] += s_speed[i];
+                        while (s_baseOffset[i] >= 1.0f) s_baseOffset[i] -= 1.0f;
+                        carPct = s_baseOffset[i];
+                    }
                 } else {
                     carPct = ir_CarIdxLapDistPct.getFloat(i);
                 }
@@ -287,24 +345,66 @@ protected:
                 if (carPct < 0.0f) continue; // Car not on track
                 
                 // Check if this car slot is valid (has a driver)
-                if (!StubDataManager::shouldUseStubData() && ir_session.cars[i].userName.empty()) {
-                    continue; // No driver in this slot
+                if (StubDataManager::shouldUseStubData()) {
+                    // In preview mode, only show cars that have stub data
+                    if (!StubDataManager::getStubCar(i)) {
+                        continue; // No stub car data for this slot
+                    }
+                } else {
+                    // In live mode, check for real driver data
+                    if (ir_session.cars[i].userName.empty()) {
+                        continue; // No driver in this slot
+                    }
                 }
                 
-                // Determine car color based on type
+                // Determine car color based on type and class
                 float4 carColor = opponentCol;
-                
+
+                // Check for special car types first
+                bool isPaceCar = false;
+                bool isSafetyCar = false;
+
                 if (!StubDataManager::shouldUseStubData()) {
-                    // Use the isPaceCar flag from iRacing first
-                    if (ir_session.cars[i].isPaceCar) {
-                        carColor = paceCarCol; // Official pace car
-                    } else {
-                        // Check car number for safety cars (common numbers)
-                        int carNumber = ir_session.cars[i].carNumber;
-                        if (carNumber == 911 || carNumber == 999 || carNumber == 0) {
-                            carColor = safetyCarCol; // Safety car (common numbers)
-                        }
+                    // In live mode, use iRacing flags with intelligent display logic
+
+                    // Pace car logic - only show in useful situations
+                    bool carIsPaceCar = ir_session.cars[i].isPaceCar != 0;
+                    if (carIsPaceCar) {
+                        // Show pace car in these situations:
+                        bool isRaceSession = ir_session.sessionType == SessionType::RACE;
+                        int currentLap = ir_Lap.getInt();
+                        bool isFirstLap = currentLap <= 1;
+                        int sessionFlags = ir_SessionFlags.getInt();
+                        bool underCaution = (sessionFlags & (irsdk_caution | irsdk_cautionWaving)) != 0;
+                        bool preStart = ir_isPreStart();
+
+                        isPaceCar = (isRaceSession && isFirstLap) || underCaution || preStart;
                     }
+
+                    // Safety car logic - only show during caution/yellow flag periods
+                    int carNumber = ir_session.cars[i].carNumber;
+                    bool carIsSafetyCar = (carNumber == 911 || carNumber == 999 || carNumber == 0);
+                    if (carIsSafetyCar) {
+                        // Only show safety car during caution or yellow flag periods
+                        int sessionFlags = ir_SessionFlags.getInt();
+                        bool underCaution = (sessionFlags & (irsdk_caution | irsdk_cautionWaving)) != 0;
+                        bool underYellow = (sessionFlags & (irsdk_yellow | irsdk_yellowWaving)) != 0;
+
+                        isSafetyCar = underCaution || underYellow;
+                    }
+                }
+
+                // Assign colors based on car type
+                if (isPaceCar) {
+                    carColor = ClassColors::paceCar();
+                } else if (isSafetyCar) {
+                    carColor = ClassColors::safetyCar();
+                } else {
+                    // Get class-based color for regular opponents
+                    int classId = StubDataManager::shouldUseStubData() ?
+                        (StubDataManager::getStubCar(i) ? StubDataManager::getStubCar(i)->classId : 0) :
+                        ir_session.cars[i].classId;
+                    carColor = ClassColors::get(classId);
                 }
                 
                 // Apply manual offset and direction for consistency with self marker
@@ -323,7 +423,7 @@ protected:
                 const float screenX = dest.left + m_pathOffset.x + (pos.x - m_pathBounds.x) * m_pathScale;
                 const float screenY = dest.top + m_pathOffset.y + (pos.y - m_pathBounds.y) * m_pathScale;
                 
-                const float r = std::max(3.0f, std::min(dest.right - dest.left, dest.bottom - dest.top) * 0.012f);
+                const float r = std::max(9.0f, std::min(overlayW, overlayH) * 0.03f);
                 D2D1_ELLIPSE el; el.point = { screenX, screenY }; el.radiusX = r; el.radiusY = r;
                 
                 // Draw car marker
@@ -331,6 +431,34 @@ protected:
                 m_renderTarget->FillEllipse(&el, m_brush.Get());
                 m_brush->SetColor(carOutlineCol);
                 m_renderTarget->DrawEllipse(&el, m_brush.Get(), 1.5f);
+
+                // Draw car number text (centered) - 12pt for other cars
+                if (m_textFormatSmall)
+                {
+                    int carNum = 0;
+                    if (StubDataManager::shouldUseStubData())
+                    {
+                        if (const auto* sc = StubDataManager::getStubCar(i))
+                            carNum = atoi(sc->carNumber);
+                    }
+                    else
+                    {
+                        carNum = ir_session.cars[i].carNumber;
+                    }
+                    if (carNum != 0)
+                    {
+                        wchar_t buf[8];
+                        _snwprintf_s(buf, _TRUNCATE, L"%d", carNum);
+                        const float xmin = screenX - r;
+                        const float xmax = screenX + r;
+                        // Shadow
+                        m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * globalOpacity));
+                        m_text.render(m_renderTarget.Get(), buf, m_textFormatSmall.Get(), xmin + 1.0f, xmax + 1.0f, screenY + 1.0f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                        // Text
+                        m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::White, 1.0f * globalOpacity));
+                        m_text.render(m_renderTarget.Get(), buf, m_textFormatSmall.Get(), xmin, xmax, screenY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                    }
+                }
             }
         }
 
@@ -342,12 +470,49 @@ protected:
             const float screenX = dest.left + m_pathOffset.x + (pos.x - m_pathBounds.x) * m_pathScale;
             const float screenY = dest.top + m_pathOffset.y + (pos.y - m_pathBounds.y) * m_pathScale;
             
-            const float r = std::max(4.0f, std::min(dest.right - dest.left, dest.bottom - dest.top) * 0.015f);
+            const float r = std::max(13.5f, std::min(overlayW, overlayH) * 0.045f);
             D2D1_ELLIPSE el; el.point = { screenX, screenY }; el.radiusX = r; el.radiusY = r;
             m_brush->SetColor(markerCol);
             m_renderTarget->FillEllipse(&el, m_brush.Get());
             m_brush->SetColor(outlineCol);
             m_renderTarget->DrawEllipse(&el, m_brush.Get(), 2.0f);
+
+            // Self car number (16pt font)
+            if (m_textFormat)
+            {
+                int selfIdx = ir_session.driverCarIdx;
+                int carNum = 0;
+                if (StubDataManager::shouldUseStubData())
+                {
+                    if (selfIdx >= 0)
+                    {
+                        if (const auto* sc = StubDataManager::getStubCar(selfIdx))
+                            carNum = atoi(sc->carNumber);
+                    }
+                    else
+                    {
+                        if (const auto* sc0 = StubDataManager::getStubCar(0))
+                            carNum = atoi(sc0->carNumber);
+                    }
+                }
+                else if (selfIdx >= 0)
+                {
+                    carNum = ir_session.cars[selfIdx].carNumber;
+                }
+                if (carNum != 0)
+                {
+                    wchar_t buf[8];
+                    _snwprintf_s(buf, _TRUNCATE, L"%d", carNum);
+                    const float xmin = screenX - r;
+                    const float xmax = screenX + r;
+                    // Shadow
+                    m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * globalOpacity));
+                    m_text.render(m_renderTarget.Get(), buf, m_textFormat.Get(), xmin + 1.0f, xmax + 1.0f, screenY + 1.0f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                    // Text
+                    m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::White, 1.0f * globalOpacity));
+                    m_text.render(m_renderTarget.Get(), buf, m_textFormat.Get(), xmin, xmax, screenY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                }
+            }
         }
 
         m_renderTarget->EndDraw();
@@ -366,7 +531,10 @@ private:
     float m_pathScale = 1.0f;
     float2 m_pathOffset = float2(0, 0);
 
-
+    // Text rendering for car numbers
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;     // For self car (16pt)
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatSmall; // For other cars (12pt)
+    TextCache    m_text;
 
     void loadPathFromJson()
     {
@@ -488,6 +656,5 @@ private:
     {
         return float2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
     }
+
 };
-
-

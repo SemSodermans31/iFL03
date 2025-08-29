@@ -25,6 +25,7 @@ public:
         float lastLapTime;
         int lapCount;
         int pitAge;
+        int classId;
     };
 
     // Initialize stub data (call once)
@@ -78,12 +79,13 @@ public:
     static float getStubPrecipitation();
     static float getStubWindSpeed();
     static float getStubWindDirection();
+    
+    // Animation timing
+    static float getAnimationTime() { return s_animationTime; }
+    static void updateAnimation();
 
 private:
     static std::vector<StubCar> s_stubCars;
     static bool s_initialized;
     static float s_animationTime;
-    
-    // Update animation time
-    static void updateAnimation();
 };

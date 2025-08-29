@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cmath>
+#include "ClassColors.h"
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -17,17 +18,27 @@ void StubDataManager::initialize()
 {
     if (s_initialized) return;
     
-    // Define realistic F1-style driver data
+    // Define realistic F1-style driver data with class assignments
     s_stubCars = {
-        // name,       carNum, lic, iRating, isSelf, isBuddy, isFlagged, pos, bestLap,  lastLap,   lapCount, pitAge
-        {"You",        "31",   'C', 2156,    true,   false,   false,     2,   84.567f,  84.623f,   12,       15},
-        {"Hamilton",   "44",   'A', 3245,    false,  true,    false,     6,   84.734f,  84.801f,   12,       16}, 
-        {"Verstappen", "1",    'A', 4789,    false,  false,   false,     5,   84.456f,  84.512f,   12,       14},
-        {"Leclerc",    "16",   'A', 3891,    false,  false,   false,     3,   84.321f,  84.389f,   13,       17}, // Fastest lap
-        {"Russell",    "63",   'B', 2945,    false,  false,   false,     1,   84.678f,  84.723f,   13,       1},  // Recent pit
-        {"Sainz",      "55",   'A', 2767,    false,  false,   false,     7,   84.823f,  84.891f,   12,       18},
-        {"Norris",     "4",    'B', 3234,    false,  false,   false,     4,   84.612f,  84.667f,   12,       16},
-        {"Piastri",    "81",   'A', 2534,    false,  false,   true,      8,   84.945f,  84.998f,   11,       12}  // Flagged
+        // name,       carNum, lic, iRating, isSelf, isBuddy, isFlagged, pos, bestLap,  lastLap,   lapCount, pitAge, classId
+        // Class 0 (Red)
+        {"You",        "31",   'C', 2156,    true,   false,   false,     2,   84.567f,  84.623f,   12,       15,      0},
+        {"Norris",     "4",    'B', 3234,    false,  false,   false,     4,   84.612f,  84.667f,   12,       16,      0},
+        // Class 1 (Green)
+        {"Hamilton",   "44",   'A', 3245,    false,  true,    false,     6,   84.734f,  84.801f,   12,       16,      1},
+        {"Piastri",    "81",   'A', 2534,    false,  false,   true,      8,   84.945f,  84.998f,   11,       12,      1},
+        // Class 2 (Magenta)
+        {"Verstappen", "1",    'A', 4789,    false,  false,   false,     5,   84.456f,  84.512f,   12,       14,      2},
+        {"Perez",      "11",   'A', 3602,    false,  false,   false,     9,   84.789f,  84.832f,   12,       13,      2},
+        // Class 3 (Orange)
+        {"Leclerc",    "16",   'A', 3891,    false,  false,   false,     3,   84.321f,  84.389f,   13,       17,      3},
+        {"Sainz",      "55",   'A', 2767,    false,  false,   false,     7,   84.823f,  84.891f,   12,       18,      3},
+        // Class 4 (Cyan)
+        {"Russell",    "63",   'B', 2945,    false,  false,   false,     1,   84.678f,  84.723f,   13,       1,       4},
+        {"Albon",      "23",   'B', 2140,    false,  false,   false,    10,   85.102f,  85.201f,   12,       11,      4},
+        // Class 5 (Yellow)
+        {"Gasly",      "10",   'A', 2680,    false,  false,   false,    11,   85.345f,  85.401f,   12,       9,       5},
+        {"Ocon",       "31",   'A', 2615,    false,  false,   false,    12,   85.389f,  85.445f,   12,       8,       5}
     };
     
     s_initialized = true;
@@ -48,18 +59,8 @@ void StubDataManager::populateSessionCars()
     ir_session.sessionType = SessionType::PRACTICE;
     ir_session.driverCarIdx = -1;
 
-    // Some simple demo colors for car classes and license grades
+    // License grade colors
     auto makeColor = [](float r, float g, float b){ return float4(r, g, b, 1.0f); };
-    const float4 classColors[] = {
-        makeColor(0.20f, 0.60f, 0.95f),
-        makeColor(0.95f, 0.50f, 0.20f),
-        makeColor(0.30f, 0.85f, 0.30f),
-        makeColor(0.80f, 0.30f, 0.80f),
-        makeColor(0.95f, 0.85f, 0.20f),
-        makeColor(0.95f, 0.30f, 0.30f),
-        makeColor(0.30f, 0.30f, 0.95f),
-        makeColor(0.30f, 0.85f, 0.80f)
-    };
     auto licenseColorFor = [&](char lic)->float4{
         switch(lic){
             case 'A': return makeColor(0.10f, 0.45f, 0.95f); // blue-ish
@@ -98,7 +99,9 @@ void StubDataManager::populateSessionCars()
         car.isSpectator = 0;
         car.isBuddy = stubCar.isBuddy ? 1 : 0;
         car.isFlagged = stubCar.isFlagged ? 1 : 0;
-        car.classCol = classColors[i % (sizeof(classColors)/sizeof(classColors[0]))];
+        // Assign class id and color from centralized palette for consistent preview across overlays
+        car.classId = stubCar.classId;
+        car.classCol = ClassColors::get(car.classId);
         
         // Assign car brands for icon display in preview mode (names chosen to match available PNG files)
         const char* carBrands[] = {
@@ -141,18 +144,16 @@ void StubDataManager::updateAnimation()
 float StubDataManager::getStubRPM()
 {
     updateAnimation();
-    // Create realistic RPM pattern with gear shifts
     float baseRPM = 4200.0f;
-    float variation = 800.0f * std::sin(s_animationTime * 0.8f) + 300.0f * std::sin(s_animationTime * 2.1f);
+    float variation = 800.0f * std::sin(s_animationTime * 0.16f) + 300.0f * std::sin(s_animationTime * 0.42f);
     return std::max(2000.0f, std::min(7500.0f, baseRPM + variation));
 }
 
 float StubDataManager::getStubSpeed()
 {
     updateAnimation();
-    // Speed correlates with RPM but with some variation
     float rpm = getStubRPM();
-    return (rpm / 7500.0f) * 180.0f + 20.0f; // 20-200 km/h range
+    return (rpm / 7500.0f) * 180.0f + 20.0f;
 }
 
 int StubDataManager::getStubGear()
@@ -185,8 +186,7 @@ float StubDataManager::getStubSessionTimeRemaining()
 float StubDataManager::getStubThrottle()
 {
     updateAnimation();
-    // Create dynamic racing-like inputs
-    float throttle = 0.6f + 0.3f * std::sin(s_animationTime * 0.8f) + 0.1f * std::sin(s_animationTime * 2.1f);
+    float throttle = 0.6f + 0.3f * std::sin(s_animationTime * 0.032f) + 0.1f * std::sin(s_animationTime * 0.084f);
     return std::max(0.0f, std::min(1.0f, throttle));
 }
 
@@ -213,40 +213,34 @@ float StubDataManager::getStubClutch()
         lastGear = gear;
     }
     
-    // Gradually release clutch after gear change
-    clutchAnimation = std::max(0.0f, clutchAnimation - 0.05f);
-    
-    // Add some minor clutch slip for realism
-    float clutchSlip = 0.1f * std::sin(s_animationTime * 3.0f);
+    clutchAnimation = std::max(0.0f, clutchAnimation - 0.01f);  
+
+    float clutchSlip = 0.1f * std::sin(s_animationTime * 0.12f); 
     return std::max(0.0f, std::min(1.0f, clutchAnimation + clutchSlip));
 }
 
 float StubDataManager::getStubSteering()
 {
     updateAnimation();
-    // Steering with cornering patterns  
-    float steer = 0.5f + 0.25f * std::sin(s_animationTime * 0.5f) + 0.1f * std::sin(s_animationTime * 1.2f);
+    float steer = 0.5f + 0.25f * std::sin(s_animationTime * 0.1f) + 0.1f * std::sin(s_animationTime * 0.24f);
     return std::max(0.1f, std::min(0.9f, steer));
 }
 
 float StubDataManager::getStubDeltaToSessionBest()
 {
     updateAnimation();
-    // Create realistic delta that oscillates between gaining and losing time
-    // Simulate realistic delta timing: -2 to +3 seconds range
-    float baseDelta = std::sin(s_animationTime * 0.3f) * 1.5f - 0.2f; // Oscillates between -1.7 and +1.3
-    
-    // Add some randomness and track progression simulation
-    float trackProgress = std::fmod(s_animationTime * 0.1f, 1.0f); // 0 to 1 over ~60 seconds
-    float sectorVariation = std::sin(trackProgress * 6.28318f * 3.0f) * 0.5f; // 3 sectors per lap
+    float baseDelta = std::sin(s_animationTime * 0.02f) * 1.5f - 0.2f; 
+
+    float trackProgress = std::fmod(s_animationTime * 0.008f, 1.0f); 
+    float sectorVariation = std::sin(trackProgress * 6.28318f * 3.0f) * 0.5f;
     
     return baseDelta + sectorVariation;
 }
 
 float StubDataManager::getStubSessionBestLapTime()
 {
-    // Return a realistic lap time (2 minutes 18.462 seconds)
-    return 138.462f;
+    //Lap time
+    return 90.462f;
 }
 
 bool StubDataManager::getStubDeltaValid()
@@ -291,43 +285,42 @@ const StubDataManager::StubCar* StubDataManager::getStubCar(int carIdx)
 float StubDataManager::getStubTrackTemp()
 {
     updateAnimation();
-    // Realistic track temperature that varies slightly
-    return 32.5f + 2.0f * std::sin(s_animationTime * 0.1f);
+    // Realistic track temperature that varies slightly (slowed down 5x)
+    return 32.5f + 2.0f * std::sin(s_animationTime * 0.02f); // 0.1f / 5
 }
 
 float StubDataManager::getStubAirTemp()
 {
     updateAnimation();
-    // Air temperature usually cooler than track
-    return 28.0f + 1.5f * std::sin(s_animationTime * 0.08f);
+    return 28.0f + 1.5f * std::sin(s_animationTime * 0.016f);
 }
 
 float StubDataManager::getStubTrackWetness()
 {
     updateAnimation();
-    // Simulate varying track wetness (0.0 = dry, 1.0 = extremely wet)
-    float baseWetness = 0.3f + 0.2f * std::sin(s_animationTime * 0.05f);
+    // Simulate varying track wetness (0.0 = dry, 1.0 = extremely wet) (slowed down 5x)
+    float baseWetness = 0.3f + 0.2f * std::sin(s_animationTime * 0.01f); // 0.05f / 5
     return std::max(0.0f, std::min(1.0f, baseWetness));
 }
 
 float StubDataManager::getStubPrecipitation()
 {
     updateAnimation();
-    // Simulate precipitation percentage (0.0 to 1.0)
-    float basePrecip = 0.15f + 0.1f * std::sin(s_animationTime * 0.03f);
+    // Simulate precipitation percentage (0.0 to 1.0) (slowed down 5x)
+    float basePrecip = 0.15f + 0.1f * std::sin(s_animationTime * 0.006f); // 0.03f / 5
     return std::max(0.0f, std::min(1.0f, basePrecip));
 }
 
 float StubDataManager::getStubWindSpeed()
 {
     updateAnimation();
-    // Wind speed in m/s (0-15 m/s range)
-    return 5.0f + 3.0f * std::sin(s_animationTime * 0.2f);
+    // Wind speed in m/s (0-15 m/s range) (slowed down 5x)
+    return 5.0f + 3.0f * std::sin(s_animationTime * 0.04f); // 0.2f / 5
 }
 
 float StubDataManager::getStubWindDirection()
 {
     updateAnimation();
-    // Wind direction in radians, slowly rotating
-    return static_cast<float>(fmod(s_animationTime * 0.1f, 2.0f * M_PI));
+    // Wind direction in radians, slowly rotating (slowed down 5x)
+    return static_cast<float>(fmod(s_animationTime * 0.02f, 2.0f * M_PI)); // 0.1f / 5
 }

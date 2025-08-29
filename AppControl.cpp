@@ -86,6 +86,15 @@ void app_set_config_bool(const char* component, const char* key, bool value)
 		s_onConfigChange(*s_overlays, *s_status);
 }
 
+void app_set_config_float(const char* component, const char* key, float value)
+{
+	if (!component || !key) return;
+	g_cfg.setFloat(component, key, value);
+	g_cfg.save();
+	if (s_overlays && s_status && s_onConfigChange)
+		s_onConfigChange(*s_overlays, *s_status);
+}
+
 std::string app_get_state_json()
 {
 	// Build a tiny JSON string without extra deps
@@ -145,7 +154,7 @@ std::string app_get_state_json()
 		"\"OverlayFlags\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_flag\":\"%s\"},"
 		"\"OverlayDelta\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"reference_mode\":%d},"
 		"\"OverlayRadar\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
-		"\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_other_cars\":%s}"
+		"\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_other_cars\":%s,\"track_width\":%.1f}"
 		"}}",
 		(s_uiEdit && *s_uiEdit) ? "true":"false",
 		boolStr(preview_mode_get()),
@@ -249,7 +258,8 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayTrack","opacity",100),
 		boolStr(g_cfg.getBool("OverlayTrack","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayTrack","show_in_race",true)),
-		boolStr(g_cfg.getBool("OverlayTrack","show_other_cars",false))
+		boolStr(g_cfg.getBool("OverlayTrack","show_other_cars",false)),
+		g_cfg.getFloat("OverlayTrack","track_width",6.0f)
 	);
 	return std::string(buf);
 }
