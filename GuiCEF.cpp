@@ -1,12 +1,20 @@
 #include "GuiCEF.h"
 
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
 #include <windows.h>
 #include "resource.h"
 #include <string>
 #include <utility>
 #include <cstdint>
 #include <cctype>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
+
+// Define DWMWA_USE_IMMERSIVE_DARK_MODE if not available (for older SDKs)
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
+
 #include "include/cef_app.h"
 #include "include/cef_client.h"
 #include "include/cef_browser.h"
@@ -23,7 +31,7 @@
 #include "Config.h"
 
 namespace {
-	static const wchar_t* kGuiWndClass = L"iRonGuiWindow";
+	static const wchar_t* kGuiWndClass = L"iFL03GuiWindow";
 	HWND g_parentHwnd = NULL;
 	CefRefPtr<CefBrowser> g_browser;
 	CefRefPtr<CefMessageRouterBrowserSide> g_router;
@@ -39,10 +47,33 @@ namespace {
 		ShellExecuteW(NULL, L"open", urlW.c_str(), NULL, NULL, SW_SHOWNORMAL);
 	}
 
+	// Helper function to enable dark mode for window borders
+	static void EnableDarkModeForWindow(HWND hwnd)
+	{
+		// Enable dark mode for window borders and title bar
+		BOOL darkMode = TRUE;
+		HRESULT hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
+
+		// If that failed, try the older attribute value for compatibility with older Windows versions
+		if (FAILED(hr)) {
+			const int DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19;
+			DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &darkMode, sizeof(darkMode));
+		}
+	}
+
 	LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 	{
 				switch (msg)
 	{
+	case WM_CREATE:
+		// Enable dark mode for the window when it's created
+		EnableDarkModeForWindow(hwnd);
+		break;
+	case WM_THEMECHANGED:
+		// Re-enable dark mode if system theme changes
+		EnableDarkModeForWindow(hwnd);
+		InvalidateRect(hwnd, NULL, TRUE);
+		break;
 	case WM_GETMINMAXINFO:
 	{
 		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lparam;
@@ -523,7 +554,7 @@ static void createParentWindow()
 
 	RECT r = { 100, 100, 100 + 1920, 100 + 1080 };
 	AdjustWindowRectEx(&r, WS_OVERLAPPEDWINDOW, FALSE, 0);
-	g_parentHwnd = CreateWindowExW(0, kGuiWndClass, L"iUP", WS_OVERLAPPEDWINDOW,
+	g_parentHwnd = CreateWindowExW(0, kGuiWndClass, L"iFL03", WS_OVERLAPPEDWINDOW,
 		r.left, r.top, r.right - r.left, r.bottom - r.top, NULL, NULL, GetModuleHandle(NULL), NULL);
 	
 	ShowWindow(g_parentHwnd, SW_SHOW);

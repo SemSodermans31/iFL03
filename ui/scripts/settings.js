@@ -42,9 +42,16 @@ function setupEventListeners() {
 	const resetBtn = document.getElementById('btn-reset-defaults');
 	if (resetBtn) {
 		resetBtn.addEventListener('click', function() {
-			if (confirm('Revert all settings to defaults?')) {
-				sendCommand('resetConfig', {});
-			}
+			showConfirmModal({
+				title: 'Reset to Defaults',
+				message: 'Are you sure you want to revert all settings to defaults?',
+				confirmText: 'Reset',
+				confirmStyle: 'danger'
+			}).then(confirmed => {
+				if (confirmed) {
+					sendCommand('resetConfig', {});
+				}
+			});
 		});
 	}
 }
@@ -170,8 +177,49 @@ function saveAllSettings() {
 	}
 }
 
+// Reusable styled confirm modal
+function showConfirmModal(opts) {
+	return new Promise(resolve => {
+		const modal = document.getElementById('confirmModal');
+		const title = document.getElementById('confirmTitle');
+		const message = document.getElementById('confirmMessage');
+		const yes = document.getElementById('confirmYes');
+		const no = document.getElementById('confirmNo');
+
+		if (!modal || !title || !message || !yes || !no) {
+			const fallback = confirm(opts?.message || 'Are you sure?');
+			resolve(fallback);
+			return;
+		}
+
+		title.textContent = opts?.title || 'Confirm Action';
+		message.innerHTML = opts?.message || 'Are you sure?';
+		yes.textContent = opts?.confirmText || 'Confirm';
+		// Style confirm button
+		yes.className = 'flex-1 px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ' +
+			(opts?.confirmStyle === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700');
+
+		const cleanup = (result) => {
+			modal.classList.add('hidden');
+			yes.removeEventListener('click', onYes);
+			no.removeEventListener('click', onNo);
+			modal.removeEventListener('click', onBackdrop);
+			resolve(result);
+		};
+
+		const onYes = () => cleanup(true);
+		const onNo = () => cleanup(false);
+		const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
+
+		yes.addEventListener('click', onYes);
+		no.addEventListener('click', onNo);
+		modal.addEventListener('click', onBackdrop);
+		modal.classList.remove('hidden');
+	});
+}
+
 // Listen for state updates from the main application
-window.onIronState = function(state) {
+window.onIFL03State = function(state) {
 	currentState = state;
 	updateUI();
 };

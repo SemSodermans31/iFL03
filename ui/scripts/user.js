@@ -13,29 +13,21 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupEventListeners() {
-	// Current car actions
-	document.getElementById('saveCurrentCarConfig').addEventListener('click', saveCurrentCarConfig);
-	document.getElementById('loadCurrentCarConfig').addEventListener('click', loadCurrentCarConfig);
-	
 	// Config management actions
-	document.getElementById('carSelect').addEventListener('change', onCarSelectChange);
-	document.getElementById('loadSelectedConfig').addEventListener('click', loadSelectedConfig);
-	document.getElementById('saveAsNewConfig').addEventListener('click', showSaveAsModal);
-	document.getElementById('copyConfig').addEventListener('click', showCopyModal);
-	document.getElementById('deleteConfig').addEventListener('click', deleteSelectedConfig);
-	
+	const dupBtn = document.getElementById('btn-duplicate-config');
+	if (dupBtn) dupBtn.addEventListener('click', showSaveAsModal);
+	const delBtn = document.getElementById('deleteConfig');
+	if (delBtn) delBtn.addEventListener('click', deleteSelectedConfig);
+	const setActiveBtn = document.getElementById('btn-set-active');
+	if (setActiveBtn) setActiveBtn.addEventListener('click', setSelectedActive);
+
 	// Modal actions
 	document.getElementById('confirmSaveAs').addEventListener('click', confirmSaveAs);
 	document.getElementById('cancelSaveAs').addEventListener('click', hideSaveAsModal);
-	document.getElementById('confirmCopy').addEventListener('click', confirmCopy);
-	document.getElementById('cancelCopy').addEventListener('click', hideCopyModal);
-	
+
 	// Close modals on background click
 	document.getElementById('saveAsModal').addEventListener('click', function(e) {
 		if (e.target === this) hideSaveAsModal();
-	});
-	document.getElementById('copyModal').addEventListener('click', function(e) {
-		if (e.target === this) hideCopyModal();
 	});
 }
 
@@ -67,9 +59,6 @@ function updateUI() {
 	
 	// Update available configs
 	updateAvailableConfigs();
-	
-	// Update car selection dropdown
-	updateCarSelect();
 }
 
 function updateConnectionStatus(status) {
@@ -100,22 +89,25 @@ function updateConnectionStatus(status) {
 function updateCurrentCarInfo() {
 	const currentCarName = document.getElementById('currentCarName');
 	const currentCarConfig = document.getElementById('currentCarConfig');
-	const saveBtn = document.getElementById('saveCurrentCarConfig');
-	const loadBtn = document.getElementById('loadCurrentCarConfig');
 	
-	if (currentCarName) {
-		currentCarName.textContent = currentState.currentCar || 'No car detected';
+	if (currentState.previewMode) {
+		if (currentCarName) currentCarName.textContent = 'preview car';
+		if (currentCarConfig) currentCarConfig.textContent = 'preview config';
+		return;
 	}
-	
+
+	// When not in preview, avoid leaking stub car names if not driving/connected
+	const carName = currentState.connectionStatus === 'DRIVING' ? (currentState.currentCar || '') : '';
+	if (currentCarName) {
+		currentCarName.textContent = carName || 'No car detected';
+	}
+
 	if (currentCarConfig) {
 		currentCarConfig.textContent = currentState.currentCarConfig || 'Default';
 	}
-	
-	// Enable/disable buttons based on car availability
-	const hasCurrentCar = currentState.currentCar && currentState.currentCar.trim() !== '';
-	if (saveBtn) saveBtn.disabled = !hasCurrentCar;
-	if (loadBtn) loadBtn.disabled = !hasCurrentCar;
 }
+
+let selectedConfigName = '';
 
 function updateAvailableConfigs() {
 	const container = document.getElementById('availableConfigs');
@@ -124,118 +116,70 @@ function updateAvailableConfigs() {
 	container.innerHTML = '';
 	
 	if (!currentState.availableCarConfigs || currentState.availableCarConfigs.length === 0) {
-		container.innerHTML = '<div class="col-span-full text-center text-slate-400 py-8">No car configurations found</div>';
+		container.innerHTML = '<div class="col-span-full text-center text-[#a8a8a8] py-8">No car configurations found</div>';
 		return;
 	}
 	
+	const active = currentState.currentCarConfig || '';
 	currentState.availableCarConfigs.forEach(carName => {
 		const card = document.createElement('div');
-		card.className = 'bg-slate-800 rounded-lg p-4 border border-slate-700 hover:border-slate-600 transition-colors';
+		const isActive = carName === active;
+		const isSelected = carName === selectedConfigName;
+
+		// Base classes
+		let className = 'bg-[#1f1f1f] rounded-lg p-4 hover:bg-[#3c3c3c] transition-colors relative';
+
+		// Add green border for selected config
+		if (isSelected) {
+			className += ' ring-2 ring-green-500/50';
+		}
+
+		// Add check icon for active config
+		const checkIcon = isActive ? '<i class="fa-solid fa-circle-check absolute top-2 right-2 text-green-500"></i>' : '';
+
+		card.className = className;
 		card.innerHTML = `
+			${checkIcon}
 			<div class="font-medium text-slate-100 mb-1">${escapeHtml(carName)}</div>
-			<div class="text-sm text-slate-400">Car Configuration</div>
+			<div class="text-sm text-[#a8a8a8]">Car Configuration</div>
 		`;
 		card.addEventListener('click', () => selectCarConfig(carName));
 		container.appendChild(card);
 	});
-}
 
-function updateCarSelect() {
-	const select = document.getElementById('carSelect');
-	const copyFromSelect = document.getElementById('copyFromCar');
-	
-	if (!select) return;
-	
-	// Clear existing options except the first one
-	select.innerHTML = '<option value="">Select a car...</option>';
-	
-	if (copyFromSelect) {
-		copyFromSelect.innerHTML = '<option value="">Default Config</option>';
-	}
-	
-	if (currentState.availableCarConfigs) {
-		currentState.availableCarConfigs.forEach(carName => {
-			const option = document.createElement('option');
-			option.value = carName;
-			option.textContent = carName;
-			select.appendChild(option);
-			
-			if (copyFromSelect) {
-				const copyOption = document.createElement('option');
-				copyOption.value = carName;
-				copyOption.textContent = carName;
-				copyFromSelect.appendChild(copyOption);
-			}
-		});
-	}
+	const dupBtn = document.getElementById('btn-duplicate-config');
+	const delBtn = document.getElementById('deleteConfig');
+	const setActiveBtn = document.getElementById('btn-set-active');
+	const hasSelection = !!selectedConfigName;
+	if (dupBtn) dupBtn.disabled = !hasSelection;
+	if (delBtn) delBtn.disabled = !hasSelection;
+	if (setActiveBtn) setActiveBtn.disabled = !hasSelection;
 }
 
 function selectCarConfig(carName) {
-	const select = document.getElementById('carSelect');
-	if (select) {
-		select.value = carName;
-		onCarSelectChange();
-	}
-}
-
-function onCarSelectChange() {
-	const select = document.getElementById('carSelect');
-	const loadBtn = document.getElementById('loadSelectedConfig');
-	const copyBtn = document.getElementById('copyConfig');
-	const deleteBtn = document.getElementById('deleteConfig');
-	
-	const hasSelection = select && select.value.trim() !== '';
-	
-	if (loadBtn) loadBtn.disabled = !hasSelection;
-	if (copyBtn) copyBtn.disabled = !hasSelection;
-	if (deleteBtn) deleteBtn.disabled = !hasSelection;
+	selectedConfigName = carName;
+	updateAvailableConfigs();
 }
 
 // API Functions
-function saveCurrentCarConfig() {
-	if (!currentState.currentCar) {
-		showStatus('No current car detected', 'error');
-		return;
-	}
-	
-	sendCommand({ cmd: 'saveCarConfig', carName: currentState.currentCar }, 
-		'Configuration saved successfully', 'Configuration save failed');
-}
-
-function loadCurrentCarConfig() {
-	if (!currentState.currentCar) {
-		showStatus('No current car detected', 'error');
-		return;
-	}
-	
-	sendCommand({ cmd: 'loadCarConfig', carName: currentState.currentCar }, 
-		'Configuration loaded successfully', 'Configuration load failed');
-}
-
-function loadSelectedConfig() {
-	const select = document.getElementById('carSelect');
-	if (!select || !select.value) {
-		showStatus('Please select a car configuration', 'error');
-		return;
-	}
-	
-	sendCommand({ cmd: 'loadCarConfig', carName: select.value }, 
-		'Configuration loaded successfully', 'Configuration load failed');
-}
-
 function deleteSelectedConfig() {
-	const select = document.getElementById('carSelect');
-	if (!select || !select.value) {
+	const name = selectedConfigName;
+	if (!name) {
 		showStatus('Please select a car configuration', 'error');
 		return;
 	}
-	
-	if (!confirm(`Are you sure you want to delete the configuration for "${select.value}"?`)) {
-		return;
-	}
-	
-	sendCommand({ cmd: 'deleteCarConfig', carName: select.value }, 
-		'Configuration deleted successfully', 'Configuration delete failed');
+
+	showConfirmModal({
+		title: 'Delete Configuration',
+		message: `Are you sure you want to delete "${escapeHtml(name)}"?`,
+		confirmText: 'Delete',
+		confirmStyle: 'danger'
+	}).then(confirmed => {
+		if (!confirmed) return;
+		sendCommand({ cmd: 'deleteCarConfig', carName: name }, 
+			'Configuration deleted successfully', 'Configuration delete failed');
+		selectedConfigName = '';
+	});
 }
 
 // Modal Functions
@@ -244,10 +188,7 @@ function showSaveAsModal() {
 	const input = document.getElementById('saveAsCarName');
 	
 	if (modal && input) {
-		// Pre-fill with current car name if available
-		if (currentState.currentCar) {
-			input.value = currentState.currentCar;
-		}
+		input.value = selectedConfigName ? (selectedConfigName + ' copy') : '';
 		modal.classList.remove('hidden');
 		input.focus();
 	}
@@ -267,47 +208,26 @@ function confirmSaveAs() {
 		showStatus('Please enter a car name', 'error');
 		return;
 	}
-	
-	sendCommand({ cmd: 'saveCarConfig', carName: input.value.trim() }, 
+	const newName = input.value.trim();
+	const fromCar = selectedConfigName || '';
+
+	sendCommand({ cmd: 'copyCarConfig', fromCar: fromCar, toCar: newName }, 
 		'Configuration saved successfully', 'Configuration save failed');
-	
+
 	hideSaveAsModal();
 }
 
-function showCopyModal() {
-	const modal = document.getElementById('copyModal');
-	if (modal) {
-		modal.classList.remove('hidden');
-		document.getElementById('copyToCar').focus();
-	}
-}
-
-function hideCopyModal() {
-	const modal = document.getElementById('copyModal');
-	if (modal) {
-		modal.classList.add('hidden');
-		document.getElementById('copyFromCar').value = '';
-		document.getElementById('copyToCar').value = '';
-	}
-}
-
-function confirmCopy() {
-	const fromSelect = document.getElementById('copyFromCar');
-	const toInput = document.getElementById('copyToCar');
-	
-	if (!toInput || !toInput.value.trim()) {
-		showStatus('Please enter a target car name', 'error');
+function setSelectedActive() {
+	const name = selectedConfigName;
+	if (!name) {
+		showStatus('Please select a car configuration', 'error');
 		return;
 	}
-	
-	const fromCar = fromSelect ? fromSelect.value : '';
-	const toCar = toInput.value.trim();
-	
-	sendCommand({ cmd: 'copyCarConfig', fromCar: fromCar, toCar: toCar }, 
-		'Configuration copied successfully', 'Configuration copy failed');
-	
-	hideCopyModal();
+	// Load the selected config; state update will reflect the active ring
+	sendCommand({ cmd: 'loadCarConfig', carName: name }, 'Configuration loaded', 'Configuration load failed');
 }
+
+// Removed copy modal logic; duplicate flow handled via Save As modal
 
 // Utility Functions
 function sendCommand(command, successMessage, errorMessage) {
@@ -318,15 +238,15 @@ function sendCommand(command, successMessage, errorMessage) {
 				try {
 					currentState = JSON.parse(response);
 					updateUI();
-					showStatus(successMessage, 'success');
+					if (successMessage) showStatus(successMessage, 'success');
 				} catch (e) {
 					console.error('Failed to parse response:', e);
-					showStatus(errorMessage, 'error');
+					if (errorMessage) showStatus(errorMessage, 'error');
 				}
 			},
 			onFailure: function(error_code, error_message) {
 				console.error('Command failed:', error_code, error_message);
-				showStatus(errorMessage, 'error');
+				if (errorMessage) showStatus(errorMessage, 'error');
 			}
 		});
 	}
@@ -372,8 +292,49 @@ function escapeHtml(text) {
 	return div.innerHTML;
 }
 
+// Reusable styled confirm modal
+function showConfirmModal(opts) {
+	return new Promise(resolve => {
+		const modal = document.getElementById('confirmModal');
+		const title = document.getElementById('confirmTitle');
+		const message = document.getElementById('confirmMessage');
+		const yes = document.getElementById('confirmYes');
+		const no = document.getElementById('confirmNo');
+
+		if (!modal || !title || !message || !yes || !no) {
+			const fallback = confirm(opts?.message || 'Are you sure?');
+			resolve(fallback);
+			return;
+		}
+
+		title.textContent = opts?.title || 'Confirm Action';
+		message.innerHTML = opts?.message || 'Are you sure?';
+		yes.textContent = opts?.confirmText || 'Confirm';
+		// Style confirm button
+		yes.className = 'flex-1 px-4 py-2 text-white text-sm font-medium rounded-lg transition-colors ' +
+			(opts?.confirmStyle === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700');
+
+		const cleanup = (result) => {
+			modal.classList.add('hidden');
+			yes.removeEventListener('click', onYes);
+			no.removeEventListener('click', onNo);
+			modal.removeEventListener('click', onBackdrop);
+			resolve(result);
+		};
+
+		const onYes = () => cleanup(true);
+		const onNo = () => cleanup(false);
+		const onBackdrop = (e) => { if (e.target === modal) cleanup(false); };
+
+		yes.addEventListener('click', onYes);
+		no.addEventListener('click', onNo);
+		modal.addEventListener('click', onBackdrop);
+		modal.classList.remove('hidden');
+	});
+}
+
 // Listen for state updates from the main application
-window.onIronState = function(state) {
+window.onIFL03State = function(state) {
 	currentState = state;
 	updateUI();
 };

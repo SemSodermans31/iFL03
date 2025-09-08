@@ -105,7 +105,7 @@ void StubDataManager::populateSessionCars()
         
         // Assign car brands for icon display in preview mode (names chosen to match available PNG files)
         const char* carBrands[] = {
-            "Ferrari 488", "Mercedes AMG", "BMW M4", "McLaren 720S",
+            "Ferrari 296 GT3", "Mercedes AMG", "BMW M4", "McLaren 720S",
             "Aston Martin Vantage", "Alpine A110", "Ford GT", "Porsche 911",
             "Alfa Romeo Giulia", "Chevrolet Corvette", "Audi R8", "Lamborghini Huracan",
             "Toyota Supra", "Mazda MX-5", "Subaru BRZ", "Honda NSX",

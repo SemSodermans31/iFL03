@@ -117,7 +117,7 @@ function sendCommand(command, data) {
 }
 
 // Listen for state updates from the main application
-window.onIronState = function(state) {
+window.onIFL03State = function(state) {
 	currentState = state;
 	updateUI();
 };

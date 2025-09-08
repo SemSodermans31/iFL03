@@ -179,7 +179,7 @@ int main()
     // Ensure config.json is read/written next to the executable
     setWorkingDirectoryToExe();
 
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
     const bool cefOk = cefInitialize();
     if( cefOk )
         cefCreateMainWindow();
@@ -196,7 +196,7 @@ int main()
     registerHotkeys();
 
     printf("\n====================================================================================\n");
-    printf("Welcome to iRon! This app provides a few simple overlays for iRacing.\n\n");
+    printf("Welcome to iFL03! This app provides a few simple overlays for iRacing.\n\n");
     printf("NOTE: Most overlays are only active when iRacing is running and the car is on track.\n\n");
     printf("Current hotkeys:\n");
     printf("    Move and resize overlays:     %s\n", g_cfg.getString("General","ui_edit_hotkey","").c_str() );
@@ -209,11 +209,12 @@ int main()
     printf("    Toggle flags overlay:         %s\n", g_cfg.getString("OverlayFlags","toggle_hotkey","").c_str() );
     printf("    Toggle delta overlay:         %s\n", g_cfg.getString("OverlayDelta","toggle_hotkey","").c_str() );
     printf("    Toggle radar overlay:         %s\n", g_cfg.getString("OverlayRadar","toggle_hotkey","").c_str() );
-    printf("\niRon will generate a file called \'config.json\' in its current directory. This file\n"\
-           "stores your settings. You can edit the file at any time, even while iRon is running,\n"\
+    printf("\niFL03 will generate a file called \'config.json\' in its current directory. This file\n"\
+           "stores your settings. You can edit the file at any time, even while iFL03 is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
-    printf("To exit iRon, simply close this console window.\n\n");
-    printf("For the latest version or to submit bug reports, go to:\n\n        https://github.com/lespalt/iRon\n\n");
+    printf("To exit iFL03, simply close this console window.\n\n");
+    printf("For the latest version of the console application or to submit bug reports, go to:\n\n        https://github.com/lespalt/iRon\n\n");
+    printf("For the latest version of the GUI application, go to:\n\n        https://github.com/SemSodermans31/iFL03\n\n");
     printf("\nHappy Racing!\n");
     printf("====================================================================================\n\n");
 
@@ -235,7 +236,7 @@ int main()
     overlays.push_back( new OverlayWeather() );
     overlays.push_back( new OverlayFlags() );
     overlays.push_back( new OverlayDelta() );
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
     overlays.push_back( new OverlayRadar() );
 #else
     overlays.push_back( new OverlayRadar() );
@@ -270,10 +271,10 @@ int main()
             // Enable user-selected overlays, but only if we're driving
             handleConfigChange( overlays, status );
 
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
             // Push status to GUI
             if (cefOk) {
-                std::string js = std::string("window.onIronState && window.onIronState(") + app_get_state_json() + ");";
+                std::string js = std::string("window.onIFL03State && window.onIFL03State(") + app_get_state_json() + ");";
                 cefExecuteScript(js.c_str());
             }
 #endif
@@ -315,9 +316,9 @@ int main()
         {
             g_cfg.load();
             handleConfigChange( overlays, status );
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
             if (cefOk) {
-                std::string js = std::string("window.onIronState && window.onIronState(") + app_get_state_json() + ");";
+                std::string js = std::string("window.onIFL03State && window.onIFL03State(") + app_get_state_json() + ");";
                 cefExecuteScript(js.c_str());
             }
 #endif
@@ -394,7 +395,7 @@ int main()
         if( quitRequested )
             break;
 
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
         // Allow CEF to process pending work when using the external pump
         cefDoMessageLoopWork();
 #endif
@@ -405,7 +406,7 @@ int main()
     for( Overlay* o : overlays )
         delete o;
 
-#ifdef IRON_USE_CEF
+#ifdef IFL03_USE_CEF
     cefShutdown();
 #endif
 }

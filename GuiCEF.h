@@ -1,6 +1,6 @@
 #pragma once
 
-// Minimal CEF integration layer for iRon
+// Minimal CEF integration layer for iFL03
 // Initialize CEF, create a simple browser window, pump its message loop, and shutdown.
 
 bool cefInitialize();

@@ -82,10 +82,21 @@ function setupEventListeners() {
 		overlayToggle.addEventListener('change', function() {
 			if (selectedOverlay) {
 				const configKey = overlayConfig[selectedOverlay].configKey;
-				sendCommand('setOverlay', { 
-					key: configKey, 
-					on: this.checked 
+				sendCommand('setOverlay', {
+					key: configKey,
+					on: this.checked
 				});
+
+				// Update border immediately for visual feedback
+				const card = document.querySelector(`[data-overlay="${selectedOverlay}"]`);
+				const iconContainer = card ? card.querySelector('.flex.items-center.justify-center') : null;
+				if (iconContainer) {
+					if (this.checked) {
+						iconContainer.classList.add('border-2', 'border-green-500');
+					} else {
+						iconContainer.classList.remove('border-2', 'border-green-500');
+					}
+				}
 			}
 		});
 	}
@@ -306,18 +317,6 @@ function setupEventListeners() {
 function selectOverlay(overlayKey) {
 	selectedOverlay = overlayKey;
 	
-	// Update card selection
-	document.querySelectorAll('.overlay-card').forEach(card => {
-		card.classList.remove('border-indigo-500', 'bg-slate-900/80');
-		card.classList.add('border-slate-800', 'bg-slate-900/60');
-	});
-	
-	const selectedCard = document.querySelector(`[data-overlay="${overlayKey}"]`);
-	if (selectedCard) {
-		selectedCard.classList.remove('border-slate-800', 'bg-slate-900/60');
-		selectedCard.classList.add('border-indigo-500', 'bg-slate-900/80');
-	}
-	
 	// Show settings sidebar
 	const settingsSidebar = document.getElementById('overlay-settings');
 	settingsSidebar.classList.remove('hidden');
@@ -499,24 +498,25 @@ function requestState() {
 function updateUI() {
 	// Update connection status
 	updateConnectionStatus(currentState.connectionStatus);
-	
+
 	// Update overlay states in grid
 	Object.keys(overlayConfig).forEach(overlayKey => {
 		const config = overlayConfig[overlayKey];
 		const card = document.querySelector(`[data-overlay="${overlayKey}"]`);
-		
-		if (card && currentState.config && currentState.config[config.configKey]) {
-			const isEnabled = currentState.config[config.configKey].enabled || false;
-			
-			// Add visual indicator for enabled overlays
+		const iconContainer = card ? card.querySelector('.flex.items-center.justify-center') : null;
+
+		if (card && iconContainer) {
+			// Check if overlay is enabled
+			const isEnabled = currentState.config && currentState.config[config.configKey] && currentState.config[config.configKey].enabled;
+
 			if (isEnabled) {
-				card.classList.add('ring-2', 'ring-green-500/50');
+				iconContainer.classList.add('border-2', 'border-green-500');
 			} else {
-				card.classList.remove('ring-2', 'ring-green-500/50');
+				iconContainer.classList.remove('border-2', 'border-green-500');
 			}
 		}
 	});
-	
+
 	// Update selected overlay settings if one is selected
 	if (selectedOverlay) {
 		updateOverlaySettings(selectedOverlay);
@@ -591,7 +591,7 @@ function saveOverlaySettings() {
 }
 
 // Listen for state updates from the main application
-window.onIronState = function(state) {
+window.onIFL03State = function(state) {
 	currentState = state;
 	updateUI();
 };

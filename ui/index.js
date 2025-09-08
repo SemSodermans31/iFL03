@@ -1,9 +1,9 @@
 /**
- * iRon CEF GUI Controller
+ * iFL03 CEF GUI Controller
  * Handles communication between the HTML frontend and C++ backend
  */
 
-class IronGuiController {
+class IFL03GuiController {
     constructor() {
         this.isInitialized = false;
         this.setupEventListeners();
@@ -81,7 +81,7 @@ class IronGuiController {
     setupEventListeners() {
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => this.bindControls());
         else this.bindControls();
-        window.onIronState = (state) => this.render(state);
+        window.onIFL03State = (state) => this.render(state);
     }
 
     bindControls() {
@@ -158,7 +158,7 @@ class IronGuiController {
     }
 }
 
-const ironGui = new IronGuiController();
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => ironGui.init());
-else ironGui.init();
-window.ironGui = ironGui; 
+const ifl03Gui = new IFL03GuiController();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => ifl03Gui.init());
+else ifl03Gui.init();
+window.ifl03Gui = ifl03Gui; 
