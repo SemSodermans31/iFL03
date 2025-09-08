@@ -99,7 +99,7 @@ protected:
     {
         m_text.reset( m_dwriteFactory.Get() );
 
-        const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
+        const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
         const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
         const int fontWeight = g_cfg.getInt( m_name, "font_weight", 700 );
         const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
@@ -107,7 +107,7 @@ protected:
         if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
         else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
         
-        m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+        m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
         HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize, L"en-us", &m_textFormat ));
         m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
         m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
@@ -489,6 +489,14 @@ protected:
             }
             else carsToSkip = 0;
         }
+        // Compute scroll limits and clamp current scroll position
+        m_maxScrollRow = std::max(0, carsInClass - carsToDraw);
+        if (m_scrollRow > m_maxScrollRow) m_scrollRow = m_maxScrollRow;
+        // Apply scroll offset to the number of cars to skip for rendering
+        {
+            const int maxSkip = std::max(0, carsInClass - carsToDraw);
+            carsToSkip = std::clamp(carsToSkip + m_scrollRow, 0, maxSkip);
+        }
         int drawnCars = 0;
         int ownClass = useStubData ? 0 : ir_PlayerCarClass.getInt(); // Use class 0 for stub data
         int selfClassDrivers = 0;
@@ -505,6 +513,11 @@ protected:
             }
 
             selfClassDrivers++;
+
+            // Apply scroll offset: skip the first 'carsToSkip' rows in-class
+            if (selfClassDrivers <= carsToSkip) {
+                continue;
+            }
 
             if( y+lineHeight/2 > ybottom )
                 break;
@@ -829,6 +842,17 @@ protected:
         }
 
         m_renderTarget->EndDraw();
+    }
+
+    virtual void onMouseWheel( int delta, int /*x*/, int /*y*/ ) override
+    {
+        // delta is typically +1 or -1 from the caller (Overlay::WndProc)
+        if (m_maxScrollRow <= 0)
+            return;
+        // Invert so positive wheel (towards user) scrolls down the list
+        m_scrollRow -= delta;
+        if (m_scrollRow < 0) m_scrollRow = 0;
+        if (m_scrollRow > m_maxScrollRow) m_scrollRow = m_maxScrollRow;
     }
 
     virtual bool canEnableWhileNotDriving() const

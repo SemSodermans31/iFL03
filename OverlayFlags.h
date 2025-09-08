@@ -73,7 +73,7 @@ protected:
 		const float baseSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
 		const int fontWeight = g_cfg.getInt( m_name, "font_weight", 700 );
 		const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-		m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+		m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
 		DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
 		if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
 		else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;

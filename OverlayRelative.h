@@ -63,11 +63,11 @@ class OverlayRelative : public Overlay
         {
             m_text.reset( m_dwriteFactory.Get() );
 
-            const std::string font = g_cfg.getString( m_name, "font", "Microsoft YaHei UI" );
+            const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
             const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
             const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
             const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-            m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+            m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
 
             // Convert font style string to enum
             DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
@@ -103,7 +103,7 @@ class OverlayRelative : public Overlay
             }
 
             // Allow user to scale the LAST column width via config
-            const float lastColScale = g_cfg.getFloat( m_name, "last_col_scale", 1.0f );
+            const float lastColScale = g_cfg.getFloat( m_name, "last_col_scale", 2.0f );
             if( g_cfg.getBool(m_name, "show_last", true) )
                 m_columns.add( (int)Columns::LAST,       computeTextExtent( L"99.99", m_dwriteFactory.Get(), m_textFormat.Get() ).x * lastColScale, fontSize/2 );
             m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"+99L  -99.9", m_dwriteFactory.Get(), m_textFormat.Get() ).x, 1, fontSize/2 );

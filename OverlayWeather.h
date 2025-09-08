@@ -115,11 +115,11 @@ class OverlayWeather : public Overlay
             {
                 m_text.reset( m_dwriteFactory.Get() );
 
-                const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
+                const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
                 const float baseFontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
                 const int fontWeight = g_cfg.getInt( m_name, "font_weight", 900 );
                 const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-                m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 5.0f );
+                m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
                 DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
                 if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
                 else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
