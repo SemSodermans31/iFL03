@@ -1,3 +1,27 @@
+/*
+MIT License
+
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
 #include "GuiCEF.h"
 
 #ifdef IFL03_USE_CEF
@@ -50,11 +74,9 @@ namespace {
 	// Helper function to enable dark mode for window borders
 	static void EnableDarkModeForWindow(HWND hwnd)
 	{
-		// Enable dark mode for window borders and title bar
 		BOOL darkMode = TRUE;
 		HRESULT hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &darkMode, sizeof(darkMode));
 
-		// If that failed, try the older attribute value for compatibility with older Windows versions
 		if (FAILED(hr)) {
 			const int DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19;
 			DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, &darkMode, sizeof(darkMode));
@@ -66,11 +88,9 @@ namespace {
 				switch (msg)
 	{
 	case WM_CREATE:
-		// Enable dark mode for the window when it's created
 		EnableDarkModeForWindow(hwnd);
 		break;
 	case WM_THEMECHANGED:
-		// Re-enable dark mode if system theme changes
 		EnableDarkModeForWindow(hwnd);
 		InvalidateRect(hwnd, NULL, TRUE);
 		break;
@@ -78,8 +98,8 @@ namespace {
 	{
 		LPMINMAXINFO lpMMI = (LPMINMAXINFO)lparam;
 		// Set minimum window size to 1368x768
-		lpMMI->ptMinTrackSize.x = 1920;
-		lpMMI->ptMinTrackSize.y = 1080;
+		lpMMI->ptMinTrackSize.x = 1368;
+		lpMMI->ptMinTrackSize.y = 768;
 		return 0;
 	}
 	case WM_SIZE:
@@ -238,7 +258,6 @@ namespace {
 				return true;
 			}
 			if (has("\"cmd\":\"openExternal\"")) {
-				// { cmd: "openExternal", url: "https://..." }
 				std::string url;
 				if (extractStringField(req, "url", url)) {
 					OpenUrlWithShellExecute(url);
@@ -292,10 +311,10 @@ namespace {
 			if (has("\"cmd\":\"setOverlayOpacity\"")) {
 				std::string component;
 				if (extractStringField(req, "component", component)) {
-					// Extract opacity as integer - look for "opacity":123 pattern
+
 					size_t opacityPos = req.find("\"opacity\":");
 					if (opacityPos != std::string::npos) {
-						size_t valueStart = opacityPos + 10; // length of "opacity":
+						size_t valueStart = opacityPos + 10;
 						while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
 						size_t valueEnd = valueStart;
 						while (valueEnd < req.size() && std::isdigit(req[valueEnd])) valueEnd++;
@@ -320,7 +339,7 @@ namespace {
 				// Extract weather type as integer - look for "value":0 or "value":1 pattern
 				size_t valuePos = req.find("\"value\":");
 				if (valuePos != std::string::npos) {
-					size_t valueStart = valuePos + 8; // length of "value":
+					size_t valueStart = valuePos + 8;
 					while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
 					if (valueStart < req.size() && (req[valueStart] == '0' || req[valueStart] == '1')) {
 						int weatherType = req[valueStart] - '0';
@@ -358,7 +377,7 @@ namespace {
 					// Extract integer value - look for "value":123 pattern
 					size_t valuePos = req.find("\"value\":");
 					if (valuePos != std::string::npos) {
-						size_t valueStart = valuePos + 8; // length of "value":
+						size_t valueStart = valuePos + 8;
 						while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
 						size_t valueEnd = valueStart;
 						while (valueEnd < req.size() && (req[valueEnd] == '-' || std::isdigit((unsigned char)req[valueEnd]))) valueEnd++;
@@ -378,7 +397,7 @@ namespace {
 					// Extract float value - look for "value":123.45 pattern
 					size_t valuePos = req.find("\"value\":");
 					if (valuePos != std::string::npos) {
-						size_t valueStart = valuePos + 8; // length of "value":
+						size_t valueStart = valuePos + 8;
 						while (valueStart < req.size() && (req[valueStart] == ' ' || req[valueStart] == '\t')) valueStart++;
 						size_t valueEnd = valueStart;
 						while (valueEnd < req.size() && (req[valueEnd] == '-' || req[valueEnd] == '.' || std::isdigit((unsigned char)req[valueEnd]))) valueEnd++;

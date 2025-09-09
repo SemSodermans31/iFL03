@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -65,8 +65,8 @@ enum class Hotkey
     Weather,
     Flags,
     Delta, 
-    Radar
-    , Track
+    Radar, 
+    Track
 };
 
 static void registerHotkeys()
@@ -197,7 +197,8 @@ int main()
 
     printf("\n====================================================================================\n");
     printf("Welcome to iFL03! This app provides a few simple overlays for iRacing.\n\n");
-    printf("NOTE: Most overlays are only active when iRacing is running and the car is on track.\n\n");
+    printf("Special thanks to lespalt for creating iRon, the original version of this app.\n\n");
+    printf("NOTE: The overlays can be activated in the menu or in the race via the \'config.json\' file.\n\n");
     printf("Current hotkeys:\n");
     printf("    Move and resize overlays:     %s\n", g_cfg.getString("General","ui_edit_hotkey","").c_str() );
     printf("    Toggle standings overlay:     %s\n", g_cfg.getString("OverlayStandings","toggle_hotkey","").c_str() );
@@ -213,6 +214,7 @@ int main()
            "stores your settings. You can edit the file at any time, even while iFL03 is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
     printf("To exit iFL03, simply close this console window.\n\n");
+    printf("For the best experience use the GUI format of the application.\n\n");
     printf("For the latest version of the console application or to submit bug reports, go to:\n\n        https://github.com/lespalt/iRon\n\n");
     printf("For the latest version of the GUI application, go to:\n\n        https://github.com/SemSodermans31/iFL03\n\n");
     printf("\nHappy Racing!\n");

@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -107,11 +107,11 @@ struct Session
     float           rpmSLLast = 0;
     float           rpmSLBlink = 0;
     // Track info
-    std::string     trackName;            // e.g. road-america
-    std::string     trackDisplayName;     // e.g. Road America Full Course
-    std::string     trackConfigName;      // e.g. 300, full, grand-prix
+    std::string     trackName;           
+    std::string     trackDisplayName;    
+    std::string     trackConfigName;      
     int             trackId = 0;
-    float           trackLengthMeters = 0.0f; // meters
+    float           trackLengthMeters = 0.0f; 
 };
 
 extern irsdkCVar ir_SessionTime;    // double[1] Seconds since session start (s)

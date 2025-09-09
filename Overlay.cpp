@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -57,7 +57,6 @@ static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
             LRESULT hit = DefWindowProc( hwnd, msg, wparam, lparam );
             if( hit == HTCLIENT )
             {
-                // check if we hit the corner area of the window to allow resizing despite having no border
                 RECT r;
                 GetWindowRect( hwnd, &r );
                 const int cur_x = GET_X_LPARAM( lparam ) - r.left;
@@ -65,15 +64,7 @@ static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
                 const int w = r.right - r.left;
                 const int h = r.bottom - r.top;
                 const int border = ResizeBorderWidth;
-                /*  Disabled these corners because using them doesn't let us update the window contents 
-                    fast enough for some reason, leading to a weird window-wobble appearance when resizing.
-                if( cur_x < border && cur_y < border )
-                    return HTTOPLEFT;
-                if( cur_x > w-border && cur_y < border )
-                    return HTTOPRIGHT;
-                if( cur_x < border && cur_y > h-border )
-                    return HTBOTTOMLEFT;
-                */
+                
                 if( cur_x > w-border && cur_y > h-border )
                     return HTBOTTOMRIGHT;
 
@@ -124,12 +115,8 @@ std::string Overlay::getName() const
 
 void Overlay::enable( bool on )
 {
-    if( on && !m_hwnd )  // enable
+    if( on && !m_hwnd )
     {
-        //
-        // Create window
-        //
-
         const char* const wndclassName = "overlay";
         WNDCLASSEX wndclass = {};
         if( !GetClassInfoEx( 0, wndclassName, &wndclass ) )  // only the first overlay we open registers the window class
