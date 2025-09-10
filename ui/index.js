@@ -182,6 +182,87 @@ class IFL03GuiController {
     }
 }
 
+/**
+ * Image Carousel for Hero Background
+ * Cycles through cover images every 30 seconds
+ * All Images are copyright free from Pexels.com
+ */
+class ImageCarousel {
+    constructor() {
+        this.coverImages = [
+            '../assets/covers/max.jpg',
+            '../assets/covers/amg.jpg',
+            '../assets/covers/closeup.jpg',
+            '../assets/covers/imola.jpg',
+            '../assets/covers/rally.jpg',
+            '../assets/covers/spray.jpg',
+            '../assets/covers/vice.jpg'
+        ];
+        this.currentImageIndex = 0;
+        this.heroBg = null;
+        this.intervalId = null;
+        this.init();
+    }
+
+    init() {
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.setupCarousel());
+        } else {
+            this.setupCarousel();
+        }
+    }
+
+    setupCarousel() {
+        this.heroBg = document.getElementById('hero-bg');
+        if (!this.heroBg) {
+            console.warn('Hero background element not found');
+            return;
+        }
+
+        // Preload all images
+        this.preloadImages();
+
+        // Start the carousel
+        this.startCarousel();
+    }
+
+    preloadImages() {
+        this.coverImages.forEach(imageSrc => {
+            const img = new Image();
+            img.src = imageSrc;
+        });
+    }
+
+    changeBackgroundImage() {
+        // Select a random image different from the current one
+        let newIndex;
+        do {
+            newIndex = Math.floor(Math.random() * this.coverImages.length);
+        } while (newIndex === this.currentImageIndex && this.coverImages.length > 1);
+
+        this.currentImageIndex = newIndex;
+        this.heroBg.style.backgroundImage = `url('${this.coverImages[this.currentImageIndex]}')`;
+    }
+
+    startCarousel() {
+        // Start the carousel - change image every 30 seconds (30000 milliseconds)
+        this.intervalId = setInterval(() => {
+            this.changeBackgroundImage();
+        }, 30000);
+    }
+
+    stopCarousel() {
+        if (this.intervalId) {
+            clearInterval(this.intervalId);
+            this.intervalId = null;
+        }
+    }
+}
+
+// Initialize the image carousel
+const imageCarousel = new ImageCarousel();
+
 const ifl03Gui = new IFL03GuiController();
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => ifl03Gui.init());
 else ifl03Gui.init();
