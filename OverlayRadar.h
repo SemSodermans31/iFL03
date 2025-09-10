@@ -47,6 +47,14 @@ class OverlayRadar : public Overlay
         virtual void onEnable()
         {
             onConfigChanged();
+            // Reset runtime state to avoid stale indicators on enable
+            m_frontDistSm = 1e9f;
+            m_rearDistSm  = 1e9f;
+            m_frontRedUntil = 0.0f;
+            m_rearRedUntil  = 0.0f;
+            m_frontYellowUntil = 0.0f;
+            m_rearYellowUntil  = 0.0f;
+            m_lastSessionTime = -1.0f;
         }
 
         virtual void onConfigChanged()
@@ -132,10 +140,11 @@ class OverlayRadar : public Overlay
                     if (i == selfIdx) continue;
                     const Car& car = ir_session.cars[i];
                     if (car.isSpectator || car.carNumber < 0) continue;
+                    // Ignore cars that are on pit road between the cones
+                    if (ir_CarIdxOnPitRoad.getBool(i)) continue;
 
                     float delta = 0.0f;
                     int lapDelta = ir_CarIdxLap.getInt(i) - ir_CarIdxLap.getInt(selfIdx);
-                    if (lapDelta != 0) continue; // only same lap
 
                     // Prefer lap percent * track length when available, otherwise fallback to EstTime * speed
                     float alongM = 0.0f; // forward(+)/back(-) in meters
@@ -197,6 +206,17 @@ class OverlayRadar : public Overlay
 
             // Smoothing and sticky timers
             const float now = ir_SessionTime.getFloat();
+            // Reset smoothing/timers if session time jumps backwards (session transition)
+            if (m_lastSessionTime >= 0.0f && now + 0.001f < m_lastSessionTime)
+            {
+                m_frontDistSm = 1e9f;
+                m_rearDistSm  = 1e9f;
+                m_frontRedUntil = 0.0f;
+                m_rearRedUntil  = 0.0f;
+                m_frontYellowUntil = 0.0f;
+                m_rearYellowUntil  = 0.0f;
+            }
+            m_lastSessionTime = now;
             auto smooth = [](float prev, float cur, float alpha){ return (prev > 1e8f) ? cur : (prev + alpha * (cur - prev)); };
             m_frontDistSm = smooth(m_frontDistSm, minAheadNow, 0.3f);
             m_rearDistSm  = smooth(m_rearDistSm,  minBehindNow, 0.3f);
@@ -228,14 +248,14 @@ class OverlayRadar : public Overlay
             }
 
             // Decide which zones to light up - Racelab style
-            // Only show colors if opponents are within the 16m total range (8m front + 8m back)
-            const bool hasOpponentsInRange = (m_frontDistSm <= 8.0f || m_rearDistSm <= 8.0f);
+            // Only show colors if opponents are within configured ranges
+            const bool hasOpponentsInRange = (m_frontDistSm <= m_yellowRangeM || m_rearDistSm <= m_yellowRangeM);
             
             // Front/back zones
-            bool frontYellowInst = hasOpponentsInRange && (m_frontDistSm <= 8.0f && m_frontDistSm > 2.0f);
-            bool frontRedInst    = hasOpponentsInRange && (m_frontDistSm <= 2.0f);
-            bool rearYellowInst  = hasOpponentsInRange && (m_rearDistSm  <= 8.0f && m_rearDistSm  > 2.0f);
-            bool rearRedInst     = hasOpponentsInRange && (m_rearDistSm  <= 2.0f);
+            bool frontYellowInst = hasOpponentsInRange && (m_frontDistSm <= m_yellowRangeM && m_frontDistSm > m_redRangeM);
+            bool frontRedInst    = hasOpponentsInRange && (m_frontDistSm <= m_redRangeM);
+            bool rearYellowInst  = hasOpponentsInRange && (m_rearDistSm  <= m_yellowRangeM && m_rearDistSm  > m_redRangeM);
+            bool rearRedInst     = hasOpponentsInRange && (m_rearDistSm  <= m_redRangeM);
 
             // Sticky timers
             const float stickRed = 0.20f;   // seconds
@@ -250,10 +270,9 @@ class OverlayRadar : public Overlay
             const bool frontYellow= now <= m_frontYellowUntil|| frontYellowInst;
             const bool rearYellow = now <= m_rearYellowUntil || rearYellowInst;
 
-            // Side zones: only red when within 2m, no yellow for sides
-            const float closeAlong = std::min(m_frontDistSm, m_rearDistSm);
-            const bool leftRed     = hasLeft  && (closeAlong <= 2.5f);
-            const bool rightRed    = hasRight && (closeAlong <= 2.5f);
+            // Side zones: rely directly on iRacing side detection (no yellow for sides)
+            const bool leftRed     = hasLeft;
+            const bool rightRed    = hasRight;
             const bool leftYellow  = false;  // No yellow for sides in Racelab style
             const bool rightYellow = false; // No yellow for sides in Racelab style
 
@@ -273,15 +292,15 @@ class OverlayRadar : public Overlay
             // Draw guide lines with fading opacity
             const float4 guideLineCol = float4(1.0f, 1.0f, 1.0f, 0.5f * globalOpacity); // 50% opacity white
             
-            // Vertical line: 8m front and back
-            const float frontLineY = cy - halfL - (8.0f * pxPerM);
-            const float rearLineY = cy + halfL + (8.0f * pxPerM);
+            // Vertical line: guide at yellow range
+            const float frontLineY = cy - halfL - (m_yellowRangeM * pxPerM);
+            const float rearLineY = cy + halfL + (m_yellowRangeM * pxPerM);
             drawLine(cx, cy - halfL, cx, frontLineY, guideLineCol, 1.5f);  // Front line
             drawLine(cx, cy + halfL, cx, rearLineY, guideLineCol, 1.5f);   // Rear line
             
-            // Horizontal lines: 2m left and right at car front/back
-            const float leftLineX = cx - (2.0f * pxPerM);
-            const float rightLineX = cx + (2.0f * pxPerM);
+            // Horizontal lines: guide at red range left and right at car front/back
+            const float leftLineX = cx - (m_redRangeM * pxPerM);
+            const float rightLineX = cx + (m_redRangeM * pxPerM);
             drawLine(leftLineX, cy - halfL, rightLineX, cy - halfL, guideLineCol, 1.5f);  // Front horizontal
             drawLine(leftLineX, cy + halfL, rightLineX, cy + halfL, guideLineCol, 1.5f);  // Rear horizontal
 
@@ -340,15 +359,15 @@ class OverlayRadar : public Overlay
             // Front zones as ring sectors with radial fading
             if (frontYellow) {
                 Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
-                const float innerR = halfL + 2.0f * pxPerM;
-                const float outerR = halfL + 8.0f * pxPerM;
+                const float innerR = halfL + m_redRangeM * pxPerM;
+                const float outerR = halfL + m_yellowRangeM * pxPerM;
                 makeRadialBrush(innerR, outerR, yellowCol, brush);
                 fillRingSector(0.0f, frontHalfAng, innerR, outerR, brush.Get());
             }
             if (frontRed) {
                 Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
                 const float innerR = halfL;
-                const float outerR = halfL + 2.0f * pxPerM;
+                const float outerR = halfL + m_redRangeM * pxPerM;
                 makeRadialBrush(innerR, outerR, redCol, brush);
                 fillRingSector(0.0f, frontHalfAng, innerR, outerR, brush.Get());
             }
@@ -356,15 +375,15 @@ class OverlayRadar : public Overlay
             // Rear zones as ring sectors with radial fading
             if (rearYellow) {
                 Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
-                const float innerR = halfL + 2.0f * pxPerM;
-                const float outerR = halfL + 8.0f * pxPerM;
+                const float innerR = halfL + m_redRangeM * pxPerM;
+                const float outerR = halfL + m_yellowRangeM * pxPerM;
                 makeRadialBrush(innerR, outerR, yellowCol, brush);
                 fillRingSector(PI, frontHalfAng, innerR, outerR, brush.Get());
             }
             if (rearRed) {
                 Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
                 const float innerR = halfL;
-                const float outerR = halfL + 2.0f * pxPerM;
+                const float outerR = halfL + m_redRangeM * pxPerM;
                 makeRadialBrush(innerR, outerR, redCol, brush);
                 fillRingSector(PI, frontHalfAng, innerR, outerR, brush.Get());
             }
@@ -373,7 +392,7 @@ class OverlayRadar : public Overlay
             if (leftRed) {
                 Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
                 const float innerR = halfW;
-                const float outerR = halfW + 2.0f * pxPerM;
+                const float outerR = halfW + m_redRangeM * pxPerM;
                 makeRadialBrush(innerR, outerR, redCol, brush);
                 // Slightly bias sector center up/down based on along position estimate
                 const float angCenter = -PI * 0.5f + (leftCarPos * 0.15f);
@@ -382,7 +401,7 @@ class OverlayRadar : public Overlay
             if (rightRed) {
                 Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush> brush;
                 const float innerR = halfW;
-                const float outerR = halfW + 2.0f * pxPerM;
+                const float outerR = halfW + m_redRangeM * pxPerM;
                 makeRadialBrush(innerR, outerR, redCol, brush);
                 const float angCenter =  PI * 0.5f + (rightCarPos * 0.15f);
                 fillRingSector(angCenter, sideHalfAng, innerR, outerR, brush.Get());
@@ -401,6 +420,18 @@ class OverlayRadar : public Overlay
             }
 
             m_renderTarget->EndDraw();
+        }
+
+        virtual void onSessionChanged()
+        {
+            // Clear smoothed values and sticky timers when iRacing switches sessions
+            m_frontDistSm = 1e9f;
+            m_rearDistSm  = 1e9f;
+            m_frontRedUntil = 0.0f;
+            m_rearRedUntil  = 0.0f;
+            m_frontYellowUntil = 0.0f;
+            m_rearYellowUntil  = 0.0f;
+            m_lastSessionTime = -1.0f;
         }
 
         virtual float2 getDefaultSize()
@@ -430,6 +461,9 @@ class OverlayRadar : public Overlay
         float m_rearRedUntil  = 0.0f;
         float m_frontYellowUntil = 0.0f;
         float m_rearYellowUntil  = 0.0f;
+
+        // Session transition tracking
+        float m_lastSessionTime = -1.0f;
 
         // Text helpers (for future labels)
         Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;

@@ -54,6 +54,40 @@ SOFTWARE.
 #include "AppControl.h"
 #include "preview_mode.h"
 
+// Helper: determine if this process is a CEF sub-process (renderer/gpu/utility)
+static bool isCefSubprocess()
+{
+    int argc = 0;
+    LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    bool isSub = false;
+    if (argv)
+    {
+        for (int i = 0; i < argc; ++i)
+        {
+            // Matches "--type=renderer" or "--type" "renderer"
+            if (wcsncmp(argv[i], L"--type=", 7) == 0 || wcscmp(argv[i], L"--type") == 0)
+            {
+                isSub = true;
+                break;
+            }
+        }
+        LocalFree(argv);
+    }
+    return isSub;
+}
+
+// Bring an already running main window to the foreground if we can find it
+static void focusExistingMainWindow()
+{
+    // Window class is defined in GuiCEF as L"iFL03GuiWindow" when CEF is enabled
+    HWND hwnd = FindWindowW(L"iFL03GuiWindow", NULL);
+    if (hwnd)
+    {
+        ShowWindow(hwnd, SW_SHOWNORMAL);
+        SetForegroundWindow(hwnd);
+    }
+}
+
 enum class Hotkey
 {
     UiEdit,
@@ -173,6 +207,19 @@ static void setWorkingDirectoryToExe()
 
 int main()
 {
+    // Single-instance guard for the main/browser process only (skip CEF sub-processes)
+    HANDLE singleInstanceMutex = NULL;
+    if (!isCefSubprocess())
+    {
+        singleInstanceMutex = CreateMutexW(NULL, TRUE, L"Global\\iFL03_SingleInstance_Mutex");
+        if (singleInstanceMutex && GetLastError() == ERROR_ALREADY_EXISTS)
+        {
+            focusExistingMainWindow();
+            MessageBoxW(NULL, L"iFL03 is already running. Please first close the existing instance and try again.", L"iFL03", MB_OK | MB_ICONINFORMATION);
+            return 0;
+        }
+    }
+
     // Bump priority up so we get time from the sim
     SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 
@@ -411,4 +458,9 @@ int main()
 #ifdef IFL03_USE_CEF
     cefShutdown();
 #endif
+
+    if (singleInstanceMutex)
+        CloseHandle(singleInstanceMutex);
+
+    return 0;
 }

@@ -202,7 +202,8 @@ protected:
                 const auto& stubCar = stubCars[i];
                 CarInfo ci;
                 ci.carIdx = (int)i;
-                ci.classIdx = 0; // All in same class for simplicity
+                // Distribute cars across classes in preview to test multi-class display
+                ci.classIdx = (int)(i % 3);
                 ci.lapCount = stubCar.lapCount;
                 ci.position = stubCar.position;
                 ci.pctAroundLap = 0.1f + (i * 0.08f);
@@ -316,19 +317,24 @@ protected:
             } );
 
         // Compute lap gap to leader and compute delta
+        const bool showAllClasses = g_cfg.getBool( m_name, "show_all_classes", false );
         int classLeader = -1;
         int carsInClass = 0;
         float classLeaderGapToOverall = 0.0f;
         
         if (!useStubData) {
             // Only do iRacing-specific calculations for real data
+            if (showAllClasses) {
+                carsInClass = (int)carInfo.size();
+            }
             for( int i=0; i<(int)carInfo.size(); ++i )
             {
                 CarInfo&       ci       = carInfo[i];
                 if (ci.classIdx != ciSelf.classIdx)
-                    continue;
+                    continue; // skip non-self class for class-based calculations
 
-                carsInClass++;
+                if (!showAllClasses)
+                    carsInClass++;
 
                 if (ci.position == 1) {
                     classLeader = ci.carIdx;
@@ -357,10 +363,18 @@ protected:
             {
                 CarInfo&       ci       = carInfo[i];
                 if (ci.classIdx == ciSelf.classIdx) {
-                    carsInClass++;
                     if (ci.position == 1) {
                         classLeader = ci.carIdx;
                     }
+                }
+            }
+            if (showAllClasses) {
+                carsInClass = (int)carInfo.size();
+            } else {
+                for( int i=0; i<(int)carInfo.size(); ++i )
+                {
+                    if (carInfo[i].classIdx == ciSelf.classIdx)
+                        carsInClass++;
                 }
             }
         }
@@ -498,7 +512,7 @@ protected:
             carsToSkip = std::clamp(carsToSkip + m_scrollRow, 0, maxSkip);
         }
         int drawnCars = 0;
-        int ownClass = useStubData ? 0 : ir_PlayerCarClass.getInt(); // Use class 0 for stub data
+        int ownClass = showAllClasses ? -1 : (useStubData ? ciSelf.classIdx : ir_PlayerCarClass.getInt()); // When showing all, ignore class filter
         int selfClassDrivers = 0;
         bool skippedCars = false;
         int numSkippedCars = 0;
@@ -508,7 +522,7 @@ protected:
 
             y = 2*yoff + lineHeight/2 + (drawnCars+1)*lineHeight;
             
-            if (carInfo[i].classIdx != ownClass) {
+            if (!showAllClasses && carInfo[i].classIdx != ownClass) {
                 continue;
             }
 

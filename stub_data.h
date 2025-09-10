@@ -71,6 +71,7 @@ public:
     static int getStubLap();
     static int getStubLapsRemaining();
     static float getStubSessionTimeRemaining();
+    static int getStubTargetLap();
     
     // Inputs-specific stub data
     static float getStubThrottle();

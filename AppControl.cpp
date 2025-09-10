@@ -168,7 +168,7 @@ std::string app_get_state_json()
 		"\"overlays\":{"
 		"\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s,\"OverlayDelta\":%s,\"OverlayRadar\":%s,\"OverlayTrack\":%s},"
 		"\"config\":{\"General\":{\"units\":\"%s\",\"performance_mode_30hz\":%s},"
-		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s},"
+		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_all_classes\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s},"
 		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
 		"\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"steering_wheel\":\"%s\"},"
 		"\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"show_in_menu\":%s,\"show_in_race\":%s},"
@@ -204,6 +204,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayStandings","opacity",100),
 		boolStr(g_cfg.getBool("OverlayStandings","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_all_classes",false)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_pit",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_license",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_irating",true)),
