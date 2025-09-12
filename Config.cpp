@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,8 @@ SOFTWARE.
 
 
 #include <atomic>
+#include <filesystem>
+#include <algorithm>
 #include "Config.h"
 
 Config              g_cfg;
@@ -80,7 +82,7 @@ bool Config::save()
     if( !ok ) {
         char s[1024];
         GetCurrentDirectory( sizeof(s), s );
-        printf("Could not save config file! Please make sure iRon is started from a directory for which it has write permissions. The current directory is: %s.\n", s);
+        printf("Could not save config file! Please make sure iFL03 is started from a directory for which it has write permissions. The current directory is: %s.\n", s);
     }
     return ok;
 }
@@ -178,10 +180,24 @@ std::vector<std::string> Config::getStringVec( const std::string& component, con
     }
 
     picojson::array& arr = value.get<picojson::array>();
-    std::vector<std::string> ret( arr.size() );
+    std::vector<std::string> ret;
+    ret.reserve( arr.size() );
     for( picojson::value& entry : arr )
         ret.push_back( entry.get<std::string>() );
     return ret;
+}
+
+void Config::setStringVec( const std::string& component, const std::string& key, const std::vector<std::string>& v )
+{
+    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    picojson::array arr;
+    arr.reserve(v.size());
+    for (const std::string& s : v) {
+        picojson::value val;
+        val.set<std::string>(s);
+        arr.push_back(val);
+    }
+    pjcomp[key].set<picojson::array>(arr);
 }
 
 void Config::setInt( const std::string& component, const std::string& key, int v )
@@ -195,6 +211,18 @@ void Config::setBool( const std::string& component, const std::string& key, bool
 {
     picojson::object& pjcomp = m_pj[component].get<picojson::object>();
     pjcomp[key].set<bool>( v );
+}
+
+void Config::setString( const std::string& component, const std::string& key, const std::string& v )
+{
+    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    pjcomp[key].set<std::string>( v );
+}
+
+void Config::setFloat( const std::string& component, const std::string& key, float v )
+{
+    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    pjcomp[key].set<double>( static_cast<double>(v) );
 }
 
 picojson::object& Config::getOrInsertComponent( const std::string& component, bool* existed )
@@ -217,4 +245,151 @@ picojson::value& Config::getOrInsertValue( const std::string& component, const s
         *existed = !it.second;
 
     return it.first->second;
+}
+
+std::string Config::sanitizeCarName( const std::string& carName ) const
+{
+    std::string sanitized = carName;
+    // Replace spaces and invalid filename characters with underscores
+    std::replace_if(sanitized.begin(), sanitized.end(), 
+        [](char c) { return c == ' ' || c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|'; }, 
+        '_');
+    return sanitized;
+}
+
+std::string Config::getCarConfigFilename( const std::string& carName ) const
+{
+    if( carName.empty() )
+        return "config.json";
+    return "config_" + sanitizeCarName(carName) + ".json";
+}
+
+bool Config::loadCarConfig( const std::string& carName )
+{
+    std::string carFilename = getCarConfigFilename(carName);
+    std::string json;
+    
+    // Try to load car-specific config
+    if( !loadFile(carFilename, json) )
+    {
+        // If car config doesn't exist, try to load default config as base
+        if( !loadFile("config.json", json) )
+        {
+            return false;
+        }
+    }
+
+    picojson::value pjval;
+    std::string parseError = picojson::parse( pjval, json );
+    if( !parseError.empty() )
+    {
+        printf("Car config file is not valid JSON!\n%s\n", parseError.c_str() );
+        return false;
+    }
+
+    m_pj = pjval.get<picojson::object>();
+    m_filename = carFilename;
+    m_currentCarName = carName;
+    m_hasChanged = false;
+    return true;
+}
+
+bool Config::saveCarConfig( const std::string& carName )
+{
+    std::string carFilename = getCarConfigFilename(carName);
+    const picojson::value value = picojson::value( m_pj );
+    const std::string json = value.serialize(true);
+    const bool ok = saveFile( carFilename, json );
+    if( !ok ) {
+        char s[1024];
+        GetCurrentDirectory( sizeof(s), s );
+        printf("Could not save car config file! Please make sure iFL03 is started from a directory for which it has write permissions. The current directory is: %s.\n", s);
+    }
+    return ok;
+}
+
+bool Config::hasCarConfig( const std::string& carName )
+{
+    std::string carFilename = getCarConfigFilename(carName);
+    std::string json;
+    return loadFile(carFilename, json);
+}
+
+bool Config::copyConfigToCar( const std::string& fromCar, const std::string& toCar )
+{
+    // Save current state
+    picojson::object currentPj = m_pj;
+    std::string currentFilename = m_filename;
+    std::string currentCarName = m_currentCarName;
+    
+    // Load source config
+    bool loadOk = false;
+    if( fromCar.empty() )
+    {
+        // Copy from default config
+        loadOk = load();
+    }
+    else
+    {
+        loadOk = loadCarConfig(fromCar);
+    }
+    
+    if( !loadOk )
+    {
+        // Restore previous state
+        m_pj = currentPj;
+        m_filename = currentFilename;
+        m_currentCarName = currentCarName;
+        return false;
+    }
+    
+    // Save to target car
+    bool saveOk = saveCarConfig(toCar);
+    
+    // Restore previous state
+    m_pj = currentPj;
+    m_filename = currentFilename;
+    m_currentCarName = currentCarName;
+    
+    return saveOk;
+}
+
+std::vector<std::string> Config::getAvailableCarConfigs()
+{
+    std::vector<std::string> carConfigs;
+    
+    try {
+        for (const auto& entry : std::filesystem::directory_iterator("."))
+        {
+            if (entry.is_regular_file())
+            {
+                std::string filename = entry.path().filename().string();
+                if (filename.starts_with("config_") && filename.ends_with(".json"))
+                {
+                    // Extract car name from filename
+                    std::string carName = filename.substr(7); // Remove "config_"
+                    carName = carName.substr(0, carName.length() - 5); // Remove ".json"
+                    
+                    // Restore spaces (reverse sanitization - basic version)
+                    std::replace(carName.begin(), carName.end(), '_', ' ');
+                    carConfigs.push_back(carName);
+                }
+            }
+        }
+    }
+    catch (const std::filesystem::filesystem_error& ex) {
+        printf("Error reading car configs: %s\n", ex.what());
+    }
+    
+    std::sort(carConfigs.begin(), carConfigs.end());
+    return carConfigs;
+}
+
+bool Config::deleteCarConfig( const std::string& carName )
+{
+    if( carName.empty() )
+        return false; // Don't delete default config
+        
+    std::string carFilename = getCarConfigFilename(carName);
+    return DeleteFileA(carFilename.c_str()) != 0;
 }

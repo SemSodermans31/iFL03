@@ -5,4 +5,12 @@ Debug/
 Release/
 sessionYaml.txt
 config.json
+local.props
+
+# Existing ignores
+.gitignore
+
+# UI build artifacts
+/ui/node_modules/
+/ui/dist/*.map
 

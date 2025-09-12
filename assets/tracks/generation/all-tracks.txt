@@ -1,0 +1,524 @@
+NAME	FILEPATH	
+Official Track Name	\tracks
+**New indicates this is the newest content at the time of viewing this list.
+Algarve International Circuit	\algarve	
+Algarve International Circuit - Grand Prix	\algarve\gp	
+Algarve International Circuit - Grand Prix - Chicanes	\algarve\gpchicane	
+Algarve International Circuit - Moto	\algarve\moto	
+Algarve International Circuit - Moto - Chicanes	\algarve\motochicane	
+Auto Club Speedway	\california	
+Auto Club Speedway - Oval	\california\oval	
+Auto Club Speedway - Competition	\california\competition	
+Auto Club Speedway - Interior	\california\interior	
+Auto Club Speedway - Moto	\california\moto	
+Autodromo Internazionale del Mugello	\mugello	
+Autodromo Internazionale del Mugello - Grand Prix	\mugello\gp	
+Autodromo Internazionale del Mugello - Short	\mugello\short	
+Autodromo Internazionale Enzo e Dino Ferrari	\imola	
+Autodromo Internazionale Enzo e Dino Ferrari - Grand Prix	\imola\gp	
+Autodromo Internazionale Enzo e Dino Ferrari - Moto	\imola\moto	
+Autódromo José Carlos Pace	\interlagos	
+Autódromo José Carlos Pace - Grand Prix	\interlagos\gp	
+Autódromo José Carlos Pace - Moto	\interlagos\moto	
+Autodromo Nazionale Monza	\monza	
+Autodromo Nazionale Monza - Grand Prix	\monza\full	
+Autodromo Nazionale Monza - GP without chicanes	\monza\nochicane	
+Autodromo Nazionale Monza - GP without first chicane	\monza\gpSecondChicane	
+Autodromo Nazionale Monza - Combined	\monza\combinedchicanes	
+Autodromo Nazionale Monza - Combined without chicanes	\monza\historic	
+Autodromo Nazionale Monza - Combined without first chicane	\monza\historicSecondChicane	
+Autodromo Nazionale Monza - Junior	\monza\junior	
+Autodromo Nazionale Monza - Oval - Left turning	\monza\ovalLeft	
+Autodromo Nazionale Monza - Oval - Right turning	\monza\oval	
+Barber Motorsports Park	\barber	
+Barber Motorsports Park - Full Course	\barber\full	
+Barber Motorsports Park - Short A	\barber\shorta	
+Barber Motorsports Park - Short B	\barber\shortb	
+Bark River International Raceway	\barkriver	
+Brands Hatch Circuit	\brandshatch	
+Brands Hatch Circuit - Grand Prix	\brandshatch\grandprix	
+Brands Hatch Circuit - Indy	\brandshatch\indy	
+Brands Hatch Circuit - Rallycross	\brandshatch\rallycross	
+Bristol Motor Speedway	\bristol	
+Bristol Motor Speedway - Dual Pit Roads	\bristol	
+Bristol Motor Speedway - Single Pit Road	\bristol\fullpit	
+Bristol Motor Speedway - Dirt	\bristol\dirt\2022	
+Bristol Motor Speedway - Dirt - 2021	\bristol\dirt	
+Cadwell Park Circuit	\cadwell	
+Cadwell Park Circuit - Full	\cadwell\full	
+Cadwell Park Circuit - Club	\cadwell\club	
+Cadwell Park Circuit - Moto	\cadwell\moto	
+Cadwell Park Circuit - Woodlands	\cadwell\woodlands	
+Canadian Tire Motorsports Park	\mosport	
+Cedar Lake Speedway	\cedarlake	
+Centripetal Circuit	\skidpad	
+Charlotte Motor Speedway	\charlotte\2018	
+Charlotte Motor Speedway - Oval - 2018	\charlotte\2018\oval	
+Charlotte Motor Speedway - Roval	\charlotte\2018\2019\roval	
+Charlotte Motor Speedway - Roval Long	\charlotte\2018\rovallong	
+Charlotte Motor Speedway - Roval - 2018	\charlotte\2018\roval	
+Charlotte Motor Speedway - Legends Oval	\charlotte\2018\legendsoval	
+Charlotte Motor Speedway - Legends RC Oval Long	\charlotte\2018\legendsrclong	
+Charlotte Motor Speedway - Legends RC Oval Medium	\charlotte\2018\legendsrcmed	
+Charlotte Motor Speedway - Legends RC Oval Short	\charlotte\2018\legendsrcshort	
+Charlotte Motor Speedway - Rallycross	\charlotte\2018\2019\rallycrosslong	
+Charlotte Motor Speedway - Oval - 2018	\charlotte\2025\oval	
+Charlotte Motor Speedway - Roval	\charlotte\2025\roval2025	
+Charlotte Motor Speedway - Roval Long	\charlotte\2025\rovalnochicanes	
+Charlotte Motor Speedway - Roval - 2018	\charlotte\2025\roval2019	
+Charlotte Motor Speedway - Legends Oval	\charlotte\2025\legendsoval	
+Charlotte Motor Speedway - Legends RC Oval Long	\charlotte\2025\legendsrclong	
+Charlotte Motor Speedway - Legends RC Oval Medium	\charlotte\2025\legendsrc2025	
+Charlotte Motor Speedway - Legends RC Oval Short	\charlotte\2025\legendsrcshort	
+Charlotte Motor Speedway - Rallycross	\charlotte\2025\rallycrosslong	
+Chicago Street Course	\chicago	
+Chicago Street Course - 2023 Cup	\chicago\2023	
+Chicago Street Course - Prototype	\chicago	
+Chicagoland Speedway	\chicagoland	
+Chili Bowl	\chilibowl	
+Circuit de Barcelona Catalunya	\barcelona	
+Circuit de Barcelona-Catalunya - Grand Prix	\barcelona\gp	
+Circuit de Barcelona-Catalunya - National	\barcelona\national	
+Circuit de Barcelona-Catalunya - Moto	\barcelona\moto	
+Circuit de Barcelona-Catalunya - Club	\barcelona\club	
+Circuit de Barcelona-Catalunya - Historic	\barcelona\historic	
+Circuit de Barcelona-Catalunya - Rallycross	\barcelona\rallycross	
+Circuit de Lédenon	\ledenon	
+Circuit de Nevers Magny-Cours	\magnycours	
+Circuit de Nevers Magny-Cours - Grand Prix	\magnycours\grandprix	
+Circuit de Spa-Francorchamps	\spa	
+Circuit de Spa-Francorchamps - Grand Prix Pits	\spa\2024\up	
+Circuit de Spa-Francorchamps - Classic Pits	\spa\2024\low	
+Circuit de Spa-Francorchamps - Endurance	\spa\2024\combined	
+Circuit de Spa-Francorchamps - Bike	\spa\2024\bike	
+Circuit de Spa-Francorchamps - Grand Prix Pits - 2010	\spa\up	
+Circuit de Spa-Francorchamps - Classic Pits - 2010	\spa\low	
+Circuit de Spa-Francorchamps - Endurance - 2010	\spa\combined	
+Circuit des 24 Heures du Mans	\lemans	
+Circuit des 24 Heures du Mans - 24 Heures du Man	\lemans\full	
+Circuit des 24 Heures du Mans - Historic	\lemans\nochicane	
+Circuit Gilles Villeneuve	\montreal	
+Circuit of the Americas	\cota	
+Circuit of the Americas - Grand Prix	\cota\gp	
+Circuit of the Americas - East	\cota\east	
+Circuit of the Americas - West	\cota\west	
+Circuit Park Zandvoort	\zandvoort	
+Circuit Park Zandvoort - Grand Prix - 2009	\zandvoort\grandprix	
+Circuit Park Zandvoort - National - 2009	\zandvoort\national	
+Circuit Park Zandvoort - Chicane - 2009	\zandvoort\chicane	
+Circuit Park Zandvoort - Club - 2009	\zandvoort\club	
+Circuit Park Zandvoort - Oostelijk - 2009	\zandvoort\oostelijk	
+Circuit Zandvoort	\zandvoort\2023	
+Circuit Zandvoort - Grand Prix	\zandvoort\2023\gp	
+Circuit Zandvoort - Grand Prix w/2 Chicane	\zandvoort\2023\gpchicane	
+Circuit Zandvoort - Nationaal	\zandvoort\2023\nationaal	
+Circuit Zandvoort - Oostelijk	\zandvoort\2023\ostelijk	
+Circuit Zolder	\zolder	
+Circuit Zolder - Grand Prix	\zolder\gp	
+Circuit Zolder - Alternate	\zolder\alt	
+Circuit Zolder	\zolder\2024	
+Circuit Zolder - Grand Prix	\zolder\2024\gp	
+Circuit Zolder - Alternate	\zolder\2024\alt	
+Circuito de Jerez - Ángel Nieto	\jerez	
+Circuito de Jerez - Ángel Nieto - Grand Prix	\jerez\gp	
+Circuito de Jerez - Ángel Nieto - Moto	\jerez\moto	
+Circuito de Navarra	\navarra	
+Circuito de Navarra - Speed Circuit	\navarra\speedlong	
+Circuito de Navarra - Speed Circuit - Medium	\navarra\speedmedium	
+Circuito de Navarra - Speed Circuit - Short	\navarra\speedshort	
+Concord Speedway	\concordhalf	
+Crandon International Raceway	\crandon	
+Crandon International Raceway - Full	\crandon	
+Crandon International Raceway - Short	\crandon\short	
+Darlington Raceway	\darlington	
+Daytona International Speedway	\daytona\2011	
+Daytona International Speedway - Oval	\daytona\2011\oval	
+Daytona International Speedway - Road Course	\daytona\2011\road	
+Daytona International Speedway - NASCAR Road Course	\daytona\2011\roadnascar2020	
+Daytona International Speedway - Moto	\daytona\2011\bike	
+Daytona International Speedway - Short	\daytona\2011\short	
+Daytona International Speedway - Oval - 2008	\daytona\oval	
+Daytona International Speedway - Road Course - 2008	\daytona\road	
+Daytona International Speedway - Moto - 2008	\daytona\bike	
+Daytona International Speedway - Short - 2008	\daytona\short	
+Daytona Rallycross and Dirt Road	\daytona	
+Daytona Rallycross and Dirt Road - Dirt Road Long	\daytona\rallycross\long\nojoker	
+Daytona Rallycross and Dirt Road - Dirt Road Short	\daytona\rallycross\short\nojoker	
+Daytona Rallycross and Dirt Road - Rallycross Long	\daytona\rallycross\long	
+Daytona Rallycross and Dirt Road - Rallycross Short	\daytona\rallycross\short	
+Detroit Grand Prix at Belle Isle	\belleisle	
+Donington Park Racing Circuit	\donington	
+Donington Park Racing Circuit - Grand Prix	\donington\gp	
+Donington Park Racing Circuit - National	\donington\national	
+Dover Motor Speedway	\dover	
+EchoPark Speedway (Atlanta)	\atlanta	
+EchoPark Speedway (Atlanta) - Oval	\atlanta\2022\oval	
+EchoPark Speedway (Atlanta) - Rallycross Long	\atlanta\rallycross\long	
+EchoPark Speedway (Atlanta) - Rallycross Short	\atlanta\rallycross\short	
+EchoPark Speedway (Atlanta) - Oval - 2008	\atlanta\quadoval	
+EchoPark Speedway (Atlanta) - Legends Oval - 2008	\atlanta\legendsoval	
+EchoPark Speedway (Atlanta) - Road Course - 2008	\atlanta\roadcourse	
+Eldora Speedway	\eldora	
+Fairbury Speedway	\fairbury	
+Federated Auto Parts Raceway at I-55	\pevely	
+Firebird Motorsports Park	\wildhorse	
+Five Flags Speedway	\fiveflags	
+Fuji International Speedway	\fuji	
+Fuji International Speedway - Grand Prix	\fuji\gp	
+Fuji International Speedway - No Chicane	\fuji\nochicane	
+Hickory Motor Speedway	\hickory	
+Hockenheimring Baden-Württemberg	\hockenheim	
+Hockenheimring Baden-Württemberg - Grand Prix	\hockenheim\gp	
+Hockenheimring Baden-Württemberg - National A	\hockenheim\nationalA	
+Hockenheimring Baden-Württemberg - National B	\hockenheim\nationalB	
+Hockenheimring Baden-Württemberg - Outer	\hockenheim\outer	
+Hockenheimring Baden-Württemberg - PEC - East	\hockenheim\peceast	
+Hockenheimring Baden-Württemberg - PEC - Handling	\hockenheim\pechandling	
+Hockenheimring Baden-Württemberg - PEC - Outer	\hockenheim\pecouter	
+Hockenheimring Baden-Württemberg - PEC - West	\hockenheim\pecwest	
+Hockenheimring Baden-Württemberg - Short A	\hockenheim\shortA	
+Hockenheimring Baden-Württemberg - Short B	\hockenheim\shortB	
+Homestead Miami Speedway	\homestead	
+Homestead Miami Speedway - Oval	\homestead\oval	
+Homestead Miami Speedway - Open Wheel Oval	\homestead\ovalindy	
+Homestead Miami Speedway - Road Course A	\homestead\roada	
+Homestead Miami Speedway - Road Course B	\homestead\roadb	
+Hungaroring Circuit	\hungaroring	
+Huset's Speedway	\husets	
+Indianapolis Motor Speedway	\indianapolis	
+Indianapolis Motor Speedway - Oval	\indianapolis\2022\ovalnascar	
+Indianapolis Motor Speedway - Open Wheel Oval	\indianapolis\2022\oval	
+Indianapolis Motor Speedway - Road Course	\indianapolis\2022\road	
+Indianapolis Motor Speedway - Bike	\indianapolis\motogp	
+Indianapolis Motor Speedway - Oval - 2009	\indianapolis\oval	
+Indianapolis Motor Speedway - Open Wheel Oval - 2009	\indianapolis\ovalindypit	
+Indianapolis Motor Speedway - Road Course - 2009	\indianapolis\road	
+Iowa Speedway	\iowa	
+Iowa Speedway - Oval	\iowa\2025\oval	
+Iowa Speedway - Oval - 2011	\iowa\oval	
+Iowa Speedway - Road Course	\iowa\road	
+Iowa Speedway - Infield Road Course	\iowa\infroad	
+Iowa Speedway - Legends	\iowa\legends	
+Iowa Speedway - Infield Legends	\iowa\inflegends	
+Iowa Speedway - Rallycross	\iowa\rallycross	
+iRacing Superspeedway	\iracingss	
+Irwindale Speedway	\irwindale	
+Irwindale Speedway - Outer	\irwindale\outer	
+Irwindale Speedway - Inner	\irwindale\inner	
+Irwindale Speedway - Outer - Inner	\irwindale\outerinner	
+Irwindale Speedway - Figure Eight	\irwindale\figureeight	
+Irwindale Speedway - Figure Eight Jump	\irwindale\figureeightjump	
+Kansas Speedway	\kansas	
+Kansas Speedway - Oval	\kansas\oval	
+Kansas Speedway - Road Course	\kansas\full	
+Kansas Speedway - Infield Road Course	\kansas\short	
+Kentucky Speedway	\kentucky\2020	
+Kentucky Speedway - Oval	\kentucky\2020\oval	
+Kevin Harvick's Kern Raceway	\kern	
+Kevin Harvick's Kern Raceway - Asphalt Track	\kern\oval	
+Kevin Harvick's Kern Raceway - Legends	\kern\legends	
+Kevin Harvick's Kern Raceway - Dirt Track	\kern\dirt	
+Kevin Harvick's Kern Raceway - Dirt Mini Oval	\kern\dirtmini	
+Knockhill Racing Circuit	\knockhill	
+Knockhill Racing Circuit - International	\knockhill\international	
+Knockhill Racing Circuit - International Reverse	\knockhill\internationalrev	
+Knockhill Racing Circuit - National	\knockhill\national	
+Knockhill Racing Circuit - National Reverse	\knockhill\nationalrev	
+Knockhill Racing Circuit - Tri-Oval	\knockhill\trioval	
+Knockhill Racing Circuit - Rallycross	\knockhill\rallycross	
+Knoxville Raceway	\knoxville	
+Kokomo Speedway	\kokomo	
+Kokomo Speedway - Tires In	\kokomo	
+Kokomo Speedway - Tires Out	\kokomo\tiresout	
+Langley Speedway	\langley	
+Lanier National Speedway	\lanier	
+Lanier National Speedway - Asphalt	\lanier	
+Lanier National Speedway - Dirt	\lanier\dirt	
+Lånkebanen (Hell RX)	\lankebanen	
+Lånkebanen (Hell RX) - Club	\lankebanen\club	
+Lånkebanen (Hell RX) - Hell Rallycross	\lankebanen\hellrx	
+Lånkebanen (Hell RX) - Rallycross Short	\lankebanen\rallyshort	
+Lånkebanen (Hell RX) - Road Long	\lankebanen\road\roadlong	
+Lånkebanen (Hell RX) - Road Short	\lankebanen\road\roadshort	
+Las Vegas Motor Speedway	\vegas	
+Las Vegas Motor Speedway - Infield Legends Oval	\vegas\inflegends	
+Las Vegas Motor Speedway - Legends Oval	\vegas\legends	
+Las Vegas Motor Speedway - Oval	\vegas\oval	
+Las Vegas Motor Speedway - Road Course Combined	\vegas\roadcombined	
+Las Vegas Motor Speedway - Road Course Long	\vegas\roadlong	
+Las Vegas Motor Speedway - Road Course Short	\vegas\roadshort	
+Lernerville Speedway	\lernerville	
+Limaland Motorsports Park	\limaland	
+Lime Rock Park	\limerock\2019	
+Lime Rock Park - Chicanes	\limerock\2019\chicanes	
+Lime Rock Park - Classic	\limerock\2019\classic	
+Lime Rock Park - Grand Prix	\limerock\2019\gp	
+Lime Rock Park - School	\limerock\2019\school	
+Lime Rock Park - West Bend Chicane	\limerock\2019\chicanewestb	
+Lincoln Speedway	\lincoln	
+Long Beach Street Circuit	\longbeach	
+Los Angeles Memorial Coliseum	\lacoliseum	
+Lucas Oil Indianapolis Raceway Park	\irp	
+Lucas Oil Indianapolis Raceway Park - Oval	\irp	
+Lucas Oil Indianapolis Raceway Park - Rallycross	\irp\rallycross	
+Lucas Oil Speedway	\wheatland	
+Lucas Oil Speedway - Dirt Oval	\wheatland	
+Martinsville Speedway	\martinsville	
+Michigan International Speedway	\michigan2018	
+Mid-Ohio Sports Car Course	\midohio	
+Mid-Ohio Sports Car Course - Alt Oval	\midohio\altoval	
+Mid-Ohio Sports Car Course - Chicane	\midohio\chicane	
+Mid-Ohio Sports Car Course - Full Course	\midohio\full	
+Mid-Ohio Sports Car Course - Oval	\midohio\oval	
+Mid-Ohio Sports Car Course - Short	\midohio\short	
+Millbridge Speedway	\millbridge	
+Misano World Circuit Marco Simoncelli	\misano	
+Misano World Circuit Marco Simoncelli - Club	\misano\club	
+Misano World Circuit Marco Simoncelli - Grand Prix	\misano\gp	
+Misano World Circuit Marco Simoncelli - Grand Prix - Historic	\misano\historicgp	
+Misano World Circuit Marco Simoncelli - Grand Prix 2007	\misano\gp2007	
+Misano World Circuit Marco Simoncelli - Truck	\misano\truck	
+Mobility Resort Motegi	\twinring	
+Mobility Resort Motegi - East	\twinring\east	
+Mobility Resort Motegi - Grand Prix	\twinring\fullrc	
+Mobility Resort Motegi - Oval	\twinring\oval	
+Mobility Resort Motegi - West	\twinring\west	
+MotorLand Aragón	\aragon	
+MotorLand Aragón - Grand Prix	\aragon\gp	
+MotorLand Aragón - Motorcycle Grand Prix	\aragon\moto	
+MotorLand Aragón - Motorcycle National	\aragon\nationalmoto	
+MotorLand Aragón - National	\aragon\national	
+MotorLand Aragón - Outer	\aragon\outer	
+MotorLand Aragón - Touring Car	\aragon\tc	
+MotorLand Aragón - West	\aragon\west	
+Motorsport Arena Oschersleben	\oschersleben	
+Motorsport Arena Oschersleben - Alternate	\oschersleben\alt	
+Motorsport Arena Oschersleben - B Course	\oschersleben\bcourse	
+Motorsport Arena Oschersleben - C Course	\oschersleben\ccourse	
+Motorsport Arena Oschersleben - Grand Prix	\oschersleben\gp	
+Mount Panorama Circuit	\bathurst	
+Mount Washington Auto Road	\mtwashington	
+Mount Washington Auto Road - Descent	\mtwashington\reverse	
+Mount Washington Auto Road - Hillclimb	\mtwashington\climb	
+Myrtle Beach Speedway	\myrtlebeach	
+Nashville Fairgrounds Speedway	\nashville	
+Nashville Fairgrounds Speedway - Mini	\nashville\mini	
+Nashville Fairgrounds Speedway - Oval	\nashville\oval	
+Nashville Superspeedway	\nashvilless	
+New Hampshire Motor Speedway	\newhampshire	
+New Hampshire Motor Speedway - Legends	\newhampshire\legends	
+New Hampshire Motor Speedway - Oval	\newhampshire\oval	
+New Hampshire Motor Speedway - Road Course	\newhampshire\chicane	
+New Hampshire Motor Speedway - Road Course with North Oval	\newhampshire\northoval	
+New Hampshire Motor Speedway - Road Course with South Oval	\newhampshire\southoval	
+New Jersey Motorsports Park	\newjersey	
+New Jersey Motorsports Park - Thunderbolt	\newjersey\full	
+New Jersey Motorsports Park - Thunderbolt w/both chicanes	\newjersey\chicane	
+New Jersey Motorsports Park - Thunderbolt w/first chicane	\newjersey\firstchicane	
+New Jersey Motorsports Park - Thunderbolt w/second chicane	\newjersey\secondchicane	
+New Smyrna Speedway	\newsmyrna	
+North Wilkesboro Speedway	\northwilkesboro	
+North Wilkesboro Speedway	\northwilkesboro\2025	
+North Wilkesboro Speedway - 1987	\northwilkesboro	
+Nürburgring	\nurburgring	
+Nürburgring Combined	\nurburgring\combined	
+Nürburgring Combined - Gesamtstrecke 24h	\nurburgring\combined	
+Nürburgring Combined - Gesamtstrecke Long	\nurburgring\combinedLong	
+Nürburgring Combined - Gesamtstrecke Short w/o Arena	\nurburgring\combinedShortA	
+Nürburgring Combined - Gesamtstrecke VLN	\nurburgring\combinedShortB	
+Nürburgring Grand-Prix-Strecke	\nurburgring\gp	
+Nürburgring Grand-Prix-Strecke - BES/WEC	nurburgring\gpnochicane	
+Nürburgring Grand-Prix-Strecke - Grand Prix	nurburgring\gp	
+Nürburgring Grand-Prix-Strecke - Grand Prix w/out Arena	nurburgring\gpshort	
+Nürburgring Grand-Prix-Strecke - Kurzanbindung w/out Arena	nurburgring\sprintshort	
+Nürburgring Grand-Prix-Strecke - Müllenbachschleife	nurburgring\mullenbachschleife	
+Nürburgring Grand-Prix-Strecke - Sprintstrecke	nurburgring\sprintchicane	
+Nürburgring Nordschleife	\nurburgring\nordschleife	
+Nürburgring Nordschleife - Industriefahrten	\nurburgring\nordschleife	
+Nürburgring Nordschleife - Touristenfahrten	\nurburgring\nordschleifetourist	
+Okayama International Circuit	\okayama	
+Okayama International Circuit - Full Course	\okayama\full	
+Okayama International Circuit - Short	\okayama\short	
+Oran Park Raceway	\oran	
+Oran Park Raceway - Grand Prix	\oran\gp	
+Oran Park Raceway - Moto	\oran\moto	
+Oran Park Raceway - North	\oran\north	
+Oran Park Raceway - North A	\oran\northa	
+Oran Park Raceway - North B	\oran\northb	
+Oran Park Raceway - South	\oran\south	
+Oswego Speedway	\oswego	
+Oswego Speedway - Dirt	\oswego\dirtoval	
+Oswego Speedway - Mini Oval	\oswego\mini	
+Oswego Speedway - Oval	\oswego\oval	
+Oulton Park Circuit	\oulton	
+Oulton Park Circuit - Fosters	\oulton\fosters	
+Oulton Park Circuit - Fosters w/Hislop	\oulton\fosterswithhislop	
+Oulton Park Circuit - International	\oulton\international	
+Oulton Park Circuit - Intl w/out Brittens	\oulton\intbrittens	
+Oulton Park Circuit - Intl w/out Chicane	\oulton\intnochicane	
+Oulton Park Circuit - Intl w/out Hislop	\oulton\inthislop	
+Oulton Park Circuit - Island	\oulton\island	
+Oulton Park Circuit - Island Historic	\oulton\islandhistoric	
+Oxford Plains Speedway	\oxford\oval	
+Phillip Island Circuit	\phillipisland	
+Phoenix Raceway	\phoenix\2021	
+Phoenix Raceway - Oval	\phoenix\2021\oval	
+Phoenix Raceway - Oval w/open Dogleg	\phoenix\2021\ovalopen	
+Pocono Raceway	\pocono\2016	
+Portland International Raceway	\portland	
+Portland International Raceway - Full	\portland\full	
+Portland International Raceway - No Chicane	\portland\nochicane	
+Port Royal Speedway	\portroyal	
+Red Bull Ring	\spielberg	
+Red Bull Ring - Grand Prix	\spielberg\gp	
+Red Bull Ring - National	\spielberg\national	
+Red Bull Ring - North	\spielberg\north	
+Richmond Raceway	\richmond\2025	
+Road America	\roadamerica	
+Road America - Bend	\roadamerica\bend	
+Road America - Full	\roadamerica\full	
+Road Atlanta	\roadatlanta	
+Road Atlanta - Club	\roadatlanta\club	
+Road Atlanta - Full Course	\roadatlanta\full	
+Road Atlanta - Short	\roadatlanta\short	
+Rockingham Speedway	\rockingham	
+Rockingham Speedway - Infield Road Course	\rockingham\infroad	
+Rockingham Speedway - Oval	\rockingham\oval	
+Rockingham Speedway - Road Course	\rockingham\road	
+Rockingham Speedway - Short Road Course	\rockingham\shortroad	
+Rudskogen Motorsenter	\rudskogen	
+Sachsenring	\sachsenring	
+Sandown International Motor Raceway	\sandown	
+Sebring International Raceway	\sebring	
+Sebring International Raceway - Club	\sebring\club	
+Sebring International Raceway - International	\sebring\international	
+Sebring International Raceway - Modified	\sebring\modified	
+Silverstone Circuit	\silverstone\2019	
+Silverstone Circuit - Grand Prix	\silverstone\2019\gp	
+Silverstone Circuit - International	\silverstone\2019\international	
+Silverstone Circuit - National	\silverstone\2019\national	
+Slinger Speedway	\slinger	
+Slinger Speedway - Figure Eight	\slinger\figure8	
+Slinger Speedway - Oval	\slinger\oval	
+Snetterton Circuit	\snetterton	
+Snetterton Circuit - 100	\snetterton\100	
+Snetterton Circuit - 200	\snetterton\200	
+Snetterton Circuit - 300	\snetterton\300	
+Sonoma Raceway	\sonoma	
+Sonoma Raceway - NASCAR Long	\sonoma\long	
+Sonoma Raceway - NASCAR Short	\sonoma\cup	
+Sonoma Raceway - Open Wheel 2008-2011	\sonoma\irl2	
+Sonoma Raceway - Open Wheel 2012-2018	\sonoma\indycar	
+Sonoma Raceway - Open Wheel pre-2008	\sonoma\irl	
+Sonoma Raceway - Rallycross	\sonoma\rallycross	
+Sonoma Raceway - NASCAR Long	\sonoma\2025\nascarlong	
+Sonoma Raceway - NASCAR Short	\sonoma\2025\nascarshort	
+Sonoma Raceway - Open Wheel 2008-2011	\sonoma\2025\irl08	
+Sonoma Raceway - Open Wheel 2012-2018	\sonoma\2025\irl12	
+Sonoma Raceway - Open Wheel pre-2008	\sonoma\2025\irl05	
+South Boston Speedway	\southboston	
+Southern National Motorsports Park	\southernnational	
+Stafford Motor Speedway	\stafford	
+Stafford Motor Speedway - Full Course	\stafford\oval	
+Stafford Motor Speedway - Mini Mile	\stafford\short	
+Summit Point Raceway	\summit	
+Summit Point Raceway - Jefferson Circuit	\summit\jefferson	
+Summit Point Raceway - Jefferson Reverse	\summit\jefferson\rev	
+Summit Point Raceway - Oval	\summit\summit\oval	
+Summit Point Raceway - School	\summit\summit\raceway\school	
+Summit Point Raceway - Short	\summit\summit\short	
+Summit Point Raceway - Summit Point Raceway	\summit\summit\raceway	
+Suzuka International Racing Course	\suzuka	
+Suzuka International Racing Course - East	\suzuka\east	
+Suzuka International Racing Course - Grand Prix	\suzuka\grandprix	
+Suzuka International Racing Course - Moto	\suzuka\moto	
+Suzuka International Racing Course - West	\suzuka\west	
+Suzuka International Racing Course - West w/chicane	\suzuka\westchicane	
+Talladega Superspeedway	\talladega	
+Texas Motor Speedway	\texas\2020	
+Texas Motor Speedway - Legends Oval	\texas\2020\legendsoval	
+Texas Motor Speedway - Oval	\texas\2020\oval	
+Shell V-Power Motorsport Park at The Bend	\thebend	***new
+Shell V-Power Motorsport Park at The Bend - International Circuit	\thebend\international	
+Shell V-Power Motorsport Park at The Bend - GT Circuit	\thebend\gt	
+Shell V-Power Motorsport Park at The Bend - Sprint Circuit	\thebend\sprint	
+Shell V-Power Motorsport Park at The Bend - East Circuit	\thebend\east	
+Shell V-Power Motorsport Park at The Bend - South-West Circuit	\thebend\southwest	
+Shell V-Power Motorsport Park at The Bend - West Circuit	\thebend\west	
+Shell V-Power Motorsport Park at The Bend - West Plus Circuit	\thebend\westplus	
+The Bullring	\bullring	
+The Dirt Track at Charlotte	\charlottedirt	
+The Milwaukee Mile	\milwaukee	
+Thompson Speedway Motorsports Park	\thompson	
+Thruxton Circuit	\thruxton	
+Tsukuba Circuit	\tsukuba	
+Tsukuba Circuit - 1000 - Chicane	\tsukuba\1kchicane	
+Tsukuba Circuit - 1000 - Full	\tsukuba\1kfull	
+Tsukuba Circuit - 1000 - Outer	\tsukuba\1kouter	
+Tsukuba Circuit - 1000 - Reverse	\tsukuba\1kreverse	
+Tsukuba Circuit - 2000 - Full	\tsukuba\2kfull	
+Tsukuba Circuit - 2000 - Moto	\tsukuba\2kchicane	
+Tsukuba Circuit - 2000 - Short	\tsukuba\2kshort	
+USA International Speedway	\lakeland	
+USA International Speedway - Asphalt	\lakeland	
+USA International Speedway - Dirt	\lakeland\dirt	
+Virginia International Raceway	\virginia\2022	
+Virginia International Raceway - Full Course	\virginia\2022\full	
+Virginia International Raceway - Grand Course	\virginia\2022\grand	
+Virginia International Raceway - North Course	\virginia\2022\north	
+Virginia International Raceway - Patriot Course	\virginia\2022\patriot	
+Virginia International Raceway - South Course	\virginia\2022\south	
+Volusia Speedway Park	\volusia	
+Watkins Glen International	\watkinsglen\2021	
+Watkins Glen International - Boot	\watkinsglen\2021\fullcourse	
+Watkins Glen International - Classic	\watkinsglen\2021\classic	
+Watkins Glen International - Classic Boot	\watkinsglen\2021\fullnoloop	
+Watkins Glen International - Cup	\watkinsglen\2021\cupcircuit	
+WeatherTech Raceway Laguna Seca	\lagunaseca	
+WeatherTech Raceway Laguna Seca	\lagunaseca	
+WeatherTech Raceway Laguna Seca - School	\lagunaseca\school	
+Weedsport Speedway	\weedsport	
+Wild West Motorsports Park	\wildwest	
+Williams Grove Speedway	\williamsgrove	
+Willow Springs International Raceway	\willow	
+Winton Motor Raceway	\winton	
+Winton Motor Raceway - Club	\winton\club	
+Winton Motor Raceway - National	\winton\national	
+Winton Motor Raceway - Rallycross	\winton\rallycross	
+World Wide Technology Raceway (Gateway)	\gateway	
+World Wide Technology Raceway (Gateway) - Oval	\gateway\oval	
+World Wide Technology Raceway (Gateway) - Road Course	\gateway\road	
+World Wide Technology Raceway (Gateway) - 2025 - Oval	\gateway\2025\oval	
+[Legacy] Charlotte Motor Speedway - 2008	\charlotte	
+[Legacy] Charlotte Motor Speedway - 2008 - Infield Road Course	\charlotte\infieldrc	
+[Legacy] Charlotte Motor Speedway - 2008 - Legends Oval	\charlotte\legendsoval	
+[Legacy] Charlotte Motor Speedway - 2008 - Oval	\charlotte\quadoval	
+[Legacy] Charlotte Motor Speedway - 2008 - Road Course	\charlotte\fullroadcourse	
+[Legacy] Kentucky Speedway - 2011	\kentucky	
+[Legacy] Kentucky Speedway - Legends	\kentucky\legend	
+[Legacy] Kentucky Speedway - Oval	\kentucky\oval	
+[Legacy] Michigan International Speedway - 2009	\michigan2014	
+[Legacy] Phoenix Raceway - 2008	\phoenix	
+[Legacy] Phoenix Raceway - 2008 - Dirt Road	\phoenix\rallycross\nojoker	
+[Legacy] Phoenix Raceway - 2008 - Oval	\phoenix\oval	
+[Legacy] Phoenix Raceway - 2008 - Rallycross	\phoenix\rallycross	
+[Legacy] Phoenix Raceway - 2008 - Road Course	\phoenix\road	
+[Legacy] Pocono Raceway - 2009	\pocono	
+[Legacy] Pocono Raceway - 2009 - East	\pocono\east	
+[Legacy] Pocono Raceway - 2009 - International	\pocono\international	
+[Legacy] Pocono Raceway - 2009 - North	\pocono\north	
+[Legacy] Pocono Raceway - 2009 - Oval	\pocono\oval	
+[Legacy] Pocono Raceway - 2009 - South	\pocono\south	
+[Legacy] Silverstone Circuit - 2008	\silverstone	
+[Legacy] Silverstone Circuit - 2008 - Grand Prix	\silverstone\gp	
+[Legacy] Silverstone Circuit - 2008 - Historical Grand Prix	\silverstone\historicgp	
+[Legacy] Silverstone Circuit - 2008 - International	\silverstone\international	
+[Legacy] Silverstone Circuit - 2008 - National	\silverstone\national	
+[Legacy] Silverstone Circuit - 2008 - Southern	\silverstone\southern	
+[Legacy] Texas Motor Speedway - 2009	\texas	
+[Legacy] Texas Motor Speedway - 2009 - Legends Oval	\texas\legendsoval	
+[Legacy] Texas Motor Speedway - 2009 - Oval	\texas\oval	
+[Legacy] Texas Motor Speedway - 2009 - Road Course Combined	\texas\roadcourse	
+[Legacy] Texas Motor Speedway - 2009 - Road Course Long	\texas\infieldrclong	
+[Legacy] Texas Motor Speedway - 2009 - Road Course Short A	\texas\infieldrcshorta	
+[Legacy] Texas Motor Speedway - 2009 - Road Course Short B	\texas\infieldrcshortb	

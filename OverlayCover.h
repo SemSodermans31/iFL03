@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,10 +25,13 @@ SOFTWARE.
 #pragma once
 
 #include "Overlay.h"
+#include "stub_data.h"
 
 class OverlayCover : public Overlay
 {
     public:
+
+        virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
         OverlayCover()
             : Overlay("OverlayCover")

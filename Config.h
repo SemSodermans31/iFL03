@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -37,6 +37,16 @@ class Config
 
         bool                        load();
         bool                        save();
+        
+        // Car-specific config methods
+        bool                        loadCarConfig( const std::string& carName );
+        bool                        saveCarConfig( const std::string& carName );
+        bool                        hasCarConfig( const std::string& carName );
+        bool                        copyConfigToCar( const std::string& fromCar, const std::string& toCar );
+        std::vector<std::string>    getAvailableCarConfigs();
+        bool                        deleteCarConfig( const std::string& carName );
+        std::string                 getCurrentCarName() const { return m_currentCarName; }
+        void                        setCurrentCarName( const std::string& carName ) { m_currentCarName = carName; }
 
         void                        watchForChanges();
         bool                        hasChanged();
@@ -47,19 +57,25 @@ class Config
         float4                      getFloat4( const std::string& component, const std::string& key, const float4& defaultVal );
         std::string                 getString( const std::string& component, const std::string& key, const std::string& defaultVal );
         std::vector<std::string>    getStringVec( const std::string& component, const std::string& key, const std::vector<std::string>& defaultVal );
+        void                        setStringVec( const std::string& component, const std::string& key, const std::vector<std::string>& v );
 
         void                        setInt( const std::string& component, const std::string& key, int v );
         void                        setBool( const std::string& component, const std::string& key, bool v );
+        void                        setString( const std::string& component, const std::string& key, const std::string& v );
+        void                        setFloat( const std::string& component, const std::string& key, float v );
 
     private:
 
         picojson::object&           getOrInsertComponent( const std::string& component, bool* existed=nullptr );
         picojson::value&            getOrInsertValue( const std::string& component, const std::string& key, bool* existed=nullptr );
+        std::string                 sanitizeCarName( const std::string& carName ) const;
+        std::string                 getCarConfigFilename( const std::string& carName ) const;
 
         picojson::object    m_pj;
         std::atomic<bool>   m_hasChanged = false;
         std::thread         m_configWatchThread;
         std::string         m_filename = "config.json";
+        std::string         m_currentCarName;
 };
 
 extern Config        g_cfg;

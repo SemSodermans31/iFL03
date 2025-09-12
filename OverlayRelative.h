@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,22 @@ SOFTWARE.
 
 #include <vector>
 #include <algorithm>
+#include <string>
+#include <format>
 #include "Overlay.h"
 #include "iracing.h"
+#include "ClassColors.h"
 #include "Config.h"
+#include "Units.h"
+#include "stub_data.h"
 
 class OverlayRelative : public Overlay
 {
     public:
 
-        const float DefaultFontSize = 15.3f;
+        virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
+
+        
 
         OverlayRelative()
             : Overlay("OverlayRelative")
@@ -42,7 +49,7 @@ class OverlayRelative : public Overlay
 
     protected:
 
-        enum class Columns { POSITION, CAR_NUMBER, NAME, DELTA, LICENSE, SAFETY_RATING, IRATING, PIT };
+        enum class Columns { POSITION, CAR_NUMBER, NAME, DELTA, LICENSE, SAFETY_RATING, IRATING, IR_PRED, PIT, LAST };
 
         virtual void onEnable()
         {
@@ -56,26 +63,17 @@ class OverlayRelative : public Overlay
 
         virtual void onConfigChanged()
         {
+            // Fonts (centralized)
             m_text.reset( m_dwriteFactory.Get() );
-
-            const std::string font = g_cfg.getString( m_name, "font", "Microsoft YaHei UI" );
-            const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-            const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
-            m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-            m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
-            m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-            m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+            createGlobalTextFormat(1.0f, m_textFormat);
+            createGlobalTextFormat(0.8f, m_textFormatSmall);
 
             // Determine widths of text columns
             m_columns.reset();
+            const float fontSize = g_cfg.getFloat( "Overlay", "font_size", 16.0f );
             m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
             m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
             m_columns.add( (int)Columns::NAME,       0, fontSize/2 );
-            m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"+99L  -99.9", m_dwriteFactory.Get(), m_textFormat.Get() ).x, 1, fontSize/2 );
-
             if( g_cfg.getBool(m_name,"show_pit_age",true) )
                 m_columns.add( (int)Columns::PIT,           computeTextExtent( L"999", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/4 );
             if( g_cfg.getBool(m_name,"show_license",true) && !g_cfg.getBool(m_name,"show_sr",false) )
@@ -84,76 +82,135 @@ class OverlayRelative : public Overlay
                 m_columns.add( (int)Columns::SAFETY_RATING, computeTextExtent( L"A 4.44", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/8 );
             if( g_cfg.getBool(m_name,"show_irating",true) )
                 m_columns.add( (int)Columns::IRATING,       computeTextExtent( L"999.9k", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/8 );
+
+            // iRating prediction column (estimated gain/loss) - only show in race sessions
+            if( g_cfg.getBool(m_name, "show_ir_pred", false) && ir_session.sessionType == SessionType::RACE ) {
+                const float irPredScale = g_cfg.getFloat( m_name, "ir_pred_col_scale", 1.0f );
+                m_columns.add( (int)Columns::IR_PRED,    computeTextExtent( L"+999", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x * irPredScale, fontSize/8 );
+            }
+
+            // Allow user to scale the LAST column width via config
+            const float lastColScale = g_cfg.getFloat( m_name, "last_col_scale", 2.0f );
+            if( g_cfg.getBool(m_name, "show_last", true) )
+                m_columns.add( (int)Columns::LAST,       computeTextExtent( L"99.99", m_dwriteFactory.Get(), m_textFormat.Get() ).x * lastColScale, fontSize/2 );
+            m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"+99L  -99.9", m_dwriteFactory.Get(), m_textFormat.Get() ).x, 1, fontSize/2 );
+            
+
         }
 
         virtual void onUpdate()
-        {            
+        {
             struct CarInfo {
                 int     carIdx = 0;
                 float   delta = 0;
+                float   lapDistPct = 0;
+                int     wrappedSum = 0;
                 int     lapDelta = 0;
                 int     pitAge = 0;
+                float   last = 0;
             };
             std::vector<CarInfo> relatives;
             relatives.reserve( IR_MAX_CARS );
-
-            // Populate cars with the ones for which a relative/delta comparison is valid
-            for( int i=0; i<IR_MAX_CARS; ++i )
-            {
-                const Car& car = ir_session.cars[i];
-
-                const int lapcountS = ir_CarIdxLap.getInt(ir_session.driverCarIdx);
-                const int lapcountC = ir_CarIdxLap.getInt(i);
-
-                if( lapcountC >= 0 && !car.isSpectator && car.carNumber>=0 )
-                {
-                    // Add the pace car only under yellow or initial pace lap
-                    if( car.isPaceCar && !(ir_SessionFlags.getInt() & (irsdk_caution|irsdk_cautionWaving)) && !ir_isPreStart() )
-                        continue;
-
-                    // If the other car is up to half a lap in front, we consider the delta 'ahead', otherwise 'behind'.
-
-                    float delta = 0;
-                    int   lapDelta = lapcountC - lapcountS;
-
-                    const float L = ir_estimateLaptime();
-                    const float C = ir_CarIdxEstTime.getFloat(i);
-                    const float S = ir_CarIdxEstTime.getFloat(ir_session.driverCarIdx);
-
-                    // Does the delta between us and the other car span across the start/finish line?
-                    const bool wrap = fabsf(ir_CarIdxLapDistPct.getFloat(i) - ir_CarIdxLapDistPct.getFloat(ir_session.driverCarIdx)) > 0.5f;
-
-                    if( wrap )
-                    {
-                        delta     = S > C ? (C-S)+L : (C-S)-L;
-                        lapDelta += S > C ? -1 : 1;
-                    }
-                    else
-                    {
-                        delta = C - S;
-                    }
-
-                    // Assume no lap delta when not in a race, because we don't want to show drivers as lapped/lapping there.
-                    // Also reset it during initial pacing, since iRacing for some reason starts counting
-                    // during the pace lap but then resets the counter a couple seconds in, confusing the logic.
-                    // And consider the pace car in the same lap as us, too.
-                    if( ir_session.sessionType!=SessionType::RACE || ir_isPreStart() || car.isPaceCar )
-                    {
-                        lapDelta = 0;
-                    }
-
+            const float ownClassEstLaptime = ir_session.cars[ir_session.driverCarIdx].carClassEstLapTime;
+            const int lapcountSelf = ir_Lap.getInt();
+            const float selfLapDistPct = ir_LapDistPct.getFloat();
+            const float SelfEstLapTime = ir_CarIdxEstTime.getFloat(ir_session.driverCarIdx);
+            // Use stub data in preview mode
+            const bool useStubData = StubDataManager::shouldUseStubData();
+            if (useStubData) {
+                StubDataManager::populateSessionCars();
+            }
+            
+            // Apply global opacity
+            const float globalOpacity = getGlobalOpacity();
+            
+            if (useStubData) {
+                // Generate stub data for preview mode using centralized data
+                auto relativeData = StubDataManager::getRelativeData();
+                for (const auto& rel : relativeData) {
                     CarInfo ci;
-                    ci.carIdx = i;
-                    ci.delta = delta;
-                    ci.lapDelta = lapDelta;
-                    ci.pitAge = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
-                    relatives.push_back( ci );
+                    ci.carIdx = rel.carIdx;
+                    ci.delta = rel.delta;
+                    ci.lapDelta = rel.lapDelta;
+                    ci.pitAge = rel.pitAge;
+                    if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(rel.carIdx)) {
+                        ci.last = sc->lastLapTime;
+                    } else {
+                        ci.last = 0.0f;
+                    }
+                    relatives.push_back(ci);
+                }
+            } else {
+                // Populate cars with the ones for which a relative/delta comparison is valid
+                for( int i=0; i<IR_MAX_CARS; ++i )
+                {
+                    const Car& car = ir_session.cars[i];
+
+                    const int lapcountCar = ir_CarIdxLap.getInt(i);
+
+                    if( lapcountCar >= 0 && !car.isSpectator && car.carNumber>=0 )
+                    {
+                        // Add the pace car only under yellow or initial pace lap
+                        if( car.isPaceCar && !(ir_SessionFlags.getInt() & (irsdk_caution|irsdk_cautionWaving)) && !ir_isPreStart() )
+                            continue;
+
+                        // If the other car is up to half a lap in front, we consider the delta 'ahead', otherwise 'behind'.
+
+                        float delta = 0;
+                        int   lapDelta = lapcountCar - lapcountSelf;
+
+                        const float LClassRatio = car.carClassEstLapTime / ownClassEstLaptime;
+                        const float CarEstLapTime = ir_CarIdxEstTime.getFloat(i) / LClassRatio;
+                        const float carLapDistPct = ir_CarIdxLapDistPct.getFloat(i);
+
+                        // Does the delta between us and the other car span across the start/finish line?
+                        const bool wrap = fabsf(carLapDistPct - selfLapDistPct) > 0.5f;
+                        int wrappedSum = 0;
+
+                        if( wrap )
+                        {
+                            if (selfLapDistPct > carLapDistPct) {
+                                delta = (CarEstLapTime - SelfEstLapTime) + ownClassEstLaptime;
+                                lapDelta += -1;
+                                wrappedSum = 1;
+                            }
+                            else {
+                                delta = (CarEstLapTime - SelfEstLapTime) - ownClassEstLaptime;
+                                lapDelta += 1;
+                                wrappedSum = -1;
+                            }
+
+                        }
+                        else
+                        {
+                            delta = CarEstLapTime - SelfEstLapTime;
+                        }
+
+                        // Assume no lap delta when not in a race, because we don't want to show drivers as lapped/lapping there.
+                        // Also reset it during initial pacing, since iRacing for some reason starts counting
+                        // during the pace lap but then resets the counter a couple seconds in, confusing the logic.
+                        // And consider the pace car in the same lap as us, too.
+                        if( ir_session.sessionType!=SessionType::RACE || ir_isPreStart() || car.isPaceCar )
+                        {
+                            lapDelta = 0;
+                        }
+
+                        CarInfo ci;
+                        ci.carIdx = i;
+                        ci.delta = delta;
+                        ci.lapDelta = lapDelta;
+                        ci.lapDistPct = ir_CarIdxLapDistPct.getFloat(i);
+                        ci.wrappedSum = wrappedSum;
+                        ci.pitAge = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
+                        ci.last = ir_CarIdxLastLapTime.getFloat(i);
+                        relatives.push_back( ci );
+                    }
                 }
             }
 
-            // Sort by delta
+            // Sort by lap % completed, in case deltas are a bit desynced
             std::sort( relatives.begin(), relatives.end(), 
-                []( const CarInfo& a, const CarInfo&b ) { return a.delta > b.delta; } );
+                []( const CarInfo& a, const CarInfo&b ) {return a.lapDistPct + a.wrappedSum > b.lapDistPct + b.wrappedSum ;} );
 
             // Locate our driver's index in the new array
             int selfCarInfoIdx = -1;
@@ -171,7 +228,7 @@ class OverlayRelative : public Overlay
 
             // Display such that our driver is in the vertical center of the area where we're listing cars
 
-            const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+            const float  fontSize           = g_cfg.getFloat( "Overlay", "font_size", 16.0f );
             const float  lineSpacing        = g_cfg.getFloat( m_name, "line_spacing", 6 );
             const float  lineHeight         = fontSize + lineSpacing;
             const float4 selfCol            = g_cfg.getFloat4( m_name, "self_col", float4(0.94f,0.67f,0.13f,1) );
@@ -185,6 +242,7 @@ class OverlayRelative : public Overlay
             const float4 alternateLineBgCol = g_cfg.getFloat4( m_name, "alternate_line_background_col", float4(0.5f,0.5f,0.5f,0) );
             const float4 buddyCol           = g_cfg.getFloat4( m_name, "buddy_col", float4(0.2f,0.75f,0,1) );
             const float4 flaggedCol         = g_cfg.getFloat4( m_name, "flagged_col", float4(0.6f,0.35f,0.2f,1) );
+            const float4 headerCol          = g_cfg.getFloat4( m_name, "header_col", float4(0.7f,0.7f,0.7f,0.9f) );
             const float4 carNumberBgCol     = g_cfg.getFloat4( m_name, "car_number_background_col", float4(1,1,1,0.9f) );
             const float4 carNumberTextCol   = g_cfg.getFloat4( m_name, "car_number_text_col", float4(0,0,0,0.9f) );
             const float4 pitCol             = g_cfg.getFloat4( m_name, "pit_col", float4(0.94f,0.8f,0.13f,1) );
@@ -198,11 +256,62 @@ class OverlayRelative : public Overlay
 
             float y = yself - entriesAbove * lineHeight;
 
+            // Reserve space for footer (1.5x line height like OverlayStandings)
+            const float  ybottomFooter      = m_height - lineHeight * 1.5f;
+
             const float xoff = 10.0f;
             m_columns.layout( (float)m_width - 20 );
 
+            // Prepare participant list for iRating prediction
+            struct Participant { int carIdx; int position; int irating; };
+            std::vector<Participant> participants;
+            participants.reserve(IR_MAX_CARS);
+            for( int i=0; i<IR_MAX_CARS; ++i )
+            {
+                const Car& car = ir_session.cars[i];
+                if( car.isSpectator || car.carNumber < 0 )
+                    continue;
+                int pos = 0;
+                if( useStubData )
+                {
+                    if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(i))
+                        pos = sc->position;
+                }
+                else
+                {
+                    pos = ir_getPosition(i);
+                }
+                if( pos <= 0 )
+                    continue;
+                participants.push_back( Participant{ i, pos, car.irating } );
+            }
+
+            const float irPredKTotal = g_cfg.getFloat( m_name, "ir_pred_k_total", 80.0f );
+            auto predictIrDeltaFor = [&](int targetCarIdx)->int
+            {
+                int n = (int)participants.size();
+                if( n <= 1 ) return 0;
+                int targetPos = 0;
+                int targetRating = 0;
+                for( const auto& p : participants )
+                {
+                    if( p.carIdx == targetCarIdx ) { targetPos = p.position; targetRating = p.irating; break; }
+                }
+                if( targetPos <= 0 ) return 0;
+                const float kPerOpponent = irPredKTotal / std::max(1, n - 1);
+                float delta = 0.0f;
+                for( const auto& opp : participants )
+                {
+                    if( opp.carIdx == targetCarIdx ) continue;
+                    const float expected = 1.0f / (1.0f + powf(10.0f, (opp.irating - targetRating) / 400.0f));
+                    const float actual = (targetPos < opp.position) ? 1.0f : (targetPos > opp.position ? 0.0f : 0.5f);
+                    delta += (actual - expected) * kPerOpponent;
+                }
+                return (int)roundf(delta);
+            };
+
             m_renderTarget->BeginDraw();
-            for( int cnt=0, i=selfCarInfoIdx-entriesAbove; i<(int)relatives.size() && y<=listingAreaBot-lineHeight/2; ++i, y+=lineHeight, ++cnt )
+            for( int cnt=0, i=selfCarInfoIdx-entriesAbove; i<(int)relatives.size() && y<=ybottomFooter-lineHeight/2; ++i, y+=lineHeight, ++cnt )
             {
                 // Alternating line backgrounds
                 if( cnt & 1 && alternateLineBgCol.a > 0 )
@@ -228,22 +337,27 @@ class OverlayRelative : public Overlay
 
                 if( car.isSelf )
                     col = selfCol;
-                else if( ir_CarIdxOnPitRoad.getBool(ci.carIdx) )
+                else if( !useStubData && ir_CarIdxOnPitRoad.getBool(ci.carIdx) )
                     col.a *= 0.5f;
                 
+                // Apply global opacity
+                col.w *= globalOpacity;
+                
                 wchar_t s[512];
+                std::string str;
                 D2D1_RECT_F r = {};
                 D2D1_ROUNDED_RECT rr = {};
                 const ColumnLayout::Column* clm = nullptr;
                 
                 // Position
-                if( ir_getPosition(ci.carIdx) > 0 )
+                int position = useStubData ? (ci.carIdx + 1) : ir_getPosition(ci.carIdx);
+                if( position > 0 )
                 {
                     clm = m_columns.get( (int)Columns::POSITION );
                     m_brush->SetColor( col );
-                    swprintf( s, _countof(s), L"P%d", ir_getPosition(ci.carIdx) );
+                    swprintf( s, _countof(s), L"P%d", position );
                     m_textFormat->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_TRAILING );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
                 }
 
                 // Car number
@@ -254,10 +368,19 @@ class OverlayRelative : public Overlay
                     rr.rect = { r.left-2, r.top+1, r.right+2, r.bottom-1 };
                     rr.radiusX = 3;
                     rr.radiusY = 3;
-                    m_brush->SetColor( car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol:carNumberBgCol)) );
+
+                    // Use centralized class colors for background
+                    int classId = car.classId;
+                    float4 bg = car.isSelf ? ClassColors::self()
+                                : (car.isPaceCar ? ClassColors::paceCar()
+                                   : ClassColors::get(classId));
+                    bg.a = licenseBgAlpha;
+                    m_brush->SetColor( bg );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
+
+                    // Car number text color
                     m_brush->SetColor( carNumberTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // Name
@@ -265,18 +388,7 @@ class OverlayRelative : public Overlay
                     clm = m_columns.get( (int)Columns::NAME );
                     swprintf( s, _countof(s), L"%S", car.userName.c_str() );
                     m_brush->SetColor( col );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING );
-                }
-
-                // Delta
-                {
-                    clm = m_columns.get( (int)Columns::DELTA );
-                    if( ci.lapDelta )
-                        swprintf( s, _countof(s), L"%+dL  %.1f", ci.lapDelta, ci.delta );
-                    else
-                        swprintf( s, _countof(s), L"%.1f", ci.delta );
-                    m_brush->SetColor( col );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 }
 
                 // Pit age
@@ -294,7 +406,7 @@ class OverlayRelative : public Overlay
                         swprintf( s, _countof(s), L"%d", ci.pitAge );
                         m_renderTarget->DrawRectangle( &r, m_brush.Get() );
                     }
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // License without SR
@@ -310,7 +422,7 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( c );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( licenseTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // License with SR
@@ -326,7 +438,7 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( c );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( licenseTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
                 // Irating
@@ -340,8 +452,101 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( iratingBgCol );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( iratingTextCol );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
+
+                // iRating prediction - only show in race sessions
+                if( (clm = m_columns.get( (int)Columns::IR_PRED )) && ir_session.sessionType == SessionType::RACE )
+                {
+                    const int irDelta = predictIrDeltaFor(ci.carIdx);
+                    swprintf( s, _countof(s), L"%+d", irDelta );
+                    r = { xoff+clm->textL, y-lineHeight/2, xoff+clm->textR, y+lineHeight/2 };
+                    rr.rect = { r.left+1, r.top+1, r.right-1, r.bottom-1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    float4 bg = irDelta > 0 ? float4(0.2f, 0.75f, 0.2f, 0.85f) : (irDelta < 0 ? float4(0.9f, 0.2f, 0.2f, 0.85f) : float4(1,1,1,0.85f));
+                    bg.w *= globalOpacity;
+                    m_brush->SetColor( bg );
+                    m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
+                    float4 tcol = (irDelta == 0) ? float4(0,0,0,0.9f) : float4(1,1,1,0.95f);
+                    tcol.w *= globalOpacity;
+                    m_brush->SetColor( tcol );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+                }
+
+                // Last
+                {
+                    clm = m_columns.get((int)Columns::LAST);
+                    str.clear();
+                    if (ci.last > 0)
+                        str = formatLaptime(ci.last);
+                    m_brush->SetColor(col);
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+
+                // Delta
+                {
+                    clm = m_columns.get((int)Columns::DELTA);
+                    swprintf(s, _countof(s), L"%.1f", ci.delta);
+                    m_brush->SetColor(col);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+            }
+
+            // Footer (matches OverlayStandings)
+            {
+                const bool imperial = isImperialUnits();
+                float trackTemp = ir_TrackTempCrew.getFloat();
+                char  tempUnit  = 'C';
+                if( imperial ) { trackTemp = celsiusToFahrenheit(trackTemp); tempUnit = 'F'; }
+
+                int hours = 0, mins = 0, secs = 0;
+                ir_getSessionTimeRemaining(hours, mins, secs);
+
+                const int laps = std::max(ir_CarIdxLap.getInt(ir_session.driverCarIdx), ir_CarIdxLapCompleted.getInt(ir_session.driverCarIdx));
+                const int remainingLaps = ir_getLapsRemaining();
+                const int irTotalLaps = ir_SessionLapsTotal.getInt();
+                int totalLaps = remainingLaps;
+                if (irTotalLaps == 32767)
+                    totalLaps = laps + remainingLaps;
+                else
+                    totalLaps = irTotalLaps;
+
+                const float ybottom = ybottomFooter;
+
+                m_brush->SetColor(float4(1,1,1,0.4f));
+                m_renderTarget->DrawLine(float2(0,ybottom), float2((float)m_width,ybottom), m_brush.Get());
+
+                std::string footer;
+                bool addSpaces = false;
+
+                if (g_cfg.getBool(m_name, "show_SoF", true)) {
+                    int sof = ir_session.sof; if (sof < 0) sof = 0;
+                    footer += std::format("SoF: {}", sof);
+                    addSpaces = true;
+                }
+
+                if (g_cfg.getBool(m_name, "show_track_temp", true)) {
+                    if (addSpaces) footer += "       ";
+                    footer += std::format("Track Temp: {:.1f}\u00B0{:c}", trackTemp, tempUnit);
+                    addSpaces = true;
+                }
+
+                if (g_cfg.getBool(m_name, "show_session_end", true)) {
+                    if (addSpaces) footer += "       ";
+                    footer += std::vformat("Session end: {}:{:0>2}:{:0>2}", std::make_format_args(hours, mins, secs));
+                    addSpaces = true;
+                }
+
+                if (g_cfg.getBool(m_name, "show_laps", true)) {
+                    if (addSpaces) footer += "       ";
+                    footer += std::format("Laps: {}/{}{}", laps, (irTotalLaps == 32767 ? "~" : ""), totalLaps);
+                    addSpaces = true;
+                }
+
+                float yFooter = m_height - (m_height - ybottom) / 2;
+                m_brush->SetColor(headerCol);
+                m_text.render( m_renderTarget.Get(), toWide(footer).c_str(), m_textFormat.Get(), xoff, (float)m_width - 2 * xoff, yFooter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
 
             // Minimap
@@ -424,4 +629,5 @@ class OverlayRelative : public Overlay
 
         ColumnLayout m_columns;
         TextCache    m_text;
+        float m_fontSpacing = getGlobalFontSpacing();
 };

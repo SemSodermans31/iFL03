@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>iFL03 - Overlays</title>
+	<link rel="stylesheet" href="../dist/styles.css" />
+</head>
+<body class="h-dvh overflow-hidden bg-[#000000] text-[#a8a8a8] flex">
+	<!-- Left Sidebar -->
+	<aside class="w-56 bg-[#121212] flex flex-col justify-between m-2 rounded-xl">
+		<!-- Top navigation -->
+		<nav class="p-4 space-y-2">
+			<a href="../index.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-home">Home</a>
+			<a href="overlays.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f] bg-[#1f1f1f]" id="nav-overlays">Overlays</a>
+			<a href="ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-ui-edit">Preview Mode</a>
+		</nav>
+
+		<!-- Bottom actions -->
+		<div class="p-4 space-y-2">
+			<a href="user.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-user">User</a>
+			<a href="settings.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-settings">Settings</a>
+		</div>
+	</aside>
+
+	<!-- Main content -->
+	<div class="flex-1 flex flex-col">
+		<header class="sticky top-0 z-10 bg-[#121212] m-2 rounded-xl">
+			<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+				<h1 class="text-lg font-semibold tracking-tight">Overlays</h1>
+				<span id="conn" class="inline-flex items-center gap-2 text-sm text-[#a8a8a8]">
+					<span class="size-2 rounded-full bg-[#a8a8a8]" id="connDot"></span>
+					<span class="text-sm text-[#a8a8a8]">iRacing status:</span>
+					<span id="connText">UNKNOWN</span>
+				</span>
+			</div>
+		</header>
+
+		<main class="flex-1 flex min-h-0 overflow-hidden bg-[#000000]">
+			<!-- Overlay Grid -->
+			<div class="flex-1 overflow-y-auto m-2 rounded-xl">
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+					<!-- Standings Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="standings">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/standings.png" alt="Standings icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Standings</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Race position and timing</p>
+						</div>
+					</div>
+
+					<!-- DDU Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="ddu">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/ddu.png" alt="DDU icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">DDU</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Driver display unit</p>
+						</div>
+					</div>
+
+					<!-- Inputs Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="inputs">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/telemetery.png" alt="Inputs icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Inputs</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Driving inputs</p>
+						</div>
+					</div>
+
+					<!-- Relative Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="relative">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/relative.png" alt="Relative icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Relative</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Relative timing</p>
+						</div>
+					</div>
+
+					<!-- Cover Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="cover">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/cover.png" alt="Cover icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Cover</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Cover overlay</p>
+						</div>
+					</div>
+
+					<!-- Weather Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="weather">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/weather.png" alt="Weather icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Weather</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Weather conditions and track information</p>
+						</div>
+					</div>
+
+					<!-- Flags Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="flags">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/flag.png" alt="Flags icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Flags</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Displays active iRacing session flags</p>
+						</div>
+					</div>
+
+					<!-- Delta Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="delta">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/delta.png" alt="Delta icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Delta</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Lap time delta comparison to best lap</p>
+						</div>
+					</div>
+
+					<!-- Radar Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="radar">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/proximity.png" alt="Radar icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Radar</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Proximity radar for nearby cars</p>
+						</div>
+					</div>
+
+					<!-- Track Map Overlay -->
+					<div class="overlay-card rounded-xl bg-[#121212] p-4 cursor-pointer transition-colors" data-overlay="track">
+						<div class="text-center">
+							<div class="w-16 h-16 mx-auto mb-3 bg-[#1f1f1f] rounded-lg flex items-center justify-center">
+								<img src="../../assets/icons/trackmap.png" alt="Track Map icon" class="w-10 h-10" />
+							</div>
+							<h3 class="font-semibold text-slate-100">Track Map</h3>
+							<p class="text-sm text-[#a8a8a8] mt-1">Track map with live car position</p>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Right Sidebar for Overlay Settings -->
+			<aside id="overlay-settings" class="w-80 bg-[#121212] hidden flex flex-col min-h-0 overflow-hidden m-2 rounded-xl">
+				<div class="flex-1 overflow-y-auto p-4 space-y-4 scroll-inset">
+					<!-- Overlay Title -->
+					<div class="pb-3">
+						<h2 id="overlay-title" class="text-lg font-semibold text-slate-100">Overlay Settings</h2>
+					</div>
+
+					<!-- Display Settings -->
+					<div class="space-y-3">
+						<div class="text-sm font-medium text-slate-200 mb-2">Display Settings</div>
+						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+							<span class="text-slate-200">Enabled</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="overlay-toggle" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+							<span class="text-slate-200">Show in Menu</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="overlay-show-menu" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+							<span class="text-slate-200">Show while Racing</span>
+							<span class="relative inline-flex h-6 w-11 items-center">
+								<input type="checkbox" id="overlay-show-race" class="peer sr-only" />
+								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+							</span>
+						</label>
+						<div class="text-xs text-[#a8a8a8] italic">Control visibility and availability of the overlay.</div>
+					</div>
+				
+					<!-- Hotkey Setting -->
+					<div class="space-y-2">
+						<label class="block text-sm font-medium text-slate-200">Toggle Hotkey</label>
+						<input type="text" id="overlay-hotkey" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200 placeholder-[#a8a8a8] focus:border-green-500 focus:outline-none" />
+					</div>
+
+					<!-- Position Setting -->
+					<div class="space-y-2">
+						<label class="block text-sm font-medium text-slate-200">Position</label>
+						<select id="overlay-position" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
+							<option value="top-left">Top Left</option>
+							<option value="top-center">Top Center</option>
+							<option value="top-right">Top Right</option>
+							<option value="center-left">Center Left</option>
+							<option value="center">Center</option>
+							<option value="center-right">Center Right</option>
+							<option value="bottom-left">Bottom Left</option>
+							<option value="bottom-center">Bottom Center</option>
+							<option value="bottom-right">Bottom Right</option>
+						</select>
+					</div>
+
+					<!-- Opacity Setting -->
+					<div class="space-y-2">
+						<label class="block text-sm font-medium text-slate-200">Opacity</label>
+						<input type="range" id="overlay-opacity" min="0" max="100" value="100" class="w-full" />
+						<div class="text-xs text-[#a8a8a8] text-center">
+							<span id="opacity-value">100%</span>
+						</div>
+					</div>
+
+					<!-- Weather: Preview Weather Type (visible only when Weather selected) -->
+					<div id="overlay-preview-weather-row" class="space-y-2 hidden">
+						<label class="block text-sm font-medium text-slate-200">Weather Type (Preview Mode only)</label>
+						<select id="overlay-preview-weather-type" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
+							<option value="0">Constant (Show Air Temp)</option>
+							<option value="1">Dynamic (Show Precipitation)</option>
+						</select>
+					</div>
+
+					<!-- Inputs: Steering Wheel Selection (visible only when Inputs selected) -->
+					<div id="overlay-inputs-steering-row" class="space-y-2 hidden">
+						<label class="block text sm font-medium text-slate-200">Steering Wheel</label>
+						<select id="overlay-inputs-steering" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
+							<option value="builtin">Built-in</option>
+							<option value="moza_ks">Moza KS</option>
+							<option value="moza_rs_v2">Moza RS v2</option>
+						</select>
+						<div class="text-xs text-[#a8a8a8] italic">
+							Choose a steering wheel style. Images are loaded from assets/wheels.
+						</div>
+					</div>
+
+					<!-- Delta: Reference Mode (visible only when Delta selected) -->
+					<div id="overlay-delta-reference-row" class="space-y-2 hidden">
+						<label class="block text-sm font-medium text-slate-200">Reference Mode</label>
+						<select id="overlay-delta-reference-mode" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
+							<option value="0">All-Time Best</option>
+							<option value="1">Session Best</option>
+							<option value="2">All-Time Optimal</option>
+							<option value="3">Session Optimal</option>
+							<option value="4">Last Lap</option>
+						</select>
+						<div class="text-xs text-[#a8a8a8] italic">
+							Choose which reference lap to compare your delta timing against.
+						</div>
+					</div>
+
+					<!-- Track: Track Width (visible only when Track selected) -->
+					<div id="overlay-track-width-row" class="hidden space-y-3">
+						<div class="rounded-lg bg-[#1f1f1f] p-3">
+							<div class="flex items-center justify-between mb-2">
+								<label for="track-width-slider" class="text-slate-200">Track Width</label>
+								<span class="text-sm text-[#a8a8a8]" id="track-width-value">6.0</span>
+							</div>
+							<input type="range" id="track-width-slider"	min="1.0" max="20.0" step="0.5" value="6.0"	class="w-full h-2 bg-[#3c3c3c] rounded-lg appearance-none cursor-pointer accent-green-600 hover:accent-green-500 focus:outline-none focus:ring-2 focus:ring-green-500"/>
+						</div>
+						<p class="text-xs text-[#a8a8a8] italic">
+							Adjust the thickness of the track path on the map. Range: 1.0 to 20.0 pixels.
+						</p>
+					</div>
+
+					<!-- General Boolean Toggles (auto-generated) -->
+					<div id="overlay-general-bool-section" class="space-y-3">
+						<div id="overlay-general-bool-section-title" class="text-sm font-medium text-slate-200 mb-2">Overlay Options</div>
+						<div id="overlay-bool-list" class="space-y-2"></div>
+						<div id="overlay-bool-list-description" class="text-xs text-[#a8a8a8] italic"></div>
+					</div>
+
+					<!-- Save Button -->
+					<div class="pt-4">
+						<button id="save-overlay-settings" class="w-full rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-[#121212]">
+							Save Settings
+						</button>
+					</div>
+				</div>
+			</aside>
+		</main>
+	</div>
+	<script src="../scripts/overlays.js"></script>
+</body>
+</html>

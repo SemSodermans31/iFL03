@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>iFL03 - Preview Mode</title>
+	<link rel="stylesheet" href="../dist/styles.css" />
+</head>
+<body class="min-h-dvh bg-[#000000] text-[#a8a8a8] flex">
+	<!-- Sidebar -->
+	<aside class="w-56 bg-[#121212] flex flex-col justify-between m-2 rounded-xl">
+		<!-- Top navigation -->
+		<nav class="p-4 space-y-2">
+			<a href="../index.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-home">Home</a>
+			<a href="overlays.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-overlays">Overlays</a>
+			<a href="ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f] bg-[#1f1f1f]" id="nav-ui-edit">Preview Mode</a>
+		</nav>
+
+		<!-- Bottom actions -->
+		<div class="p-4 space-y-2">
+			<a href="user.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-user">User</a>
+			<a href="settings.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-settings">Settings</a>
+		</div>
+	</aside>
+
+	<!-- Main content -->
+	<div class="flex-1 flex flex-col">
+		<header class="sticky top-0 z-10 bg-[#121212] m-2 rounded-xl">
+			<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+				<h1 class="text-lg font-semibold tracking-tight">Preview Mode</h1>
+				<span id="conn" class="inline-flex items-center gap-2 text-sm text-[#a8a8a8]">
+					<span class="size-2 rounded-full bg-[#a8a8a8]" id="connDot"></span>
+					<span class="text-sm text-[#a8a8a8]">iRacing status:</span>
+					<span id="connText">UNKNOWN</span>
+				</span>
+			</div>
+		</header>
+
+		<main class="mx-auto w-full max-w-4xl px-4 py-6 space-y-6">
+			<section class="rounded-xl bg-[#121212] p-6">
+				<h2 class="text-lg font-semibold mb-4 text-slate-100">Edit Mode</h2>
+				<div class="space-y-3">
+					<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+						<span class="text-[#a8a8a8]">Enable UI Editing</span>
+						<span class="relative inline-flex h-6 w-11 items-center">
+							<input type="checkbox" id="chk_uiEdit" class="peer sr-only" />
+							<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+							<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+						</span>
+					</label>
+					<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+						<span class="text-[#a8a8a8]">Preview Mode</span>
+						<span class="relative inline-flex h-6 w-11 items-center">
+							<input type="checkbox" id="chk_previewMode" class="peer sr-only" />
+							<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+							<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+						</span>
+					</label>
+					<div class="text-sm text-[#a8a8a8]">
+						Preview mode shows overlays without requiring iRacing connection, useful for testing and positioning.
+					</div>
+				</div>
+			</section>
+		</main>
+	</div>
+	<script src="../scripts/ui-edit.js"></script>
+</body>
+</html>

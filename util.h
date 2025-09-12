@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,8 +32,13 @@ SOFTWARE.
 #include <windows.h>
 #include <d2d1_3.h>
 #include <dwrite.h>
+#include <dwrite_1.h>
+#include <wrl.h>
+#include <wincodec.h>
 #include <unordered_map>
 #include <ctype.h>
+#include <map>
+#include <filesystem>
 
 #define HRCHECK( x_ ) do{ \
     HRESULT hr_ = x_; \
@@ -100,9 +105,178 @@ inline bool saveFile( const std::string& fname, const std::string& s )
     return true;
 }
 
-inline std::wstring toWide( const std::string& narrow )
+inline bool loadFileW( const std::wstring& fnameW, std::string& output )
 {
-    return std::wstring(narrow.begin(),narrow.end());
+    FILE* fp = _wfopen( fnameW.c_str(), L"rb" );
+    if( !fp )
+        return false;
+
+    fseek( fp, 0, SEEK_END );
+    const long sz = ftell( fp );
+    fseek( fp, 0, SEEK_SET );
+
+    char* buf = new char[sz];
+
+    fread( buf, 1, sz, fp );
+    fclose( fp );
+    output = std::string( buf, sz );
+
+    delete[] buf;
+    return true;
+}
+
+inline std::wstring toWide(const std::string& narrow)
+{
+    if (narrow.empty()) return L"";
+
+    // First try UTF-8, which is what our sources and UI strings use
+    int required = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                       narrow.data(), (int)narrow.size(),
+                                       nullptr, 0);
+    if (required > 0)
+    {
+        std::wstring wide(required, L'\0');
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                             narrow.data(), (int)narrow.size(),
+                             wide.data(), required);
+        return wide;
+    }
+
+    // Fallback to the system codepage if the input wasn't valid UTF-8
+    required = MultiByteToWideChar(CP_ACP, 0,
+                                   narrow.data(), (int)narrow.size(),
+                                   nullptr, 0);
+    if (required > 0)
+    {
+        std::wstring wide(required, L'\0');
+        MultiByteToWideChar(CP_ACP, 0,
+                             narrow.data(), (int)narrow.size(),
+                             wide.data(), required);
+        return wide;
+    }
+
+    return L"";
+}
+
+// --------------------
+// Asset path helpers
+// --------------------
+inline std::wstring getExecutableDirW()
+{
+    wchar_t path[MAX_PATH] = {0};
+    GetModuleFileNameW(NULL, path, MAX_PATH);
+    wchar_t* last = wcsrchr(path, L'\\');
+    if (last) *last = 0;
+    return std::wstring(path);
+}
+
+inline bool fileExistsW(const std::wstring& path)
+{
+    DWORD a = GetFileAttributesW(path.c_str());
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
+inline bool directoryExistsW(const std::wstring& path)
+{
+    DWORD a = GetFileAttributesW(path.c_str());
+    return a != INVALID_FILE_ATTRIBUTES && (a & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+inline std::wstring resolveAssetPathW(const std::wstring& relative)
+{
+    const std::wstring exeDir = getExecutableDirW();
+    std::wstring repo = exeDir + L"\\..\\..\\" + relative;
+    if (directoryExistsW(repo)) return repo;
+    std::wstring local = exeDir + L"\\" + relative;
+    if (directoryExistsW(local)) return local;
+    // For debugging, let's also check if individual files exist
+    if (fileExistsW(repo)) return repo;
+    if (fileExistsW(local)) return local;
+    // Try current working directory as final fallback
+    std::wstring cwd = L".\\";
+    std::wstring cwdPath = cwd + relative;
+    if (directoryExistsW(cwdPath)) return cwdPath;
+    return relative;
+}
+
+// --------------------
+// Car brand icons
+// --------------------
+inline bool loadCarBrandIcons(std::map<std::string, IWICFormatConverter*>& outIconMap)
+{
+    outIconMap.clear();
+
+    HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    (void)hr; // safe to ignore S_FALSE
+
+    Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic))))
+        return false;
+
+    const std::wstring dir = resolveAssetPathW(L"assets\\carIcons\\");
+
+    WIN32_FIND_DATAW fd = {};
+    HANDLE h = FindFirstFileW((dir + L"*.png").c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE)
+        return false;
+
+    do {
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            continue;
+        std::wstring fileW = dir + fd.cFileName;
+
+        Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+        if (FAILED(wic->CreateDecoderFromFilename(fileW.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder)))
+            continue;
+        Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+        if (FAILED(decoder->GetFrame(0, &frame)))
+            continue;
+        Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+        if (FAILED(wic->CreateFormatConverter(&converter)))
+            continue;
+        if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut)))
+            continue;
+
+        // Key name = filename without extension (lowercased)
+        std::wstring fnameW(fd.cFileName);
+        size_t dot = fnameW.find_last_of(L'.');
+        if (dot != std::wstring::npos) fnameW = fnameW.substr(0, dot);
+        std::string key;
+        key.reserve(fnameW.size());
+        for (wchar_t c : fnameW) key.push_back((char)tolower((unsigned short)c));
+
+        // Store raw pointer and AddRef to keep alive beyond ComPtr lifetime
+        IWICFormatConverter* raw = converter.Get();
+        if (raw) raw->AddRef();
+        outIconMap[key] = raw;
+    } while (FindNextFileW(h, &fd));
+
+    FindClose(h);
+    return !outIconMap.empty();
+}
+
+inline IWICFormatConverter* findCarBrandIcon(const std::string& carName, const std::map<std::string, IWICFormatConverter*>& iconMap)
+{
+    // Normalize car name
+    std::string name = carName;
+    for (char& c : name) c = (char)tolower((unsigned char)c);
+
+    // Try simple contains on known keys
+    IWICFormatConverter* best = nullptr;
+    size_t bestLen = 0;
+    for (const auto& [key, conv] : iconMap)
+    {
+        if (!conv) continue;
+        if (key == "00error") { if (!best) best = conv; continue; }
+        // Allow underscore or space equivalence
+        std::string k = key;
+        for (char& c : k) if (c == '_') c = ' ';
+        if (name.find(k) != std::string::npos)
+        {
+            if (k.length() > bestLen) { best = conv; bestLen = k.length(); }
+        }
+    }
+    return best; // may be nullptr; caller can fallback to default
 }
 
 inline std::string formatLaptime( float secs )
@@ -296,9 +470,9 @@ class TextCache
         // Assumption: textFormat is set to DWRITE_PARAGRAPH_ALIGNMENT_CENTER, so ycenter +/- fontSize is enough vertical room in all
         // cases. I.e. we only care about rendering single-line text.
         //
-        void render( ID2D1RenderTarget* renderTarget, const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, float ycenter, ID2D1SolidColorBrush* brush, DWRITE_TEXT_ALIGNMENT align )
+        void render( ID2D1RenderTarget* renderTarget, const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, float ycenter, ID2D1SolidColorBrush* brush, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
-            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align );
+            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align, characterSpacing );
             if( !textLayout )
                 return;
 
@@ -311,9 +485,9 @@ class TextCache
         //
         // Same assumptions as render().
         //
-        float2 getExtent( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align )
+        float2 getExtent( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
-            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align );
+            IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align, characterSpacing );
             if( !textLayout )
                 return float2(0,0);
 
@@ -325,7 +499,7 @@ class TextCache
 
     private:
 
-        IDWriteTextLayout* getOrCreateTextLayout( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align )
+        IDWriteTextLayout* getOrCreateTextLayout( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
             if( xmax < xmin )
                 return nullptr;
@@ -341,6 +515,7 @@ class TextCache
             hash ^= (unsigned)(uint64_t(textFormat) >> 32);
             hash ^= *((unsigned*)&width);
             hash ^= (unsigned)align;
+            hash ^= *((unsigned*)&characterSpacing);
 
             IDWriteTextLayout* textLayout = nullptr;
 
@@ -349,6 +524,18 @@ class TextCache
             if( it == m_cache.end() )
             {
                 m_factory->CreateTextLayout( str, len, textFormat, width, fontSize*2, &textLayout );
+                
+                // Apply character spacing if specified
+                if( characterSpacing != 0.0f && textLayout )
+                {
+                    Microsoft::WRL::ComPtr<IDWriteTextLayout1> textLayout1;
+                    if( SUCCEEDED(textLayout->QueryInterface(__uuidof(IDWriteTextLayout1), &textLayout1)) )
+                    {
+                        DWRITE_TEXT_RANGE textRange = { 0, (UINT32)len };
+                        textLayout1->SetCharacterSpacing( characterSpacing, characterSpacing, 0, textRange );
+                    }
+                }
+                
                 m_cache.insert( std::make_pair(hash, textLayout) );
             }
             else
@@ -363,11 +550,24 @@ class TextCache
         IDWriteFactory*                                      m_factory = nullptr;
 };
 
-inline float2 computeTextExtent( const wchar_t* str, IDWriteFactory* factory, IDWriteTextFormat* textFormat )
+inline float2 computeTextExtent( const wchar_t* str, IDWriteFactory* factory, IDWriteTextFormat* textFormat, float characterSpacing = 0.0f )
 {
     IDWriteTextLayout* textLayout = nullptr;
 
     factory->CreateTextLayout( str, (int)wcslen(str), textFormat, 99999, 99999, &textLayout );
+    
+    // Apply character spacing if specified
+    if( characterSpacing != 0.0f && textLayout )
+    {
+        Microsoft::WRL::ComPtr<IDWriteTextLayout1> textLayout1;
+        if( SUCCEEDED(textLayout->QueryInterface(__uuidof(IDWriteTextLayout1), &textLayout1)) )
+        {
+            const int len = (int)wcslen( str );
+            DWRITE_TEXT_RANGE textRange = { 0, (UINT32)len };
+            textLayout1->SetCharacterSpacing( characterSpacing, characterSpacing, 0, textRange );
+        }
+    }
+    
     DWRITE_TEXT_METRICS m = {};
     textLayout->GetMetrics( &m );
 

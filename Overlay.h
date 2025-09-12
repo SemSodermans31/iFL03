@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,6 +31,7 @@ SOFTWARE.
 #include <d2d1_3.h>
 #include <dcomp.h>
 #include <dwrite.h>
+#include <dwrite_1.h>
 #include <wrl.h>
 #include "util.h"
 
@@ -58,6 +59,11 @@ class Overlay
 
         void            setWindowPosAndSize( int x, int y, int w, int h, bool callSetWindowPos=true );
         void            saveWindowPosAndSize();
+        
+        void            handleMouseWheel( int delta, int x, int y ) { onMouseWheel( delta, x, y ); }
+
+        float           getGlobalOpacity() const;
+        void            applyPositionSetting();
 
     protected:
 
@@ -68,6 +74,20 @@ class Overlay
         virtual void    onSessionChanged();
         virtual float2  getDefaultSize();
         virtual bool    hasCustomBackground();
+        virtual void    onMouseWheel( int delta, int x, int y );
+
+        // Global font helpers (centralized typography settings)
+        float getGlobalFontSpacing() const;
+        void createGlobalTextFormat( 
+            float scale,
+            Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat 
+        ) const;
+        void createGlobalTextFormat( 
+            float scale,
+            int weightOverride,
+            const std::string& styleOverride,
+            Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat 
+        ) const;
 
         std::string     m_name;
         HWND            m_hwnd = 0;

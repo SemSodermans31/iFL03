@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ SOFTWARE.
 #include <windowsx.h>
 #include "Overlay.h"
 #include "Config.h"
+#include <string>
 
 using namespace Microsoft::WRL;
 
@@ -35,6 +36,16 @@ static const int ResizeBorderWidth = 25;
 static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
 {
     Overlay* o = (Overlay*)GetWindowLongPtr( hwnd, GWLP_USERDATA );
+
+    // Always forward mouse wheel to overlays (even outside UI edit)
+    if( o && msg == WM_MOUSEWHEEL )
+    {
+        const int delta = GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_DELTA;
+        const int x = GET_X_LPARAM(lparam);
+        const int y = GET_Y_LPARAM(lparam);
+        o->handleMouseWheel( delta, x, y );
+        return 0;
+    }
 
     if( !o || !o->isUiEditEnabled() )
         return DefWindowProc( hwnd, msg, wparam, lparam );
@@ -47,7 +58,6 @@ static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
             LRESULT hit = DefWindowProc( hwnd, msg, wparam, lparam );
             if( hit == HTCLIENT )
             {
-                // check if we hit the corner area of the window to allow resizing despite having no border
                 RECT r;
                 GetWindowRect( hwnd, &r );
                 const int cur_x = GET_X_LPARAM( lparam ) - r.left;
@@ -55,15 +65,7 @@ static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
                 const int w = r.right - r.left;
                 const int h = r.bottom - r.top;
                 const int border = ResizeBorderWidth;
-                /*  Disabled these corners because using them doesn't let us update the window contents 
-                    fast enough for some reason, leading to a weird window-wobble appearance when resizing.
-                if( cur_x < border && cur_y < border )
-                    return HTTOPLEFT;
-                if( cur_x > w-border && cur_y < border )
-                    return HTTOPRIGHT;
-                if( cur_x < border && cur_y > h-border )
-                    return HTBOTTOMLEFT;
-                */
+                
                 if( cur_x > w-border && cur_y > h-border )
                     return HTBOTTOMRIGHT;
 
@@ -114,12 +116,8 @@ std::string Overlay::getName() const
 
 void Overlay::enable( bool on )
 {
-    if( on && !m_hwnd )  // enable
+    if( on && !m_hwnd )
     {
-        //
-        // Create window
-        //
-
         const char* const wndclassName = "overlay";
         WNDCLASSEX wndclass = {};
         if( !GetClassInfoEx( 0, wndclassName, &wndclass ) )  // only the first overlay we open registers the window class
@@ -266,6 +264,9 @@ void Overlay::configChanged()
     const int w = g_cfg.getInt(m_name,"window_size_x", (int)defaultSize.x);
     const int h = g_cfg.getInt(m_name,"window_size_y", (int)defaultSize.y);
     setWindowPosAndSize( x, y, w, h );
+    
+    // Apply position setting if specified
+    applyPositionSetting();
 
     onConfigChanged();
 }
@@ -293,7 +294,13 @@ void Overlay::update()
         rr.rect = { 0.5f, 0.5f, w-0.5f, h-0.5f };
         rr.radiusX = cornerRadius;
         rr.radiusY = cornerRadius;
-        m_brush->SetColor( g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) ) );
+        
+        // Apply global opacity setting
+        float4 bgColor = g_cfg.getFloat4( m_name, "global_background_col", float4(0,0,0,1.0f) );
+        float globalOpacity = g_cfg.getFloat( m_name, "opacity", 100.0f ) / 100.0f;
+        bgColor.w *= globalOpacity;
+        
+        m_brush->SetColor( bgColor );
         m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
         m_renderTarget->EndDraw();
     }
@@ -352,6 +359,9 @@ void Overlay::saveWindowPosAndSize()
     g_cfg.setInt( m_name, "window_pos_y", m_ypos );
     g_cfg.setInt( m_name, "window_size_x", m_width );
     g_cfg.setInt( m_name, "window_size_y", m_height  );
+    
+    // When user manually moves overlay, switch to custom position
+    g_cfg.setString( m_name, "position", "custom" );
 
     g_cfg.save();
 }
@@ -366,6 +376,64 @@ bool Overlay::canEnableWhileDisconnected() const
     return false;
 }
 
+float Overlay::getGlobalOpacity() const
+{
+    return g_cfg.getFloat( m_name, "opacity", 100.0f ) / 100.0f;
+}
+
+void Overlay::applyPositionSetting()
+{
+    std::string position = g_cfg.getString( m_name, "position", "custom" );
+    
+    if (position == "custom") {
+        // Use existing saved position, don't change anything
+        return;
+    }
+    
+    // Get screen dimensions for positioning
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    
+    int newX = m_xpos;
+    int newY = m_ypos;
+    
+    // Apply position setting
+    if (position == "top-left") {
+        newX = 50;
+        newY = 50;
+    } else if (position == "top-center") {
+        newX = (screenWidth - m_width) / 2;
+        newY = 50;
+    } else if (position == "top-right") {
+        newX = screenWidth - m_width - 50;
+        newY = 50;
+    } else if (position == "center-left") {
+        newX = 50;
+        newY = (screenHeight - m_height) / 2;
+    } else if (position == "center") {
+        newX = (screenWidth - m_width) / 2;
+        newY = (screenHeight - m_height) / 2;
+    } else if (position == "center-right") {
+        newX = screenWidth - m_width - 50;
+        newY = (screenHeight - m_height) / 2;
+    } else if (position == "bottom-left") {
+        newX = 50;
+        newY = screenHeight - m_height - 100;
+    } else if (position == "bottom-center") {
+        newX = (screenWidth - m_width) / 2;
+        newY = screenHeight - m_height - 100;
+    } else if (position == "bottom-right") {
+        newX = screenWidth - m_width - 50;
+        newY = screenHeight - m_height - 100;
+    }
+    
+    // Apply the new position
+    setWindowPosAndSize(newX, newY, m_width, m_height);
+    
+    // Save the new position
+    saveWindowPosAndSize();
+}
+
 void Overlay::onEnable() {}
 void Overlay::onDisable() {}
 void Overlay::onUpdate() {}
@@ -373,4 +441,59 @@ void Overlay::onConfigChanged() {}
 void Overlay::onSessionChanged() {}
 float2 Overlay::getDefaultSize() { return float2(400,300); }
 bool Overlay::hasCustomBackground() { return false; }
+
+void Overlay::onMouseWheel( int /*delta*/, int /*x*/, int /*y*/ ) {}
+
+
+float Overlay::getGlobalFontSpacing() const
+{
+    return g_cfg.getFloat("Overlay", "font_spacing", 0.0f);
+}
+
+static DWRITE_FONT_STYLE s_toFontStyle(const std::string& style)
+{
+    if( style == "italic" )  return DWRITE_FONT_STYLE_ITALIC;
+    if( style == "oblique" ) return DWRITE_FONT_STYLE_OBLIQUE;
+    return DWRITE_FONT_STYLE_NORMAL;
+}
+
+void Overlay::createGlobalTextFormat( float scale,
+                                      Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
+{
+    const std::string family   = g_cfg.getString("Overlay", "font", "Poppins");
+    const float       baseSize = g_cfg.getFloat ("Overlay", "font_size", 16.0f);
+    const int         weight   = g_cfg.getInt   ("Overlay", "font_weight", 500);
+    const std::string styleStr = g_cfg.getString("Overlay", "font_style", "normal");
+
+    const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
+    const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
+
+    HRCHECK(m_dwriteFactory->CreateTextFormat(
+        toWide(family).c_str(), NULL,
+        (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+        size, L"en-us", &outFormat ));
+    outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+    outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+}
+
+void Overlay::createGlobalTextFormat( float scale,
+                                      int weightOverride,
+                                      const std::string& styleOverride,
+                                      Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
+{
+    const std::string family   = g_cfg.getString("Overlay", "font", "Poppins");
+    const float       baseSize = g_cfg.getFloat ("Overlay", "font_size", 16.0f);
+    const int         weight   = weightOverride > 0 ? weightOverride : g_cfg.getInt("Overlay", "font_weight", 500);
+    const std::string styleStr = styleOverride.empty() ? g_cfg.getString("Overlay", "font_style", "normal") : styleOverride;
+
+    const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
+    const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
+
+    HRCHECK(m_dwriteFactory->CreateTextFormat(
+        toWide(family).c_str(), NULL,
+        (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+        size, L"en-us", &outFormat ));
+    outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+    outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+}
 

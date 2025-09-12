@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2021-2022 L. E. Spalt
+Copyright (c) 2021-2025 L. E. Spalt & Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -50,16 +50,29 @@ enum class SessionType
 };
 static const char* const SessionTypeStr[] = {"UNKNOWN","PRACTICE","QUALIFY","RACE"};
 
+struct SessionPosTimes
+{
+    float           lastTime = 0;
+    float           fastestTime = 0;
+    int             position = 0;
+};
+
 struct Car
 {    
     std::string     userName;
+    std::string     teamName;
     int             carNumber = 0;
     std::string     carNumberStr;
+    std::string     carName;
+    int             carID;
     std::string     licenseStr;
     char            licenseChar = 'R';
     float           licenseSR = 0;
     std::string     licenseColStr;
     float4          licenseCol = float4(0,0,0,1);
+    std::string     classColStr;
+    float4          classCol = float4(0, 0, 0, 1);
+    int             classId = 0;
     int             irating = 0;
     int             isSelf = 0;
     int             isPaceCar = 0;
@@ -68,17 +81,18 @@ struct Car
     int             isFlagged = 0;
     int             incidentCount = 0;
     float           carClassEstLapTime = 0;
-    int             practicePosition = 0;
-    int             qualPosition = 0;
-    float           qualTime = 0;
-    int             racePosition = 0;
     int             lastLapInPits = 0;
+    SessionPosTimes practice;
+    SessionPosTimes qualy;
+    SessionPosTimes race;
 };
 
 struct Session
 {
     SessionType     sessionType = SessionType::UNKNOWN;
+    bool            isReplay;
     Car             cars[IR_MAX_CARS];
+    int             numCarClasses = -1;
     int             driverCarIdx = -1;
     int             sof = 0;
     int             subsessionId = 0;
@@ -92,6 +106,12 @@ struct Session
     float           rpmSLShift = 0;
     float           rpmSLLast = 0;
     float           rpmSLBlink = 0;
+    // Track info
+    std::string     trackName;           
+    std::string     trackDisplayName;    
+    std::string     trackConfigName;      
+    int             trackId = 0;
+    float           trackLengthMeters = 0.0f; 
 };
 
 extern irsdkCVar ir_SessionTime;    // double[1] Seconds since session start (s)
@@ -224,6 +244,8 @@ extern irsdkCVar ir_WindVel;    // float[1] Wind velocity at start/finish line (
 extern irsdkCVar ir_WindDir;    // float[1] Wind direction at start/finish line (rad)
 extern irsdkCVar ir_RelativeHumidity;    // float[1] Relative Humidity (%)
 extern irsdkCVar ir_FogLevel;    // float[1] Fog level (%)
+extern irsdkCVar ir_TrackWetness;    // int[1] Track wetness level (0=dry, 1=slightly wet, 2=lightly wet, 3=wet, 4=very wet, 5=extremely wet)
+extern irsdkCVar ir_Precipitation;    // float[1] Precipitation intensity (0.0 to 1.0)
 extern irsdkCVar ir_DCLapStatus;    // int[1] Status of driver change lap requirements ()
 extern irsdkCVar ir_DCDriversSoFar;    // int[1] Number of team drivers who have run a stint ()
 extern irsdkCVar ir_OkToReloadTextures;    // bool[1] True if it is ok to reload car textures at this time ()
@@ -318,8 +340,13 @@ extern irsdkCVar ir_VertAccel;    // float[1] Vertical acceleration (including g
 extern irsdkCVar ir_LatAccel;    // float[1] Lateral acceleration (including gravity) (m/s^2)
 extern irsdkCVar ir_LongAccel;    // float[1] Longitudinal acceleration (including gravity) (m/s^2)
 extern irsdkCVar ir_dcStarter;    // bool[1] In car trigger car starter ()
-extern irsdkCVar ir_dpRTireChange;    // float[1] Pitstop right tire change request ()
+extern irsdkCVar ir_dpRFTireChange;    // float[1] Pitstop right front tire change request ()
+extern irsdkCVar ir_dpLFTireChange;    // float[1] Pitstop left front tire change request ()
+extern irsdkCVar ir_dpRRTireChange;    // float[1] Pitstop right rear tire change request ()
+extern irsdkCVar ir_dpLRTireChange;    // float[1] Pitstop left rear tire change request ()
+extern irsdkCVar ir_dpTireChange;    // float[1] Pitstop all tire change request ()
 extern irsdkCVar ir_dpLTireChange;    // float[1] Pitstop left tire change request ()
+extern irsdkCVar ir_dpRTireChange;    // float[1] Pitstop right tire change request ()
 extern irsdkCVar ir_dpFuelFill;    // float[1] Pitstop fuel fill flag ()
 extern irsdkCVar ir_dpWindshieldTearoff;    // float[1] Pitstop windshield tearoff ()
 extern irsdkCVar ir_dpFuelAddKg;    // float[1] Pitstop fuel add ammount (kg)
@@ -404,8 +431,23 @@ float ir_estimateLaptime();
 // Get the best known position, from the latest session we can find.
 int ir_getPosition( int carIdx );
 
-// Get lap delta to P0 car if available.
+// Get gained positions.
+int ir_getPositionsChanged(int carIdx);
+
+// Get lap gap to P0 car if available.
 int ir_getLapDeltaToLeader( int carIdx, int ldrIdx );
+
+// Get lap delta if available.
+float ir_getDeltaTime(int carIdx, int selfIdx);
+
+// Get laps remaining for sesion
+int ir_getLapsRemaining();
+
+// Get session time remaining
+void ir_getSessionTimeRemaining(int& hours, int& mins, int& secs);
+
+// Get car class id
+int ir_getClassId(int carIdx);
 
 // Print all the variables the sim supports.
 void ir_printVariables();

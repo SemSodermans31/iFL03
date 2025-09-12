@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>iFL03 - User</title>
+	<link rel="stylesheet" href="../dist/styles.css" />
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+</head>
+<body class="h-dvh overflow-hidden bg-[#000000] text-[#a8a8a8] flex">
+	<!-- Sidebar -->
+	<aside class="w-56 bg-[#121212] flex flex-col justify-between m-2 rounded-xl">
+		<!-- Top navigation -->
+		<nav class="p-4 space-y-2">
+			<a href="../index.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-home">Home</a>
+			<a href="overlays.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-overlays">Overlays</a>
+			<a href="ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-ui-edit">Preview Mode</a>
+		</nav>
+
+		<!-- Bottom actions -->
+		<div class="p-4 space-y-2">
+			<a href="user.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f] bg-[#1f1f1f]" id="nav-user">User</a>
+			<a href="settings.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-settings">Settings</a>
+		</div>
+	</aside>
+
+	<!-- Main content -->
+	<div class="flex-1 flex flex-col min-h-0">
+		<header class="sticky top-0 z-10 bg-[#121212] m-2 rounded-xl">
+			<div class="mx-auto max-w-4xl px-4 py-3 flex items-center justify-between">
+				<h1 class="text-lg font-semibold tracking-tight">User</h1>
+				<span id="conn" class="inline-flex items-center gap-2 text-sm text-[#a8a8a8]">
+					<span class="size-2 rounded-full bg-[#a8a8a8]" id="connDot"></span>
+					<span class="text-sm text-[#a8a8a8]">iRacing status:</span>
+					<span id="connText">UNKNOWN</span>
+				</span>
+			</div>
+		</header>
+
+		<main class="flex-1 overflow-y-auto mx-auto w-full max-w-4xl px-4 py-6 space-y-6">
+			<!-- Current Car Status -->
+			<section class="rounded-xl bg-[#121212] p-6">
+				<h2 class="text-lg font-semibold mb-4 text-slate-100">Current Car</h2>
+				<div class="flex items-center justify-between mb-4">
+					<div>
+						<div class="text-sm text-[#a8a8a8]">Car</div>
+						<div class="text-lg font-medium text-slate-100" id="currentCarName">No car detected</div>
+					</div>
+					<div>
+						<div class="text-sm text-[#a8a8a8] text-right">Active Config</div>
+						<div class="text-lg font-medium text-slate-100 text-right" id="currentCarConfig">Default</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- My Configurations -->
+			<section class="rounded-xl bg-[#121212] p-6">
+				<h2 class="text-lg font-semibold mb-4 text-slate-100">My Configurations</h2>
+
+				<!-- Config Actions -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+					<div class="space-y-3">
+						<button id="btn-duplicate-config" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-[#1f1f1f] disabled:cursor-not-allowed" disabled>
+							Duplicate Selected
+						</button>
+					</div>
+					<div class="space-y-3">
+						<button id="btn-set-active" class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-[#1f1f1f] disabled:cursor-not-allowed" disabled>
+							Set as Active
+						</button>
+						<button id="deleteConfig" class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:bg-[#1f1f1f] disabled:cursor-not-allowed" disabled>
+							Delete Selected
+						</button>
+					</div>
+				</div>
+
+				<!-- Available Configs -->
+				<div>
+					<h3 class="text-sm font-medium text-[#a8a8a8] mb-3">Available Car Configurations</h3>
+					<div id="availableConfigs" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+						<!-- Config cards will be populated here -->
+					</div>
+				</div>
+			</section>			
+
+			<!-- General & Overlay Settings -->
+			<section class="rounded-xl bg-[#121212] p-6 space-y-6">
+				<h2 class="text-lg font-semibold text-slate-100">General & Overlay Settings</h2>
+
+				<!-- Buddies / Flagged Lists -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div>
+						<h3 class="text-sm font-medium text-[#a8a8a8] mb-2">Buddies</h3>
+						<div id="buddies-list" class="space-y-2"></div>
+						<div class="flex gap-2 mt-3">
+							<input id="buddies-input" type="text" placeholder="Add driver name..." class="flex-1 px-3 py-2 bg-[#1f1f1f] rounded-lg text-slate-100 focus:ring-2 focus:ring-green-500 focus:border-transparent" />
+							<button id="buddies-add" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg">Add</button>
+						</div>
+					</div>
+					<div>
+						<h3 class="text-sm font-medium text-[#a8a8a8] mb-2">Flagged Drivers</h3>
+						<div id="flagged-list" class="space-y-2"></div>
+						<div class="flex gap-2 mt-3">
+							<input id="flagged-input" type="text" placeholder="Add driver name..." class="flex-1 px-3 py-2 bg-[#1f1f1f] rounded-lg text-slate-100 focus:ring-2 focus:ring-red-500 focus:border-transparent" />
+							<button id="flagged-add" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg">Add</button>
+						</div>
+					</div>
+				</div>
+
+				<!-- Overlay Font Settings -->
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+					<div class="space-y-3">
+						<label class="block text-sm font-medium text-slate-200">Font Family</label>
+						<select id="overlay-font" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
+							<option value="Waukegan LDO">Waukegan LDO</option>
+							<option value="Poppins">Poppins</option>
+							<option value="Arial">Arial</option>
+						</select>
+					</div>
+					<div class="space-y-3">
+						<label class="block text-sm font-medium text-slate-200">Font Size</label>
+						<input id="overlay-font-size" type="number" min="8" max="64" step="1" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200" />
+					</div>
+					<div class="space-y-3">
+						<label class="block text-sm font-medium text-slate-200">Font Spacing</label>
+						<input id="overlay-font-spacing" type="number" min="0" max="2" step="0.05" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200" />
+					</div>
+					<div class="space-y-3">
+						<label class="block text-sm font-medium text-slate-200">Font Style</label>
+						<select id="overlay-font-style" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
+							<option value="normal">Normal</option>
+							<option value="italic">Italic</option>
+							<option value="oblique">Oblique</option>
+						</select>
+					</div>
+					<div class="space-y-3 md:col-span-2">
+						<label class="block text-sm font-medium text-slate-200">Font Weight <span id="overlay-font-weight-value" class="text-[#a8a8a8]"></span></label>
+						<input id="overlay-font-weight" type="range" min="100" max="900" step="100" class="w-full" />
+					</div>
+				</div>
+			</section>
+
+			<!-- Status Messages -->
+			<div id="statusMessage" class="hidden rounded-lg p-4">
+				<div id="statusText" class="text-sm font-medium"></div>
+			</div>
+		</main>
+
+		<!-- Duplicate Config Modal -->
+
+		<!-- Save As Modal -->
+		<div id="saveAsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+			<div class="bg-[#121212] rounded-lg p-6 w-full max-w-md mx-4">
+				<h3 class="text-lg font-semibold text-slate-100 mb-4">Duplicate Configuration</h3>
+				<div class="mb-6">
+					<label for="saveAsCarName" class="block text-sm font-medium text-[#a8a8a8] mb-2">New name</label>
+					<input type="text" id="saveAsCarName" placeholder="Enter new configuration name..." class="w-full px-3 py-2 bg-[#1f1f1f] rounded-lg text-slate-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+				</div>
+				<div class="flex gap-3">
+					<button id="confirmSaveAs" class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+						Save
+					</button>
+					<button id="cancelSaveAs" class="flex-1 px-4 py-2 bg-[#1f1f1f] hover:bg-[#3c3c3c] text-white text-sm font-medium rounded-lg transition-colors">
+						Cancel
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Confirm Modal -->
+		<div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+			<div class="bg-[#121212] rounded-lg p-6 w-full max-w-md mx-4">
+				<h3 class="text-lg font-semibold text-slate-100 mb-2" id="confirmTitle">Confirm Action</h3>
+				<p class="text-[#a8a8a8] mb-6" id="confirmMessage">Are you sure?</p>
+				<div class="flex gap-3">
+					<button id="confirmYes" class="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">Confirm</button>
+					<button id="confirmNo" class="flex-1 px-4 py-2 bg-[#1f1f1f] hover:bg-[#3c3c3c] text-white text-sm font-medium rounded-lg transition-colors">Cancel</button>
+				</div>
+			</div>
+		</div>
+	</div>
+	<script src="../scripts/user.js"></script>
+</body>
+</html>

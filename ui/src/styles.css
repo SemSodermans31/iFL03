@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+/* Hide CEF status bar and any browser chrome elements */
+::-webkit-status-bar,
+*[class*="status"],
+*[id*="status"] {
+  display: none !important;
+}
+
+/* Hide any bottom status elements that might show link previews */
+body::after,
+html::after {
+  display: none !important;
+} 
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  -webkit-border-radius: 10px;
+  border-radius: 10px;
+  background: #1f1f1f; 
+  margin: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3c3c3c;
+}
+
+/* Create vertical insets for specific containers so the scrollbar is not full-height */
+.scroll-inset::-webkit-scrollbar-track {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  border-radius: 10px;
+}
+.scroll-inset::-webkit-scrollbar-thumb {
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  background-clip: padding-box;
+  border-radius: 10px;
+}
