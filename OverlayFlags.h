@@ -36,9 +36,6 @@ SOFTWARE.
 class OverlayFlags : public Overlay
 {
 public:
-
-	const float DefaultFontSize = 28.0f;
-
 	OverlayFlags()
 		: Overlay("OverlayFlags")
 	{}
@@ -67,26 +64,13 @@ protected:
 			m_scaleFactor = std::max(0.5f, std::min(6.0f, m_scaleFactor));
 		}
 
-		// Fonts
+
+		// Fonts (centralized)
 		m_text.reset( m_dwriteFactory.Get() );
-		const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
-		const float baseSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-		const int fontWeight = g_cfg.getInt( m_name, "font_weight", 700 );
-		const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-		m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
-		DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-		if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-		else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-		const float size = std::max(8.0f, std::min(220.0f, baseSize * m_scaleFactor));
-
-		HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, size*1.5f, L"en-us", &m_textFormatBold ));
-		m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-		m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-
-		HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, size*1.5f, L"en-us", &m_textFormatLarge ));
-		m_textFormatLarge->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-		m_textFormatLarge->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+		
+		const float baseScale = std::max(0.5f, std::min(6.0f, m_scaleFactor));
+		createGlobalTextFormat(baseScale * 3.6f, 900, "oblique", m_textFormatBold);
+		createGlobalTextFormat(baseScale * 3.2f, 900, "oblique", m_textFormatLarge);
 	}
 
 	virtual void onUpdate()
@@ -179,32 +163,8 @@ private:
 		// Preview override
 		if (preview_mode_get())
 		{
-			const std::string sel = g_cfg.getString("OverlayFlags", "preview_flag", "none");
 			auto set = [&](const char* top, const char* bottom, const float4& c)->FlagInfo{ FlagInfo f; f.active=true; f.topText=top; f.bottomText=bottom; f.color=c; return f; };
-			if (sel == "checkered")   return set("SESSION IS OVER","Checkered Flag", col(1,1,1));
-			if (sel == "white")       return set("ONE MORE LAP","White Flag", col(1,1,1));
-			if (sel == "green")       return set("RESUME RACING","Green Flag", col(0.1f,0.9f,0.1f));
-			if (sel == "yellow")      return set("CAUTION","Yellow Flag", col(1,1,0));
-			if (sel == "yellowWaving") return set("ACCIDENT AHEAD","Yellow Waving", col(1,1,0));
-			if (sel == "red")         return set("SESSION IS SUSPENDED","Red Flag", col(1,0,0));
-			if (sel == "blue")        return set("LET OTHERS BY","Blue Flag", col(0.1f,0.4f,1.0f));
-			if (sel == "debris")      return set("DEBRIS ON TRACK","Debris Flag", col(1.0f,0.5f,0.0f));
-			if (sel == "crossed")     return set("CROSSED","Crossed Flag", col(0.7f,0.7f,0.7f));
-			if (sel == "oneLapToGreen") return set("ONE LAP TO GREEN","Session Flag", col(1,1,1));
-			if (sel == "greenHeld")   return set("GREEN HELD","Green Held", col(0.1f,0.9f,0.1f));
-			if (sel == "tenToGo")     return set("10 LAPS TO GO","Session Flag", col(1,1,1));
-			if (sel == "fiveToGo")    return set("5 LAPS TO GO","Session Flag", col(1,1,1));
-			if (sel == "randomWaving") return set("RANDOM WAVING","Waving Flag", col(1,1,1));
-			if (sel == "caution")     return set("CAUTION","Caution Flag", col(1,1,0));
-			if (sel == "cautionWaving") return set("CAUTION","Caution Waving", col(1,1,0));
-			if (sel == "black")       return set("PENALTY","Black Flag", col(0,0,0));
-			if (sel == "disqualify")  return set("DISQUALIFIED","Disqualified", col(0,0,0));
-			if (sel == "furled")      return set("CUTTING TRACK","Furled Flag", col(1.0f,0.6f,0.0f));
-			if (sel == "repair")      return set("REQUIRED REPAIR","Meatball Flag", col(1.0f,0.4f,0.0f));
-			if (sel == "startReady")  return set("GET READY","Start Ready", col(1,0,0));
-			if (sel == "startSet")    return set("SET","Start Set", col(1.0f,0.9f,0.0f));
-			if (sel == "startGo")     return set("GO!","Start Go", col(0.1f,0.9f,0.1f));
-			out.active = false; return out;
+			return set("GO!","Start Go", col(0.1f,0.9f,0.1f));
 		}
 
 		const int flags = ir_SessionFlags.getInt();
@@ -285,5 +245,5 @@ protected:
 	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatBold;
 	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatLarge;
 	TextCache m_text;
-	float m_fontSpacing = 0.0f;
+	float m_fontSpacing = getGlobalFontSpacing();
 };

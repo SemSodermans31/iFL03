@@ -76,7 +76,7 @@ function setupEventListeners() {
 		});
 	});
 
-	// Overlay toggle
+	// Enabled toggle
 	const overlayToggle = document.getElementById('overlay-toggle');
 	if (overlayToggle) {
 		overlayToggle.addEventListener('change', function() {
@@ -130,6 +130,7 @@ function setupEventListeners() {
 			}
 		});
 	}
+
 
 	// Hotkey input
 	const overlayHotkey = document.getElementById('overlay-hotkey');
@@ -187,25 +188,6 @@ function setupEventListeners() {
 		});
 	}
 
-	// Flags preview flag change
-	const previewFlagSel = document.getElementById('overlay-preview-flag');
-	if (previewFlagSel) {
-		previewFlagSel.addEventListener('change', function() {
-			// Send to backend only for OverlayFlags
-			if (selectedOverlay === 'flags') {
-				if (window.cefQuery) {
-					window.cefQuery({
-						request: JSON.stringify({ cmd: 'setPreviewFlag', value: this.value }),
-						onSuccess: function(response) {
-							try { currentState = JSON.parse(response); updateUI(); } catch(e) { console.error(e); }
-						},
-						onFailure: function(code, msg) { console.error('setPreviewFlag failed', code, msg); }
-					});
-				}
-			}
-		});
-	}
-
 	// Weather type change
 	const previewWeatherTypeSel = document.getElementById('overlay-preview-weather-type');
 	if (previewWeatherTypeSel) {
@@ -254,48 +236,7 @@ function setupEventListeners() {
 		});
 	}
 
-	// Standings column toggles
-	const columnToggles = [
-		{ id: 'standings-show-pit', key: 'show_pit' },
-		{ id: 'standings-show-license', key: 'show_license' },
-		{ id: 'standings-show-irating', key: 'show_irating' },
-		{ id: 'standings-show-car-brand', key: 'show_car_brand' },
-		{ id: 'standings-show-positions-gained', key: 'show_positions_gained' },
-		{ id: 'standings-show-gap', key: 'show_gap' },
-		{ id: 'standings-show-best', key: 'show_best' },
-		{ id: 'standings-show-lap-time', key: 'show_lap_time' },
-		{ id: 'standings-show-delta', key: 'show_delta' },
-		{ id: 'standings-show-l5', key: 'show_L5' }
-	];
 
-	columnToggles.forEach(toggle => {
-		const element = document.getElementById(toggle.id);
-		if (element) {
-			element.addEventListener('change', function() {
-				if (selectedOverlay === 'standings') {
-					sendCommand('setConfigBool', {
-						component: 'OverlayStandings',
-						key: toggle.key,
-						value: this.checked
-					});
-				}
-			});
-		}
-	});
-
-	// Track: Show Other Cars toggle
-	const trackShowOtherCarsToggle = document.getElementById('track-show-other-cars');
-	if (trackShowOtherCarsToggle) {
-		trackShowOtherCarsToggle.addEventListener('change', function() {
-			if (selectedOverlay === 'track') {
-				sendCommand('setConfigBool', {
-					component: 'OverlayTrack',
-					key: 'show_other_cars',
-					value: this.checked
-				});
-			}
-		});
-	}
 
 	// Track: Track Width slider
 	const trackWidthSlider = document.getElementById('track-width-slider');
@@ -325,26 +266,114 @@ function selectOverlay(overlayKey) {
 	updateOverlaySettings(overlayKey);
 }
 
+function toTitleCase(str) {
+	return str.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function renderBooleanToggles(configKey) {
+	const container = document.getElementById('overlay-bool-list');
+	if (!container) return;
+	container.innerHTML = '';
+
+	const cfg = currentState.config && currentState.config[configKey];
+	if (!cfg) return;
+
+	// Collect boolean keys
+	const exclude = new Set(['enabled', 'show_in_menu', 'show_in_race']);
+	const keys = Object.keys(cfg).filter(k => typeof cfg[k] === 'boolean' && !exclude.has(k));
+	if (keys.length === 0) return;
+
+	// Order: enabled, show_in_menu, show_in_race, then others alpha
+	const priority = { enabled: 0, show_in_menu: 1, show_in_race: 2 };
+	keys.sort((a, b) => (priority[a] ?? 99) - (priority[b] ?? 99) || a.localeCompare(b));
+
+	keys.forEach(key => {
+		const id = `bool-${key}`;
+		const checked = !!cfg[key];
+		const labelText = toTitleCase(key);
+
+		const wrapper = document.createElement('label');
+		wrapper.className = 'flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2';
+
+		const spanText = document.createElement('span');
+		spanText.className = 'text-slate-200';
+		spanText.textContent = labelText;
+
+		const switchWrap = document.createElement('span');
+		switchWrap.className = 'relative inline-flex h-6 w-11 items-center';
+
+		const input = document.createElement('input');
+		input.type = 'checkbox';
+		input.id = id;
+		input.className = 'peer sr-only';
+		input.checked = checked;
+		input.dataset.key = key;
+
+		const bg = document.createElement('span');
+		bg.className = 'block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600';
+
+		const knob = document.createElement('span');
+		knob.className = 'pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]';
+
+		switchWrap.appendChild(input);
+		switchWrap.appendChild(bg);
+		switchWrap.appendChild(knob);
+
+		wrapper.appendChild(spanText);
+		wrapper.appendChild(switchWrap);
+
+		container.appendChild(wrapper);
+
+		input.addEventListener('change', function() {
+			const k = this.dataset.key;
+			if (!selectedOverlay) return;
+			const component = overlayConfig[selectedOverlay].configKey;
+			if (k === 'enabled') {
+				sendCommand('setOverlay', { key: component, on: this.checked });
+				// Visual feedback on card
+				const card = document.querySelector(`[data-overlay="${selectedOverlay}"]`);
+				const iconContainer = card ? card.querySelector('.flex.items-center.justify-center') : null;
+				if (iconContainer) {
+					if (this.checked) iconContainer.classList.add('border-2', 'border-green-500');
+					else iconContainer.classList.remove('border-2', 'border-green-500');
+				}
+			} else {
+				sendCommand('setConfigBool', { component, key: k, value: this.checked });
+			}
+		});
+	});
+}
+
 function updateOverlaySettings(overlayKey) {
 	const config = overlayConfig[overlayKey];
 	if (!config) return;
 	
 	// Update title
 	document.getElementById('overlay-title').textContent = config.name + ' Settings';
-	
-	// Update toggle state
-	const overlayToggle = document.getElementById('overlay-toggle');
-	if (overlayToggle && currentState.config && currentState.config[config.configKey]) {
-		overlayToggle.checked = currentState.config[config.configKey].enabled || false;
+
+	// Update general boolean toggles description
+	const overlayGeneralBoolSectionTitle = document.getElementById('overlay-general-bool-section-title');
+	if (overlayGeneralBoolSectionTitle) {
+		overlayGeneralBoolSectionTitle.textContent = config.name + ' Options';
 	}
 
-	// Update show in menu/race toggles
-	const showMenuToggle = document.getElementById('overlay-show-menu');
-	const showRaceToggle = document.getElementById('overlay-show-race');
-	if (currentState.config && currentState.config[config.configKey]) {
-		const cfg = currentState.config[config.configKey];
-		if (showMenuToggle) showMenuToggle.checked = cfg.show_in_menu !== false; // Default to true
-		if (showRaceToggle) showRaceToggle.checked = cfg.show_in_race !== false; // Default to true
+	const overlayGeneralBoolListDescription = document.getElementById('overlay-bool-list-description');
+	if (overlayGeneralBoolListDescription) {
+		overlayGeneralBoolListDescription.textContent = 'All options for the ' + config.name + ' configuration.';
+	}
+
+	// Render general boolean toggles
+	renderBooleanToggles(config.configKey);
+
+	// Sync display toggles states
+	const cfg = currentState.config && currentState.config[config.configKey];
+	if (cfg) {
+		const enabled = document.getElementById('overlay-toggle');
+		if (enabled) enabled.checked = !!cfg.enabled;
+		const showMenu = document.getElementById('overlay-show-menu');
+		if (showMenu) showMenu.checked = cfg.show_in_menu !== false; // default true
+		const showRace = document.getElementById('overlay-show-race');
+		if (showRace) showRace.checked = cfg.show_in_race !== false; // default true
 	}
 	
 	// Update hotkey
@@ -367,17 +396,7 @@ function updateOverlaySettings(overlayKey) {
 		document.getElementById('opacity-value').textContent = opacity + '%';
 	}
 
-	// Flags-specific: show preview flag selector when Flags overlay selected
-	const previewFlagRow = document.getElementById('overlay-preview-flag-row');
-	if (previewFlagRow) previewFlagRow.classList.add('hidden');
-	if (overlayKey === 'flags') {
-		if (previewFlagRow) previewFlagRow.classList.remove('hidden');
-		const sel = document.getElementById('overlay-preview-flag');
-		if (sel) {
-			const cfg = currentState.config && currentState.config['OverlayFlags'];
-			if (cfg && cfg.preview_flag) sel.value = cfg.preview_flag;
-		}
-	}
+	// Flags-specific: preview flag selector removed; no flags-specific UI
 
 	// Inputs-specific: show steering wheel selector when Inputs overlay selected
 	const inputsSteeringRow = document.getElementById('overlay-inputs-steering-row');
@@ -416,54 +435,15 @@ function updateOverlaySettings(overlayKey) {
 		}
 	}
 
-	// Standings-specific: show column toggles when Standings overlay selected
-	const standingsColumnsRow = document.getElementById('overlay-standings-columns-row');
-	if (standingsColumnsRow) standingsColumnsRow.classList.add('hidden');
-	if (overlayKey === 'standings') {
-		if (standingsColumnsRow) standingsColumnsRow.classList.remove('hidden');
-		
-		// Update column toggle states from config
-		const cfg = currentState.config && currentState.config['OverlayStandings'];
-		if (cfg) {
-			const columnToggles = [
-				{ id: 'standings-show-pit', key: 'show_pit', defaultValue: true },
-				{ id: 'standings-show-license', key: 'show_license', defaultValue: true },
-				{ id: 'standings-show-irating', key: 'show_irating', defaultValue: true },
-				{ id: 'standings-show-car-brand', key: 'show_car_brand', defaultValue: true },
-				{ id: 'standings-show-positions-gained', key: 'show_positions_gained', defaultValue: true },
-				{ id: 'standings-show-gap', key: 'show_gap', defaultValue: true },
-				{ id: 'standings-show-best', key: 'show_best', defaultValue: true },
-				{ id: 'standings-show-lap-time', key: 'show_lap_time', defaultValue: true },
-				{ id: 'standings-show-delta', key: 'show_delta', defaultValue: true },
-				{ id: 'standings-show-l5', key: 'show_L5', defaultValue: true }
-			];
 
-			columnToggles.forEach(toggle => {
-				const element = document.getElementById(toggle.id);
-				if (element) {
-					element.checked = cfg[toggle.key] !== undefined ? cfg[toggle.key] : toggle.defaultValue;
-				}
-			});
-		}
-	}
-
-	// Track-specific: show other cars toggle and track width slider when Track overlay selected
-	const trackCarsRow = document.getElementById('overlay-track-cars-row');
+	// Track-specific: show track width slider when Track overlay selected
 	const trackWidthRow = document.getElementById('overlay-track-width-row');
-	if (trackCarsRow) trackCarsRow.classList.add('hidden');
 	if (trackWidthRow) trackWidthRow.classList.add('hidden');
 	if (overlayKey === 'track') {
-		if (trackCarsRow) trackCarsRow.classList.remove('hidden');
 		if (trackWidthRow) trackWidthRow.classList.remove('hidden');
 
-		// Update show other cars toggle state from config
 		const cfg = currentState.config && currentState.config['OverlayTrack'];
 		if (cfg) {
-			const showOtherCarsToggle = document.getElementById('track-show-other-cars');
-			if (showOtherCarsToggle) {
-				showOtherCarsToggle.checked = cfg.show_other_cars !== undefined ? cfg.show_other_cars : false;
-			}
-
 			// Update track width slider from config
 			const trackWidthSlider = document.getElementById('track-width-slider');
 			const trackWidthValue = document.getElementById('track-width-value');

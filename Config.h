@@ -57,6 +57,7 @@ class Config
         float4                      getFloat4( const std::string& component, const std::string& key, const float4& defaultVal );
         std::string                 getString( const std::string& component, const std::string& key, const std::string& defaultVal );
         std::vector<std::string>    getStringVec( const std::string& component, const std::string& key, const std::vector<std::string>& defaultVal );
+        void                        setStringVec( const std::string& component, const std::string& key, const std::vector<std::string>& v );
 
         void                        setInt( const std::string& component, const std::string& key, int v );
         void                        setBool( const std::string& component, const std::string& key, bool v );

@@ -66,29 +66,10 @@ class OverlayRadar : public Overlay
             m_carScale      = g_cfg.getFloat(m_name, "car_scale", 1.0f);
             m_showBG        = g_cfg.getBool (m_name, "show_background", true);
 
-            m_text.reset(m_dwriteFactory.Get());
-
-            const std::string font = g_cfg.getString(m_name, "font", "Poppins");
-            const float fontSize = g_cfg.getFloat(m_name, "font_size", 14.0f);
-            const int fontWeight = g_cfg.getInt(m_name, "font_weight", 500);
-            const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
-            DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-            if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-            else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
-            m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-            m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
         }
 
         virtual void onUpdate()
         {
-            // Enhanced Racelab-style proximity radar with animated side positioning
-            // - Shows guide lines at 8m front/back and 2m left/right
-            // - Colors only appear when opponents are within detection range
-            // - Animated red blocks move along sides to show exact lateral positions
-            // - Yellow zones (8-2m) and red zones (0-2m) for front/back
-            // - Only red zones for sides, positioned based on detected car locations
             struct Blip { float dx; float dy; };
             std::vector<Blip> blips; // used only to synthesize preview distances
             blips.reserve(8);
@@ -464,10 +445,4 @@ class OverlayRadar : public Overlay
 
         // Session transition tracking
         float m_lastSessionTime = -1.0f;
-
-        // Text helpers (for future labels)
-        Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;
-        TextCache    m_text;
 };
-
-

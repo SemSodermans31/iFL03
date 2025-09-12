@@ -13,7 +13,7 @@
 		<nav class="p-4 space-y-2">
 			<a href="../index.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-home">Home</a>
 			<a href="overlays.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f] bg-[#1f1f1f]" id="nav-overlays">Overlays</a>
-			<a href="ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-ui-edit">UI Edit Mode</a>
+			<a href="ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-ui-edit">Preview Mode</a>
 		</nav>
 
 		<!-- Bottom actions -->
@@ -160,21 +160,17 @@
 						<h2 id="overlay-title" class="text-lg font-semibold text-slate-100">Overlay Settings</h2>
 					</div>
 
-					<!-- Enable/Disable Toggle -->
+					<!-- Display Settings -->
 					<div class="space-y-3">
+						<div class="text-sm font-medium text-slate-200 mb-2">Display Settings</div>
 						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Enable Overlay</span>
+							<span class="text-slate-200">Enabled</span>
 							<span class="relative inline-flex h-6 w-11 items-center">
 								<input type="checkbox" id="overlay-toggle" class="peer sr-only" />
 								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
 								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
 							</span>
 						</label>
-					</div>
-
-					<!-- Show in Menu/Race Toggles -->
-					<div class="space-y-3">
-						<div class="text-sm font-medium text-slate-200 mb-2">Display Settings</div>
 						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
 							<span class="text-slate-200">Show in Menu</span>
 							<span class="relative inline-flex h-6 w-11 items-center">
@@ -191,11 +187,9 @@
 								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
 							</span>
 						</label>
-						<div class="text-xs text-[#a8a8a8] italic">
-							Control when this overlay is visible based on your session state.
-						</div>
+						<div class="text-xs text-[#a8a8a8] italic">Control visibility and availability of the overlay.</div>
 					</div>
-
+				
 					<!-- Hotkey Setting -->
 					<div class="space-y-2">
 						<label class="block text-sm font-medium text-slate-200">Toggle Hotkey</label>
@@ -207,8 +201,13 @@
 						<label class="block text-sm font-medium text-slate-200">Position</label>
 						<select id="overlay-position" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
 							<option value="top-left">Top Left</option>
+							<option value="top-center">Top Center</option>
 							<option value="top-right">Top Right</option>
+							<option value="center-left">Center Left</option>
+							<option value="center">Center</option>
+							<option value="center-right">Center Right</option>
 							<option value="bottom-left">Bottom Left</option>
+							<option value="bottom-center">Bottom Center</option>
 							<option value="bottom-right">Bottom Right</option>
 						</select>
 					</div>
@@ -219,37 +218,6 @@
 						<input type="range" id="overlay-opacity" min="0" max="100" value="100" class="w-full" />
 						<div class="text-xs text-[#a8a8a8] text-center">
 							<span id="opacity-value">100%</span>
-						</div>
-					</div>
-
-					<!-- Flags: Preview Flag (visible only when Flags selected) -->
-					<div id="overlay-preview-flag-row" class="space-y-2 hidden">
-						<label class="block text-sm font-medium text-slate-200">Preview Flag</label>
-						<select id="overlay-preview-flag" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
-							<option value="none">None</option>
-							<option value="checkered">Checkered</option>
-							<option value="white">White</option>
-							<option value="green">Green</option>
-							<option value="yellow">Yellow</option>
-							<option value="red">Red</option>
-							<option value="blue">Blue</option>
-							<option value="debris">Debris</option>
-							<option value="crossed">Crossed</option>
-							<option value="oneLapToGreen">One Lap To Green</option>
-							<option value="tenToGo">10 Laps To Go</option>
-							<option value="fiveToGo">5 Laps To Go</option>
-							<option value="randomWaving">Random Waving</option>
-							<option value="caution">Caution</option>
-							<option value="black">Black</option>
-							<option value="disqualify">Disqualified</option>
-							<option value="furled">Furled (Cut Track)</option>
-							<option value="repair">Meatball (Required Repair)</option>
-							<option value="startReady">Start: Ready</option>
-							<option value="startSet">Start: Set</option>
-							<option value="startGo">Start: Go</option>
-						</select>
-						<div class="text-xs text-[#a8a8a8] italic">
-							Choose a flag to display in preview mode.
 						</div>
 					</div>
 
@@ -290,21 +258,6 @@
 						</div>
 					</div>
 
-					<!-- Track: Show Other Cars (visible only when Track selected) -->
-					<div id="overlay-track-cars-row" class="space-y-3 hidden">
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Show Other Cars</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="track-show-other-cars" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-						<div class="text-xs text-[#a8a8a8] italic">
-							Display other cars on the track map. Pace/safety cars appear in yellow/orange, regular opponents in red.
-						</div>
-					</div>
-
 					<!-- Track: Track Width (visible only when Track selected) -->
 					<div id="overlay-track-width-row" class="hidden space-y-3">
 						<div class="rounded-lg bg-[#1f1f1f] p-3">
@@ -319,110 +272,11 @@
 						</p>
 					</div>
 
-					<!-- Standings: Column Toggles (visible only when Standings selected) -->
-					<div id="overlay-standings-columns-row" class="space-y-3 hidden">
-						<div class="text-sm font-medium text-slate-200 mb-2">Column Visibility</div>
-						<div class="text-xs text-[#a8a8a8] italic mb-3">
-							Control which columns are displayed in the standings overlay. Position, Number, Name are always shown.
-						</div>
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Show All Classes</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-all-classes" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-						
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Pit Age</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-pit" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">License/SR</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-license" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">iRating</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-irating" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Car Brand</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-car-brand" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Positions +/-</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-positions-gained" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Gap</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-gap" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Best Lap</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-best" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Last Lap</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-lap-time" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Delta</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-delta" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
-
-						<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
-							<span class="text-slate-200">Last 5 Avg</span>
-							<span class="relative inline-flex h-6 w-11 items-center">
-								<input type="checkbox" id="standings-show-l5" class="peer sr-only" />
-								<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
-								<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
-							</span>
-						</label>
+					<!-- General Boolean Toggles (auto-generated) -->
+					<div id="overlay-general-bool-section" class="space-y-3">
+						<div id="overlay-general-bool-section-title" class="text-sm font-medium text-slate-200 mb-2">Overlay Options</div>
+						<div id="overlay-bool-list" class="space-y-2"></div>
+						<div id="overlay-bool-list-description" class="text-xs text-[#a8a8a8] italic"></div>
 					</div>
 
 					<!-- Save Button -->

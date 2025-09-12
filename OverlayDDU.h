@@ -38,8 +38,6 @@ class OverlayDDU : public Overlay
 {
     public:
 
-        const float DefaultFontSize = 17;
-
         OverlayDDU()
             : Overlay("OverlayDDU")
         {}
@@ -82,43 +80,17 @@ class OverlayDDU : public Overlay
 
         virtual void onConfigChanged()
         {
-            // Font stuff
+            // Font stuff (centralized)
             {
                 m_text.reset( m_dwriteFactory.Get() );
-
-                const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
-                const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-                const int fontWeight = g_cfg.getInt( m_name, "font_weight", 900 );
-                const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-                m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.60f );
-                DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-                if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-                else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-                
-                
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize, L"en-us", &m_textFormat ));
-                m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BLACK, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize, L"en-us", &m_textFormatBold ));
-                m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize*1.2f, L"en-us", &m_textFormatLarge ));
-                m_textFormatLarge->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatLarge->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize*0.7f, L"en-us", &m_textFormatSmall ));
-                m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize*0.6f, L"en-us", &m_textFormatVerySmall ));
-                m_textFormatVerySmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatVerySmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide("Waukegan LDO").c_str(), NULL, DWRITE_FONT_WEIGHT_BLACK, DWRITE_FONT_STYLE_OBLIQUE, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize*3.0f, L"en-us", &m_textFormatGear ));
-                m_textFormatGear->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatGear->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+                createGlobalTextFormat(1.0f, m_textFormat);
+                // Bold variant (override weight)
+                createGlobalTextFormat(1.0f, (int)DWRITE_FONT_WEIGHT_BLACK, "", m_textFormatBold);
+                createGlobalTextFormat(1.2f, m_textFormatLarge);
+                createGlobalTextFormat(0.7f, m_textFormatSmall);
+                createGlobalTextFormat(0.6f, m_textFormatVerySmall);
+                // Gear uses heavy and oblique and much larger size
+                createGlobalTextFormat(3.0f, (int)DWRITE_FONT_WEIGHT_BLACK, "oblique", m_textFormatGear);
             }
 
             // Background geometry
@@ -187,7 +159,7 @@ class OverlayDDU : public Overlay
                 m_boxFuel = makeBox( 0.5f+gearw/2+hgap, w3, vtop, h3, "Fuel" );
                 addBoxFigure( geometrySink.Get(), m_boxFuel );
 
-                m_boxBias = makeBox( 0.5f+gearw/2+3*hgap+w3+w2, w1, vtop+2*vgap+2*h1, h1, "Bias" );
+                m_boxBias = makeBox( 0.5f+gearw/2+3*hgap+w3+w2, w1 * 1.5f, vtop+2*vgap+2*h1, h1, "Bias" );
                 addBoxFigure( geometrySink.Get(), m_boxBias );
             
                 m_boxTires = makeBox( 0.5f+gearw/2+2*hgap+w3, w2, vtop+2*vgap+2*h1, h1, "Tires" );
@@ -245,7 +217,6 @@ class OverlayDDU : public Overlay
 
         virtual void onUpdate()
         {
-            const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
             const float4 outlineCol         = g_cfg.getFloat4( m_name, "outline_col", float4(0.7f,0.7f,0.7f,0.9f) );
             const float4 textCol            = g_cfg.getFloat4( m_name, "text_col", float4(1,1,1,0.9f) );
             const float4 goodCol            = g_cfg.getFloat4( m_name, "good_col", float4(0,0.8f,0,0.6f) );
@@ -916,19 +887,19 @@ class OverlayDDU : public Overlay
         Microsoft::WRL::ComPtr<ID2D1PathGeometry1> m_boxPathGeometry;
         Microsoft::WRL::ComPtr<ID2D1PathGeometry1> m_backgroundPathGeometry;
 
-        TextCache           m_text;
+        TextCache m_text;
         Microsoft::WRL::ComPtr<ID2D1Bitmap> m_backgroundBitmap;
 
-        int                 m_prevCurrentLap = 0;
-        DWORD               m_lastLapChangeTickCount = 0;
+        int m_prevCurrentLap = 0;
+        DWORD m_lastLapChangeTickCount = 0;
 
-        float               m_prevBestLapTime = 0;
+        float m_prevBestLapTime = 0;
         
-        float               m_prevBrakeBias = 0;
-        DWORD               m_prevBrakeBiasTickCount = 0;
+        float m_prevBrakeBias = 0;
+        DWORD m_prevBrakeBiasTickCount = 0;
 
-        float               m_lapStartRemainingFuel = 0;
-        std::deque<float>   m_fuelUsedLastLaps;
-        bool                m_isValidFuelLap = false;
-        float               m_fontSpacing = 0.0f;
+        float m_lapStartRemainingFuel = 0;
+        std::deque<float> m_fuelUsedLastLaps;
+        bool m_isValidFuelLap = false;
+        float m_fontSpacing = getGlobalFontSpacing();
 };

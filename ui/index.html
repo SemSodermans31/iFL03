@@ -14,7 +14,7 @@
 		<nav class="p-4 space-y-2">
 			<a href="#" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f] bg-[#1f1f1f]" id="nav-home">Home</a>
 			<a href="pages/overlays.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-overlays">Overlays</a>
-			<a href="pages/ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-ui-edit">UI Edit Mode</a>
+			<a href="pages/ui-edit.html" class="block rounded-lg px-3 py-2 text-slate-200 hover:bg-[#1f1f1f]" id="nav-ui-edit">Preview Mode</a>
 		</nav>
 
 		<!-- Bottom actions -->
@@ -90,10 +90,10 @@
 								<i class="fa-brands fa-linkedin"></i>
 								<span class="text-[#a8a8a8]">LinkedIn</span>
 							</a>
-							<a href="https://paypal.me/sems0drmans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
-								<!-- PayPal icon -->
-								<i class="fa-brands fa-paypal"></i>
-								<span class="text-[#a8a8a8]">PayPal</span>
+							<a href="https://github.com/SemSodermans31/iFL03/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
+								<!-- Github icon -->
+								<i class="fa-brands fa-github"></i>
+								<span class="text-[#a8a8a8]">GitHub</span>
 							</a>
 						</div>
 					</div>
@@ -121,7 +121,21 @@
 					<button id="btn-close-release-notes" class="rounded-md px-2 py-1 text-[#a8a8a8] hover:bg-[#3c3c3c]">✕</button>
 				</div>
 				<div id="release-notes-content" class="p-4 text-sm text-[#a8a8a8] flex-1 overflow-y-auto">
-					Loading...
+					Alongside the original overlays, iFL03 adds several new overlays and many quality‑of‑life upgrades:
+
+New overlays
+Delta: Circular delta with trend‑aware coloring and predicted lap time.
+Flags: Clean, high‑contrast flag callouts with two‑band design.
+Weather: Track temp, wetness bar, precipitation/air temp, and a wind compass relative to car.
+Track Map: Scaled track rendering with start/finish markers and cars for most tracks.
+Radar: Proximity radar with 8 m/2 m guides and sticky alerts.
+Enhanced original overlays
+Relative: Optional minimap, license or SR, iRating, pit age, last lap, average of last 5 laps, positions gained, class colors, buddy highlighting, scrollable list, optional iRating prediction in races.
+Standings: Class‑aware grid with fastest‑lap highlighting, car brand icons, deltas/gaps, average of last 5 laps, configurable top/ahead/behind visibility, scroll bar.
+DDU: Fuel calculator refinements, P1 last, delta vs session best, shift light behavior, temperatures, brake bias, incident count, RPM lights, etc.
+Inputs: Dual graph plus vertical bars (clutch/brake/throttle), steering ring or image wheel (Moza KS / RS v2), on‑wheel speed/gear.
+Preview mode: Populate overlays with stub data even when disconnected to place layouts.
+Global opacity: All overlays respect a global opacity for easy blending with broadcasts/streams.
 				</div>
 			</div>
 		</div>

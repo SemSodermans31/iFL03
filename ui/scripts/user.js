@@ -29,6 +29,25 @@ function setupEventListeners() {
 	document.getElementById('saveAsModal').addEventListener('click', function(e) {
 		if (e.target === this) hideSaveAsModal();
 	});
+
+	// Buddies/Flagged add buttons
+	const buddiesAdd = document.getElementById('buddies-add');
+	if (buddiesAdd) buddiesAdd.addEventListener('click', () => addListEntry('General', 'buddies', 'buddies-input'));
+	const flaggedAdd = document.getElementById('flagged-add');
+	if (flaggedAdd) flaggedAdd.addEventListener('click', () => addListEntry('General', 'flagged', 'flagged-input'));
+
+	// Overlay font settings
+	const fontSel = document.getElementById('overlay-font');
+	if (fontSel) fontSel.addEventListener('change', () => setConfigString('Overlay', 'font', fontSel.value));
+	const fontSize = document.getElementById('overlay-font-size');
+	if (fontSize) fontSize.addEventListener('blur', () => setConfigInt('Overlay', 'font_size', parseInt(fontSize.value || '16', 10)));
+	const fontSpacing = document.getElementById('overlay-font-spacing');
+	if (fontSpacing) fontSpacing.addEventListener('blur', () => setConfigFloat('Overlay', 'font_spacing', parseFloat(fontSpacing.value || '0.30')));
+	const fontStyle = document.getElementById('overlay-font-style');
+	if (fontStyle) fontStyle.addEventListener('change', () => setConfigString('Overlay', 'font_style', fontStyle.value));
+	const fontWeight = document.getElementById('overlay-font-weight');
+	if (fontWeight) fontWeight.addEventListener('input', () => updateFontWeightPreview());
+	if (fontWeight) fontWeight.addEventListener('change', () => setConfigInt('Overlay', 'font_weight', parseInt(fontWeight.value || '500', 10)));
 }
 
 function requestState() {
@@ -59,6 +78,10 @@ function updateUI() {
 	
 	// Update available configs
 	updateAvailableConfigs();
+
+	// Update general lists and overlay font settings
+	updateGeneralLists();
+	updateOverlayFontSettings();
 }
 
 function updateConnectionStatus(status) {
@@ -84,6 +107,110 @@ function updateConnectionStatus(status) {
 				connText.textContent = 'UNKNOWN';
 		}
 	}
+}
+
+function updateGeneralLists() {
+    const rawBuddies = (currentState.config && currentState.config.General && Array.isArray(currentState.config.General.buddies)) ? currentState.config.General.buddies : [];
+    const rawFlagged = (currentState.config && currentState.config.General && Array.isArray(currentState.config.General.flagged)) ? currentState.config.General.flagged : [];
+
+    const sanitize = (arr) => arr.filter(s => typeof s === 'string' && s.trim().length > 0).map(s => s.trim());
+    const buddies = sanitize(rawBuddies);
+    const flagged = sanitize(rawFlagged);
+
+    // Auto-clean persisted empties from older versions
+    if (buddies.length !== rawBuddies.length) setConfigStringVec('General', 'buddies', buddies);
+    if (flagged.length !== rawFlagged.length) setConfigStringVec('General', 'flagged', flagged);
+
+    renderStringList('buddies-list', buddies, (idx) => removeListEntry('General', 'buddies', idx));
+    renderStringList('flagged-list', flagged, (idx) => removeListEntry('General', 'flagged', idx));
+}
+
+function renderStringList(containerId, items, onRemove) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.innerHTML = '';
+    if (!items || items.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-xs text-[#a8a8a8]';
+        empty.textContent = 'No entries';
+        container.appendChild(empty);
+        return;
+    }
+    items.forEach((name, idx) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between rounded-lg bg-[#1f1f1f] px-3 py-2';
+        const span = document.createElement('span');
+        span.className = 'text-slate-200';
+        span.textContent = name;
+        const btn = document.createElement('button');
+        btn.className = 'px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded-md';
+        btn.textContent = 'Remove';
+        btn.addEventListener('click', () => onRemove(idx));
+        row.appendChild(span);
+        row.appendChild(btn);
+        container.appendChild(row);
+    });
+}
+
+function addListEntry(component, key, inputId) {
+    const input = document.getElementById(inputId);
+    const value = (input && input.value) ? input.value.trim() : '';
+    if (!value) return;
+    const list = (currentState.config && currentState.config[component] && Array.isArray(currentState.config[component][key])) ? currentState.config[component][key] : [];
+    const newList = list.filter(s => typeof s === 'string' && s.trim().length > 0).map(s => s.trim());
+    newList.push(value);
+    setConfigStringVec(component, key, newList);
+    input.value = '';
+}
+
+function removeListEntry(component, key, index) {
+    const list = (currentState.config && currentState.config[component] && Array.isArray(currentState.config[component][key])) ? currentState.config[component][key] : [];
+    if (index < 0 || index >= list.length) return;
+    const newList = list.slice();
+    newList.splice(index, 1);
+    setConfigStringVec(component, key, newList);
+}
+
+function setConfigString(component, key, value) {
+    sendCommand({ cmd: 'setConfigString', component, key, value }, 'Setting saved', 'Failed to save setting');
+}
+
+function setConfigInt(component, key, value) {
+    if (!Number.isFinite(value)) return;
+    sendCommand({ cmd: 'setConfigInt', component, key, value }, 'Setting saved', 'Failed to save setting');
+}
+
+function setConfigFloat(component, key, value) {
+    if (!Number.isFinite(value)) return;
+    sendCommand({ cmd: 'setConfigFloat', component, key, value }, 'Setting saved', 'Failed to save setting');
+}
+
+function setConfigStringVec(component, key, values) {
+    sendCommand({ cmd: 'setConfigStringVec', component, key, values }, 'List updated', 'Failed to update list');
+}
+
+function updateOverlayFontSettings() {
+    const overlay = currentState.config && currentState.config.Overlay;
+    if (!overlay) return;
+    const fontSel = document.getElementById('overlay-font');
+    if (fontSel && overlay.font) fontSel.value = overlay.font;
+    const fontSize = document.getElementById('overlay-font-size');
+    if (fontSize && overlay.font_size !== undefined) fontSize.value = overlay.font_size;
+    const fontSpacing = document.getElementById('overlay-font-spacing');
+    if (fontSpacing && overlay.font_spacing !== undefined) fontSpacing.value = overlay.font_spacing;
+    const fontStyle = document.getElementById('overlay-font-style');
+    if (fontStyle && overlay.font_style) fontStyle.value = overlay.font_style;
+    const fontWeight = document.getElementById('overlay-font-weight');
+    if (fontWeight && overlay.font_weight !== undefined) fontWeight.value = overlay.font_weight;
+    updateFontWeightPreview();
+}
+
+function updateFontWeightPreview() {
+    const fontWeight = document.getElementById('overlay-font-weight');
+    const label = document.getElementById('overlay-font-weight-value');
+    if (fontWeight && label) {
+        label.textContent = ` (${fontWeight.value})`;
+    }
 }
 
 function updateCurrentCarInfo() {

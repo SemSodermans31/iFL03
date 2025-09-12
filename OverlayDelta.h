@@ -55,28 +55,7 @@ protected:
         SESSION_OPTIMAL = 3,     // Session optimal lap from sectors (ir_LapDeltaToSessionOptimalLap)
         LAST_LAP = 4            // Last completed lap (custom calculation)
     };
-
-    // Core delta data
-    float m_currentDelta;
-    bool m_isDeltaImproving;
     
-    // Trend tracking for coloring
-    std::deque<float> m_deltaTrendHistory;
-    int m_trendSamples;
-    
-    // Settings
-    ReferenceMode m_referenceMode;
-    
-    // Text formats
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_titleFormat;
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_deltaFormat;
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_smallFormat;
-    
-    // Scaled text formats (created dynamically)
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_scaledTitleFormat;
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_scaledDeltaFormat;
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_scaledSmallFormat;
-
     virtual void onEnable()
     {
         onConfigChanged();
@@ -84,42 +63,10 @@ protected:
 
     virtual void onConfigChanged()
     {
-        const std::string font = g_cfg.getString(m_name, "font", "Consolas");
-        const float titleSize = g_cfg.getFloat(m_name, "title_font_size", 16.0f);
-        const float deltaSize = g_cfg.getFloat(m_name, "delta_font_size", 32.0f);
-        const float smallSize = g_cfg.getFloat(m_name, "small_font_size", 14.0f);
-        const int fontWeight = g_cfg.getInt(m_name, "font_weight", 500);
-        const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
-        
         m_referenceMode = (ReferenceMode)g_cfg.getInt(m_name, "reference_mode", 1); // Default to session best
         m_trendSamples = g_cfg.getInt(m_name, "trend_samples", 10);
-
-        // Convert font style string to enum
-        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-
-        // Create text formats
-        HRCHECK(m_dwriteFactory->CreateTextFormat(
-            toWide(font).c_str(), NULL,
-            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
-            titleSize, L"en-us", &m_titleFormat));
-        m_titleFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        m_titleFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-        HRCHECK(m_dwriteFactory->CreateTextFormat(
-            toWide(font).c_str(), NULL,
-            DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
-            deltaSize, L"en-us", &m_deltaFormat));
-        m_deltaFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        m_deltaFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-        HRCHECK(m_dwriteFactory->CreateTextFormat(
-            toWide(font).c_str(), NULL,
-            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
-            smallSize, L"en-us", &m_smallFormat));
-        m_smallFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        m_smallFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        m_text.reset(m_dwriteFactory.Get());
+        m_fontSpacing = getGlobalFontSpacing();
     }
 
 
@@ -316,48 +263,18 @@ protected:
 
     void createScaledTextFormats(float scale)
     {
-        const std::string font = g_cfg.getString(m_name, "font", "Consolas");
-        const float titleSize = g_cfg.getFloat(m_name, "title_font_size", 16.0f) * scale;
-        const float deltaSize = g_cfg.getFloat(m_name, "delta_font_size", 32.0f) * scale;
-        const float smallSize = g_cfg.getFloat(m_name, "small_font_size", 14.0f) * scale;
-        const int fontWeight = g_cfg.getInt(m_name, "font_weight", 500);
-        const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
+        // Create scaled text formats from global font settings
+        createGlobalTextFormat(scale * 1.0f, m_scaledTitleFormat);
+        // Heavy and oblique for delta emphasis
+        createGlobalTextFormat(scale * 1.6f, 900, "normal", m_scaledDeltaFormat);
+        createGlobalTextFormat(scale * 0.8f, m_scaledSmallFormat);
 
-        // Convert font style string to enum
-        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-
-        // Create scaled text formats
-        HRCHECK(m_dwriteFactory->CreateTextFormat(
-            toWide(font).c_str(), NULL,
-            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
-            titleSize, L"en-us", &m_scaledTitleFormat));
-        m_scaledTitleFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        m_scaledTitleFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-        HRCHECK(m_dwriteFactory->CreateTextFormat(
-            toWide(font).c_str(), NULL,
-            DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
-            deltaSize, L"en-us", &m_scaledDeltaFormat));
-        m_scaledDeltaFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        m_scaledDeltaFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
-
-        HRCHECK(m_dwriteFactory->CreateTextFormat(
-            toWide(font).c_str(), NULL,
-            (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL,
-            smallSize, L"en-us", &m_scaledSmallFormat));
-        m_scaledSmallFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-        m_scaledSmallFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+        if (m_scaledTitleFormat)      m_scaledTitleFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        if (m_scaledDeltaFormat)      m_scaledDeltaFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+        if (m_scaledSmallFormat)      m_scaledSmallFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
     }
 
-    void drawText(const std::wstring& text, float x, float y, float width, float height, 
-                  IDWriteTextFormat* format, const float4& color)
-    {
-        m_brush->SetColor(color);
-        D2D1_RECT_F textRect = { x, y, x + width, y + height };
-        m_renderTarget->DrawTextA(text.c_str(), (int)text.size(), format, &textRect, m_brush.Get());
-    }
+    // Removed DrawText wrapper; we render via TextCache to apply global font spacing
 
     void drawCircularDelta(float centerX, float centerY, float radius, float delta, float scale)
     {
@@ -385,8 +302,8 @@ protected:
         const float4 labelColor = float4(0.6f, 0.6f, 0.6f, 1.0f);
         float labelWidth = 60.0f * scale;
         float labelHeight = 16.0f * scale;
-        drawText(L"DELTA", centerX - labelWidth/2, centerY - radius + (15.0f * scale), 
-                 labelWidth, labelHeight, m_scaledSmallFormat.Get(), labelColor);
+        m_brush->SetColor(labelColor);
+        m_text.render( m_renderTarget.Get(), L"DELTA", m_scaledSmallFormat.Get(), centerX - labelWidth/2, centerX + labelWidth/2, centerY - radius + (15.0f * scale), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
         
         // Draw delta value in center (scaled positioning)
         wchar_t deltaBuffer[32];
@@ -398,9 +315,8 @@ protected:
         }
         
         float deltaWidth = 90.0f * scale;
-        float deltaHeight = 40.0f * scale;
-        drawText(deltaBuffer, centerX - deltaWidth/2, centerY - deltaHeight/2, 
-                 deltaWidth, deltaHeight, m_scaledDeltaFormat.Get(), deltaColor);
+        m_brush->SetColor(deltaColor);
+        m_text.render( m_renderTarget.Get(), deltaBuffer, m_scaledDeltaFormat.Get(), centerX - deltaWidth/2, centerX + deltaWidth/2, centerY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing * 1.2f );
     }
 
     void drawArcProgress(float centerX, float centerY, float radius, float progress, const float4& color, float scale)
@@ -453,11 +369,11 @@ protected:
         
         // Calculate column widths for side-by-side layout (scaled padding)
         const float padding = 8.0f * scale;
-        const float columnWidth = (width - (3.0f * padding)) / 2; // Split into two columns with padding
+        const float columnWidth = (width - (3.0f * padding)) / 2;
         const float leftX = x + padding;
         const float rightX = x + (2.0f * padding) + columnWidth;
         const float panelCenterY = y + height * 0.5f;
-        const float innerSpacing = 6.0f * scale; // spacing between time and its label
+        const float innerSpacing = 6.0f * scale;
         
         // Reference lap time section (left side)
         float referenceLapTime = getReferenceLapTime();
@@ -469,23 +385,25 @@ protected:
             wchar_t timeBuffer[32];
             swprintf_s(timeBuffer, L"%02d:%06.3f", minutes, seconds);
             
-            float timeHeight = 25.0f * scale;
+            float timeHeight = 22.0f * scale;
             float labelHeight = 15.0f * scale;
-            // Vertically center the time + label block within the panel
+            
             const float totalBlockH = timeHeight + innerSpacing + labelHeight;
             const float blockTop = panelCenterY - (totalBlockH * 0.5f);
             float timeY = blockTop;
             float labelY = blockTop + timeHeight + innerSpacing;
-            // Draw background pill only when content exists
+
             const float cardVPad = 6.0f * scale;
             drawCard(leftX, blockTop - cardVPad, columnWidth, totalBlockH + (2.0f * cardVPad), bgColor);
             
-            drawText(timeBuffer, leftX, timeY, columnWidth, timeHeight, m_scaledDeltaFormat.Get(), timeColor);
+            m_brush->SetColor(timeColor);
+            m_text.render( m_renderTarget.Get(), timeBuffer, m_scaledDeltaFormat.Get(), leftX, leftX + columnWidth, timeY + (timeHeight * 0.6f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing * 3.0f );
             
             // Draw reference mode label
             std::string refText = getReferenceText();
             std::wstring refTextW(refText.begin(), refText.end());
-            drawText(refTextW, leftX, labelY, columnWidth, labelHeight, m_scaledSmallFormat.Get(), textColor);
+            m_brush->SetColor(textColor);
+            m_text.render( m_renderTarget.Get(), refTextW.c_str(), m_scaledSmallFormat.Get(), leftX, leftX + columnWidth, labelY + (timeHeight * 0.2f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
         }
         
         // Predicted time section (right side)
@@ -502,19 +420,21 @@ protected:
                 wchar_t timeBuffer[32];
                 swprintf_s(timeBuffer, L"%02d:%06.3f", minutes, seconds);
                 
-                float timeHeight = 25.0f * scale;
+                float timeHeight = 22.0f * scale;
                 float labelHeight = 15.0f * scale;
-                // Vertically center the time + label block within the panel
+                
                 const float totalBlockH = timeHeight + innerSpacing + labelHeight;
                 const float blockTop = panelCenterY - (totalBlockH * 0.5f);
                 float timeY = blockTop;
                 float labelY = blockTop + timeHeight + innerSpacing;
-                // Draw background pill only when content exists
+                
                 const float cardVPad = 6.0f * scale;
                 drawCard(rightX, blockTop - cardVPad, columnWidth, totalBlockH + (2.0f * cardVPad), bgColor);
                 
-                drawText(timeBuffer, rightX, timeY, columnWidth, timeHeight, m_scaledDeltaFormat.Get(), predictedColor);
-                drawText(L"PREDICTED", rightX, labelY, columnWidth, labelHeight, m_scaledSmallFormat.Get(), textColor);
+                m_brush->SetColor(predictedColor);
+                m_text.render( m_renderTarget.Get(), timeBuffer, m_scaledDeltaFormat.Get(), rightX, rightX + columnWidth, timeY + (timeHeight * 0.6f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing * 3.0f );
+                m_brush->SetColor(textColor);
+                m_text.render( m_renderTarget.Get(), L"PREDICTED", m_scaledSmallFormat.Get(), rightX, rightX + columnWidth, labelY + (timeHeight * 0.2f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
         }
     }
@@ -527,17 +447,14 @@ protected:
 
         switch (m_referenceMode) {
             case ReferenceMode::ALLTIME_BEST:
-            case ReferenceMode::LAST_LAP: // Fallback
+            case ReferenceMode::LAST_LAP:
                 return ir_LapBestLapTime.getFloat();
                 
             case ReferenceMode::SESSION_BEST:
-                // iRacing doesn't provide the actual session best lap time directly
-                // Use player's best lap time as approximation
                 return ir_LapBestLapTime.getFloat();
                 
             case ReferenceMode::ALLTIME_OPTIMAL:
             case ReferenceMode::SESSION_OPTIMAL:
-                // These don't have direct lap time equivalents
                 return ir_LapBestLapTime.getFloat();
                 
             default:
@@ -550,28 +467,25 @@ protected:
         // Update delta calculation
         updateDelta();
 
-        // Check if we should show the overlay (like iRacing delta bar)
         if (!shouldShowDelta()) {
-            // Don't draw anything if conditions aren't met
             m_renderTarget->BeginDraw();
-            m_renderTarget->Clear(float4(0, 0, 0, 0)); // Transparent background
+            m_renderTarget->Clear(float4(0, 0, 0, 0));
             m_renderTarget->EndDraw();
             return;
         }
 
         // Start drawing
         m_renderTarget->BeginDraw();
-        m_renderTarget->Clear(float4(0, 0, 0, 0)); // Transparent background
+        m_renderTarget->Clear(float4(0, 0, 0, 0));
 
-        // Get current delta
         float displayDelta = m_currentDelta;
         
-        // Calculate scale factor based on current overlay size
-        const float baseWidth = 500.0f;  // Reference width for 1.0 scale
-        const float baseHeight = 190.0f; // Reference height for 1.0 scale
+        
+        const float baseWidth = 600.0f;
+        const float baseHeight = 180.0f; 
         const float scaleX = (float)m_width / baseWidth;
         const float scaleY = (float)m_height / baseHeight;
-        const float scale = std::min(scaleX, scaleY); // Use smaller scale to maintain aspect ratio
+        const float scale = std::min(scaleX, scaleY); 
         
         // Scaled layout constants
         const float circleRadius = 85.0f * scale;
@@ -583,9 +497,8 @@ protected:
         const float infoX = circleX + circleRadius + (20.0f * scale);
         const float infoWidth = (float)m_width - infoX - padding;
         const float infoHeight = 100.0f * scale;
-        // Allow fine-tuning of info panel vertical positioning relative to the circle center
-        const float infoYOffset = g_cfg.getFloat(m_name, "info_vertical_offset", 0.0f) * scale; // +down, -up
-        const float infoY = circleY - infoHeight / 2 + infoYOffset;
+        
+        const float infoY = circleY - infoHeight / 2;
 
         // Create scaled text formats
         createScaledTextFormats(scale);
@@ -601,18 +514,35 @@ protected:
 
     virtual float2 getDefaultSize()
     {
-        return float2(500, 190); // Proper size for the layout
+        return float2(600, 180);
     }
 
     virtual bool hasCustomBackground()
     {
-        return true; // We draw our own background
+        return true;
     }
 
     virtual void sessionChanged()
     {
-        // Reset trend data when session changes
         m_deltaTrendHistory.clear();
         m_isDeltaImproving = false;
     }
+
+    // Core delta data
+    float m_currentDelta;
+    bool m_isDeltaImproving;
+    
+    // Trend tracking for coloring
+    std::deque<float> m_deltaTrendHistory;
+    int m_trendSamples;
+    
+    // Settings
+    ReferenceMode m_referenceMode;
+
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_scaledTitleFormat;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_scaledDeltaFormat;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_scaledSmallFormat;
+
+    TextCache m_text;
+	float m_fontSpacing = getGlobalFontSpacing();
 };

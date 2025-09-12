@@ -37,7 +37,7 @@ void app_register_bridge(std::vector<Overlay*>* overlaysPtr,
                          ConnectionStatus* statusPtr,
                          HandleConfigChangeFn onConfigChangeFn);
 
-// Toggle UI edit mode for all overlays
+// Toggle Preview Mode for all overlays
 void app_set_ui_edit(bool on);
 
 // Toggle preview mode for overlays
@@ -52,6 +52,7 @@ void app_set_config_string(const char* component, const char* key, const char* v
 void app_set_config_int(const char* component, const char* key, int value);
 void app_set_config_bool(const char* component, const char* key, bool value);
 void app_set_config_float(const char* component, const char* key, float value);
+void app_set_config_string_vec(const char* component, const char* key, const std::vector<std::string>& values);
 
 // Build current state JSON for the GUI
 std::string app_get_state_json();

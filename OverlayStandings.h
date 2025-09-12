@@ -41,8 +41,7 @@ class OverlayStandings : public Overlay
 public:
 
     virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
-
-    const float DefaultFontSize = 15;
+    
     const int defaultNumTopDrivers = 3;
     const int defaultNumAheadDrivers = 5;
     const int defaultNumBehindDrivers = 5;
@@ -99,58 +98,46 @@ protected:
     {
         m_text.reset( m_dwriteFactory.Get() );
 
-        const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
-        const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-        const int fontWeight = g_cfg.getInt( m_name, "font_weight", 700 );
-        const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-        
-        m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
-        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize, L"en-us", &m_textFormat ));
-        m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-        m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+        // Centralized fonts
+        createGlobalTextFormat(1.0f, m_textFormat);
+        createGlobalTextFormat(0.8f, m_textFormatSmall);
 
-        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
-        m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-        m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-        // Determine widths of text columns
+        // Determine widths of text columns (use base font size from global settings)
         m_columns.reset();
-        m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
-        m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
-        m_columns.add( (int)Columns::NAME,       0, fontSize/2 );
+        const float baseFontSize = g_cfg.getFloat("Overlay", "font_size", 16.0f);
+        m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize/2 );
+        m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize/2 );
+        m_columns.add( (int)Columns::NAME,       0, baseFontSize/2 );
 
         if (g_cfg.getBool(m_name, "show_pit", true))
-            m_columns.add( (int)Columns::PIT,        computeTextExtent( L"P.Age", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+            m_columns.add( (int)Columns::PIT,        computeTextExtent( L"P.Age", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize/2 );
 
         if (g_cfg.getBool(m_name, "show_license", true))
-            m_columns.add( (int)Columns::LICENSE,    computeTextExtent( L"A 4.44", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, fontSize/6 );
+            m_columns.add( (int)Columns::LICENSE,    computeTextExtent( L"A 4.44", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, baseFontSize/6 );
 
         if (g_cfg.getBool(m_name, "show_irating", true))
-            m_columns.add( (int)Columns::IRATING,    computeTextExtent( L" 9.9k ", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, fontSize/6 );
+            m_columns.add( (int)Columns::IRATING,    computeTextExtent( L" 9.9k ", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, baseFontSize/6 );
 
         if (g_cfg.getBool(m_name, "show_car_brand", true))
-            m_columns.add( (int)Columns::CAR_BRAND,  30, fontSize / 2);
+            m_columns.add( (int)Columns::CAR_BRAND,  30, baseFontSize / 2);
 
         if (g_cfg.getBool(m_name, "show_positions_gained", true))
-            m_columns.add( (int)Columns::POSITIONS_GAINED, computeTextExtent(L"▲99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize / 2);
+            m_columns.add( (int)Columns::POSITIONS_GAINED, computeTextExtent(L"▲99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize / 2);
 
         if (g_cfg.getBool(m_name, "show_gap", true))
-            m_columns.add( (int)Columns::GAP,        computeTextExtent(L"999.9", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize / 2 );
+            m_columns.add( (int)Columns::GAP,        computeTextExtent(L"999.9", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize / 2 );
 
         if (g_cfg.getBool(m_name, "show_best", true))
-            m_columns.add( (int)Columns::BEST,       computeTextExtent( L"99:99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+            m_columns.add( (int)Columns::BEST,       computeTextExtent( L"99:99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize/2 );
 
         if (g_cfg.getBool(m_name, "show_lap_time", true))
-            m_columns.add( (int)Columns::LAST,   computeTextExtent( L"99:99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+            m_columns.add( (int)Columns::LAST,   computeTextExtent( L"99:99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize/2 );
 
         if (g_cfg.getBool(m_name, "show_delta", true))
-            m_columns.add( (int)Columns::DELTA,  computeTextExtent( L"99.99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize/2 );
+            m_columns.add( (int)Columns::DELTA,  computeTextExtent( L"99.99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize/2 );
 
         if (g_cfg.getBool(m_name, "show_L5", true))
-            m_columns.add( (int)Columns::L5,     computeTextExtent(L"99.99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, fontSize / 2 );
+            m_columns.add( (int)Columns::L5,     computeTextExtent(L"99.99.999", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize / 2 );
     }
 
     virtual void onUpdate()
@@ -195,32 +182,29 @@ protected:
         bool hasPacecar = false;
         
         if (useStubData) {
-            // Generate stub data for preview mode using centralized data
             const auto& stubCars = StubDataManager::getStubCars();
             
             for (size_t i = 0; i < stubCars.size(); ++i) {
                 const auto& stubCar = stubCars[i];
                 CarInfo ci;
                 ci.carIdx = (int)i;
-                // Distribute cars across classes in preview to test multi-class display
                 ci.classIdx = (int)(i % 3);
                 ci.lapCount = stubCar.lapCount;
                 ci.position = stubCar.position;
                 ci.pctAroundLap = 0.1f + (i * 0.08f);
-                ci.lapGap = stubCar.position > 1 ? -(stubCar.position - 1) : 0; // Laps behind leader
-                ci.gap = stubCar.position == 1 ? 0.0f : (stubCar.position * 0.523f + 0.234f); // Gap to leader in seconds
+                ci.lapGap = stubCar.position > 1 ? -(stubCar.position - 1) : 0;
+                ci.gap = stubCar.position == 1 ? 0.0f : (stubCar.position * 0.523f + 0.234f);
                 ci.delta = stubCar.position == 1 ? 0.0f : (stubCar.position * 0.234f + 0.123f);
                 ci.best = stubCar.bestLapTime;
                 ci.last = stubCar.lastLapTime;
-                ci.l5 = stubCar.bestLapTime + 0.2f; // Average of last 5 laps
+                ci.l5 = stubCar.bestLapTime + 0.2f;
                 ci.pitAge = stubCar.pitAge;
-                ci.hasFastestLap = (stubCar.bestLapTime < 84.4f); // Leclerc has fastest
-                ci.positionsChanged = (i % 3) - 1; // Some gained, some lost, some unchanged
+                ci.hasFastestLap = (stubCar.bestLapTime < 84.4f);
+                ci.positionsChanged = (i % 3) - 1;
                 
                 carInfo.push_back(ci);
             }
         } else {
-            // Real data from iRacing
         for( int i=0; i<IR_MAX_CARS; ++i )
         {
             const Car& car = ir_session.cars[i];
@@ -331,7 +315,7 @@ protected:
             {
                 CarInfo&       ci       = carInfo[i];
                 if (ci.classIdx != ciSelf.classIdx)
-                    continue; // skip non-self class for class-based calculations
+                    continue;
 
                 if (!showAllClasses)
                     carsInClass++;
@@ -358,7 +342,6 @@ protected:
                 }
             }
         } else {
-            // For stub data, just count cars in same class
             for( int i=0; i<(int)carInfo.size(); ++i )
             {
                 CarInfo&       ci       = carInfo[i];
@@ -379,7 +362,7 @@ protected:
             }
         }
 
-        const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+        const float  fontSize           = g_cfg.getFloat("Overlay", "font_size", 16.0f);
         const float  lineSpacing        = g_cfg.getFloat( m_name, "line_spacing", 8 );
         const float  lineHeight         = fontSize + lineSpacing;
         const float4 selfCol            = g_cfg.getFloat4( m_name, "self_col", float4(0.94f,0.67f,0.13f,1) );
@@ -830,7 +813,7 @@ protected:
                 if (addSpaces) {
                     str += "       ";
                 }
-                str += std::vformat("Track Temp: {:.1f}{:c}", std::make_format_args(trackTemp, tempUnit));
+                str += std::format("Track Temp: {:.1f}\u00B0{:c}", trackTemp, tempUnit);
                 addSpaces = true;
             }
 
@@ -878,15 +861,15 @@ protected:
 
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatSmall;
-
-    ColumnLayout m_columns;
-    TextCache    m_text;
-    int          m_scrollRow = 0;
-    int          m_maxScrollRow = 0;
-    float        m_fontSpacing = 0.0f;
     std::vector<std::vector<float>> m_avgL5Times;
     bool m_carBrandIconsLoaded;
     std::map<std::string, IWICFormatConverter*> m_carBrandIconsMap;
     std::map<int, ID2D1Bitmap*> m_carIdToIconMap;
     std::set<std::string> notFoundBrands;
+
+    ColumnLayout m_columns;
+    TextCache m_text;
+    int m_scrollRow = 0;
+    int m_maxScrollRow = 0;
+    float m_fontSpacing = getGlobalFontSpacing();
 };

@@ -46,8 +46,6 @@ class OverlayWeather : public Overlay
 {
     public:
 
-        const float DefaultFontSize = 24;
-
         OverlayWeather()
             : Overlay("OverlayWeather")
         {}
@@ -111,37 +109,15 @@ class OverlayWeather : public Overlay
                 m_scaleFactorY = std::max(0.1f, std::min(10.0f, m_scaleFactorY));
             }
             
-            // Font setup with dynamic scaling
+            // Font setup with dynamic scaling (centralized)
             {
                 m_text.reset( m_dwriteFactory.Get() );
-
-                const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
-                const float baseFontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-                const int fontWeight = g_cfg.getInt( m_name, "font_weight", 900 );
-                const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-                m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
-                DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-                if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-                else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-                const float scaledFontSize = std::max(6.0f, std::min(200.0f, baseFontSize * m_scaleFactor));
-                
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, scaledFontSize, L"en-us", &m_textFormat ));
-                m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, scaledFontSize, L"en-us", &m_textFormatBold ));
-                m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                const float smallFontSize = std::max(4.0f, std::min(160.0f, scaledFontSize*0.8f));
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, smallFontSize, L"en-us", &m_textFormatSmall ));
-                m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-                const float largeFontSize = std::max(8.0f, std::min(300.0f, scaledFontSize*1.5f));
-                HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, DWRITE_FONT_WEIGHT_BOLD, fontStyle, DWRITE_FONT_STRETCH_EXTRA_EXPANDED, largeFontSize, L"en-us", &m_textFormatLarge ));
-                m_textFormatLarge->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-                m_textFormatLarge->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+                m_fontSpacing = getGlobalFontSpacing();
+                const float baseScale = std::max(0.1f, std::min(10.0f, m_scaleFactor));
+                createGlobalTextFormat(baseScale * 1.0f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormat);
+                createGlobalTextFormat(baseScale * 1.0f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatBold);
+                createGlobalTextFormat(baseScale * 0.8f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatSmall);
+                createGlobalTextFormat(baseScale * 1.5f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatLarge);
             }
 
             setupWeatherBoxes();
@@ -160,7 +136,7 @@ class OverlayWeather : public Overlay
                  m_lastWeatherUpdate = currentTime;
              }
 
-             const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+            const float  fontSize           = g_cfg.getFloat( "Overlay", "font_size", 16.0f );
             const float4 textCol            = g_cfg.getFloat4( m_name, "text_col", float4(1,1,1,0.9f) );
             const float4 backgroundCol      = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
             const float4 accentCol          = float4(0.2f, 0.75f, 0.95f, 0.9f);
@@ -744,5 +720,5 @@ class OverlayWeather : public Overlay
 
         Microsoft::WRL::ComPtr<IWICImagingFactory> m_wicFactory;
         TextCache m_text;
-        float m_fontSpacing = 0.0f;
+        float m_fontSpacing = getGlobalFontSpacing();
 };

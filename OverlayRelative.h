@@ -27,10 +27,12 @@ SOFTWARE.
 #include <vector>
 #include <algorithm>
 #include <string>
+#include <format>
 #include "Overlay.h"
 #include "iracing.h"
 #include "ClassColors.h"
 #include "Config.h"
+#include "Units.h"
 #include "stub_data.h"
 
 class OverlayRelative : public Overlay
@@ -39,7 +41,7 @@ class OverlayRelative : public Overlay
 
         virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
-        const float DefaultFontSize = 15.3f;
+        
 
         OverlayRelative()
             : Overlay("OverlayRelative")
@@ -61,29 +63,14 @@ class OverlayRelative : public Overlay
 
         virtual void onConfigChanged()
         {
+            // Fonts (centralized)
             m_text.reset( m_dwriteFactory.Get() );
-
-            const std::string font = g_cfg.getString( m_name, "font", "Poppins" );
-            const float fontSize = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
-            const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
-            const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-            m_fontSpacing = g_cfg.getFloat( m_name, "font_spacing", 0.0f );
-
-            // Convert font style string to enum
-            DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-            if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-            else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
-            m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-            m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.8f, L"en-us", &m_textFormatSmall ));
-            m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-            m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+            createGlobalTextFormat(1.0f, m_textFormat);
+            createGlobalTextFormat(0.8f, m_textFormatSmall);
 
             // Determine widths of text columns
             m_columns.reset();
+            const float fontSize = g_cfg.getFloat( "Overlay", "font_size", 16.0f );
             m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
             m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
             m_columns.add( (int)Columns::NAME,       0, fontSize/2 );
@@ -241,7 +228,7 @@ class OverlayRelative : public Overlay
 
             // Display such that our driver is in the vertical center of the area where we're listing cars
 
-            const float  fontSize           = g_cfg.getFloat( m_name, "font_size", DefaultFontSize );
+            const float  fontSize           = g_cfg.getFloat( "Overlay", "font_size", 16.0f );
             const float  lineSpacing        = g_cfg.getFloat( m_name, "line_spacing", 6 );
             const float  lineHeight         = fontSize + lineSpacing;
             const float4 selfCol            = g_cfg.getFloat4( m_name, "self_col", float4(0.94f,0.67f,0.13f,1) );
@@ -255,6 +242,7 @@ class OverlayRelative : public Overlay
             const float4 alternateLineBgCol = g_cfg.getFloat4( m_name, "alternate_line_background_col", float4(0.5f,0.5f,0.5f,0) );
             const float4 buddyCol           = g_cfg.getFloat4( m_name, "buddy_col", float4(0.2f,0.75f,0,1) );
             const float4 flaggedCol         = g_cfg.getFloat4( m_name, "flagged_col", float4(0.6f,0.35f,0.2f,1) );
+            const float4 headerCol          = g_cfg.getFloat4( m_name, "header_col", float4(0.7f,0.7f,0.7f,0.9f) );
             const float4 carNumberBgCol     = g_cfg.getFloat4( m_name, "car_number_background_col", float4(1,1,1,0.9f) );
             const float4 carNumberTextCol   = g_cfg.getFloat4( m_name, "car_number_text_col", float4(0,0,0,0.9f) );
             const float4 pitCol             = g_cfg.getFloat4( m_name, "pit_col", float4(0.94f,0.8f,0.13f,1) );
@@ -267,6 +255,9 @@ class OverlayRelative : public Overlay
             const int    entriesAbove       = int( (yself - lineHeight/2 - listingAreaTop) / lineHeight );
 
             float y = yself - entriesAbove * lineHeight;
+
+            // Reserve space for footer (1.5x line height like OverlayStandings)
+            const float  ybottomFooter      = m_height - lineHeight * 1.5f;
 
             const float xoff = 10.0f;
             m_columns.layout( (float)m_width - 20 );
@@ -320,7 +311,7 @@ class OverlayRelative : public Overlay
             };
 
             m_renderTarget->BeginDraw();
-            for( int cnt=0, i=selfCarInfoIdx-entriesAbove; i<(int)relatives.size() && y<=listingAreaBot-lineHeight/2; ++i, y+=lineHeight, ++cnt )
+            for( int cnt=0, i=selfCarInfoIdx-entriesAbove; i<(int)relatives.size() && y<=ybottomFooter-lineHeight/2; ++i, y+=lineHeight, ++cnt )
             {
                 // Alternating line backgrounds
                 if( cnt & 1 && alternateLineBgCol.a > 0 )
@@ -502,29 +493,61 @@ class OverlayRelative : public Overlay
                 }
             }
 
-           /* // Footer
+            // Footer (matches OverlayStandings)
             {
+                const bool imperial = isImperialUnits();
                 float trackTemp = ir_TrackTempCrew.getFloat();
-                char  tempUnit = 'C';
+                char  tempUnit  = 'C';
+                if( imperial ) { trackTemp = celsiusToFahrenheit(trackTemp); tempUnit = 'F'; }
 
-                double sessionTime = ir_SessionTimeRemain.getDouble();
-                int laps = std::max(ir_CarIdxLap.getInt(ir_session.driverCarIdx), ir_CarIdxLapCompleted.getInt(ir_session.driverCarIdx));
+                int hours = 0, mins = 0, secs = 0;
+                ir_getSessionTimeRemaining(hours, mins, secs);
 
-                const bool   sessionIsTimeLimited = ir_SessionLapsTotal.getInt() == 32767 && ir_SessionTimeRemain.getDouble() < 48.0 * 3600.0;  // most robust way I could find to figure out whether this is a time-limited session (info in session string is often misleading)
-                const int    remainingLaps = sessionIsTimeLimited ? int(0.5 + sessionTime / ir_estimateLaptime()) : (ir_SessionLapsRemainEx.getInt() != 32767 ? ir_SessionLapsRemainEx.getInt() : -1);
+                const int laps = std::max(ir_CarIdxLap.getInt(ir_session.driverCarIdx), ir_CarIdxLapCompleted.getInt(ir_session.driverCarIdx));
+                const int remainingLaps = ir_getLapsRemaining();
+                const int irTotalLaps = ir_SessionLapsTotal.getInt();
+                int totalLaps = remainingLaps;
+                if (irTotalLaps == 32767)
+                    totalLaps = laps + remainingLaps;
+                else
+                    totalLaps = irTotalLaps;
 
-                const int    hours = int(sessionTime / 3600.0);
-                const int    mins = int(sessionTime / 60.0) % 60;
-                const int    secs = (int)fmod(sessionTime, 60.0);
+                const float ybottom = ybottomFooter;
 
-                m_brush->SetColor(float4(1, 1, 1, 0.4f));
-                m_renderTarget->DrawLine(float2(0, ybottom), float2((float)m_width, ybottom), m_brush.Get());
-                swprintf(s, _countof(s), L"SoF: %d      Track Temp: %.1f°%c      Session end: %d:%02d:%02d       Laps: %d/%d", ir_session.sof, trackTemp, tempUnit, hours, mins, secs, laps, remainingLaps);
-                y = m_height - (m_height - ybottom) / 2;
+                m_brush->SetColor(float4(1,1,1,0.4f));
+                m_renderTarget->DrawLine(float2(0,ybottom), float2((float)m_width,ybottom), m_brush.Get());
+
+                std::string footer;
+                bool addSpaces = false;
+
+                if (g_cfg.getBool(m_name, "show_SoF", true)) {
+                    int sof = ir_session.sof; if (sof < 0) sof = 0;
+                    footer += std::format("SoF: {}", sof);
+                    addSpaces = true;
+                }
+
+                if (g_cfg.getBool(m_name, "show_track_temp", true)) {
+                    if (addSpaces) footer += "       ";
+                    footer += std::format("Track Temp: {:.1f}\u00B0{:c}", trackTemp, tempUnit);
+                    addSpaces = true;
+                }
+
+                if (g_cfg.getBool(m_name, "show_session_end", true)) {
+                    if (addSpaces) footer += "       ";
+                    footer += std::vformat("Session end: {}:{:0>2}:{:0>2}", std::make_format_args(hours, mins, secs));
+                    addSpaces = true;
+                }
+
+                if (g_cfg.getBool(m_name, "show_laps", true)) {
+                    if (addSpaces) footer += "       ";
+                    footer += std::format("Laps: {}/{}{}", laps, (irTotalLaps == 32767 ? "~" : ""), totalLaps);
+                    addSpaces = true;
+                }
+
+                float yFooter = m_height - (m_height - ybottom) / 2;
                 m_brush->SetColor(headerCol);
-                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff, (float)m_width - 2 * xoff, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                m_text.render( m_renderTarget.Get(), toWide(footer).c_str(), m_textFormat.Get(), xoff, (float)m_width - 2 * xoff, yFooter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
             }
-            */
 
             // Minimap
             if( minimapEnabled )
@@ -606,5 +629,5 @@ class OverlayRelative : public Overlay
 
         ColumnLayout m_columns;
         TextCache    m_text;
-        float m_fontSpacing = 0.0f;
+        float m_fontSpacing = getGlobalFontSpacing();
 };

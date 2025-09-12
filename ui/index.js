@@ -171,7 +171,21 @@ class IFL03GuiController {
                 content.textContent = 'No release notes available.';
             } catch (e) {
                 console.error('Failed to load release notes', e);
-                content.textContent = 'Failed to load release notes.';
+                content.textContent = `Alongside the original overlays, iFL03 adds several new overlays and many quality‑of‑life upgrades
+                New overlays
+                Delta: Circular delta with trend‑aware coloring and predicted lap time.
+                Flags: Clean, high‑contrast flag callouts with two‑band design.
+                Weather: Track temp, wetness bar, precipitation/air temp, and a wind compass relative to car.
+                Track Map: Scaled track rendering with start/finish markers and cars for most tracks.
+                Radar: Proximity radar with 8 m/2 m guides and sticky alerts.
+
+                Enhanced original overlays
+                Relative: Optional minimap, license or SR, iRating, pit age, last lap, average of last 5 laps, positions gained, class colors, buddy highlighting, scrollable list, optional iRating prediction in races.
+                Standings: Class‑aware grid with fastest‑lap highlighting, car brand icons, deltas/gaps, average of last 5 laps, configurable top/ahead/behind visibility, scroll bar.
+                DDU: Fuel calculator refinements, P1 last, delta vs session best, shift light behavior, temperatures, brake bias, incident count, RPM lights, etc.
+                Inputs: Dual graph plus vertical bars (clutch/brake/throttle), steering ring or image wheel (Moza KS / RS v2), on‑wheel speed/gear.
+                Preview mode: Populate overlays with stub data even when disconnected to place layouts.
+                Global opacity: All overlays respect a global opacity for easy blending with broadcasts/streams.`;
             }
         }
     }

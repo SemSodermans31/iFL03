@@ -176,7 +176,7 @@ Screenshot: (not applicable)
 
 ## Editing, Layout and Configuration using the Console
 
-- UI edit mode: Press ALT‑J to toggle. Drag overlays to move; drag bottom‑right corner to resize. Press ALT‑J again to exit.
+- Preview Mode: Press ALT‑J to toggle. Drag overlays to move; drag bottom‑right corner to resize. Press ALT‑J again to exit.
 - Hotkeys: Overlays can be toggled at runtime (see console on startup). Hotkeys are configurable.
 - Live config: Most colors, fonts, sizes and behavior can be tuned in the generated config.json. Edits are applied live when you save.
 - Preview mode: Enable to populate overlays with stub data when disconnected, for layout/design.
@@ -229,7 +229,7 @@ Please open an issue in this repository. Repro steps and logs/screenshots help a
 - License: MIT (see LICENSE). Please retain copyright notices in source files.
 
 
-## Buy me a coffee
+## Donations
 
-If you like this project enough to wonder whether you can contribute financially: first of all, thank you! Make sure to also checkout lesphalt's repo/github to show some appreciation. you can buy me a coffee using this [link](https://paypal.me/sems0drmans). If not **please 
-consider giving to Ukraine-related charities instead**.
+If you like this project enough to wonder whether you can contribute financially: first of all, thank you! Make sure to also checkout lesphalt's repo/github to show some appreciation. you can support me (only if you really want to) using this [link](https://paypal.me/sems0drmans). If not **please 
+consider giving to any charities of your choosing instead**.

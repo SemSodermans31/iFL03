@@ -76,6 +76,19 @@ class Overlay
         virtual bool    hasCustomBackground();
         virtual void    onMouseWheel( int delta, int x, int y );
 
+        // Global font helpers (centralized typography settings)
+        float getGlobalFontSpacing() const;
+        void createGlobalTextFormat( 
+            float scale,
+            Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat 
+        ) const;
+        void createGlobalTextFormat( 
+            float scale,
+            int weightOverride,
+            const std::string& styleOverride,
+            Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat 
+        ) const;
+
         std::string     m_name;
         HWND            m_hwnd = 0;
         bool            m_enabled = false;

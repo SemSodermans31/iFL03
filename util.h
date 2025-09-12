@@ -125,9 +125,37 @@ inline bool loadFileW( const std::wstring& fnameW, std::string& output )
     return true;
 }
 
-inline std::wstring toWide( const std::string& narrow )
+inline std::wstring toWide(const std::string& narrow)
 {
-    return std::wstring(narrow.begin(),narrow.end());
+    if (narrow.empty()) return L"";
+
+    // First try UTF-8, which is what our sources and UI strings use
+    int required = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                       narrow.data(), (int)narrow.size(),
+                                       nullptr, 0);
+    if (required > 0)
+    {
+        std::wstring wide(required, L'\0');
+        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                             narrow.data(), (int)narrow.size(),
+                             wide.data(), required);
+        return wide;
+    }
+
+    // Fallback to the system codepage if the input wasn't valid UTF-8
+    required = MultiByteToWideChar(CP_ACP, 0,
+                                   narrow.data(), (int)narrow.size(),
+                                   nullptr, 0);
+    if (required > 0)
+    {
+        std::wstring wide(required, L'\0');
+        MultiByteToWideChar(CP_ACP, 0,
+                             narrow.data(), (int)narrow.size(),
+                             wide.data(), required);
+        return wide;
+    }
+
+    return L"";
 }
 
 // --------------------

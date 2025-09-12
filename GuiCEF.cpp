@@ -410,6 +410,40 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			if (has("\"cmd\":\"setConfigStringVec\"")) {
+				std::string component, key;
+				if (extractStringField(req, "component", component) &&
+					extractStringField(req, "key", key)) {
+					// Parse very simple JSON array of strings: "values":["a","b"]
+					size_t p = req.find("\"values\":");
+					std::vector<std::string> values;
+					if (p != std::string::npos) {
+						size_t lb = req.find('[', p);
+						size_t rb = req.find(']', lb == std::string::npos ? p : lb);
+						if (lb != std::string::npos && rb != std::string::npos && rb > lb) {
+							std::string arr = req.substr(lb+1, rb-lb-1);
+							// Split on "," and unquote entries
+							size_t start = 0;
+							while (start < arr.size()) {
+								while (start < arr.size() && (arr[start] == ' ' || arr[start] == '\t' || arr[start] == ',')) start++;
+								if (start >= arr.size()) break;
+								if (arr[start] == '"') {
+									size_t end = arr.find('"', start+1);
+									if (end != std::string::npos) {
+										values.push_back(arr.substr(start+1, end-(start+1)));
+										start = end + 1;
+									} else break;
+								} else {
+									break; // invalid format, bail
+								}
+							}
+						}
+					}
+					app_set_config_string_vec(component.c_str(), key.c_str(), values);
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			if (has("\"cmd\":\"loadCarConfig\"")) {
 				std::string carName;
 				if (extractStringField(req, "carName", carName)) {

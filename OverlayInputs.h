@@ -60,27 +60,24 @@ class OverlayInputs : public Overlay
             const int horizontalWidth = (int)(m_width * 0.6f);
             m_throttleVtx.resize( horizontalWidth );
             m_brakeVtx.resize( horizontalWidth );
+            m_steeringVtx.resize( horizontalWidth );
             for( int i=0; i<horizontalWidth; ++i )
             {
                 m_throttleVtx[i].x = float(i);
                 m_brakeVtx[i].x = float(i);
+                m_steeringVtx[i].x = float(i);
             }
             
-            // Create text format for labels and values with dynamic font configuration
-            const std::string font = g_cfg.getString(m_name, "font", "Waukegan LDO");
-            const float fontSize = g_cfg.getFloat(m_name, "font_size", 14.0f);
-            const int fontWeight = g_cfg.getInt(m_name, "font_weight", 700); // Bold by default
-            const std::string fontStyleStr = g_cfg.getString(m_name, "font_style", "normal");
-
-            // Convert font style string to enum
-            DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-            if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-            else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-
-            HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormatBold ));
+            // Create text format for labels and values using centralized settings
+            createGlobalTextFormat(1.0f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatBold);
             m_textFormatBold->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
             m_textFormatBold->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_CENTER );
             m_textFormatBold->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+            
+            createGlobalTextFormat(0.8f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatPercent);
+            m_textFormatPercent->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+            m_textFormatPercent->SetTextAlignment( DWRITE_TEXT_ALIGNMENT_CENTER );
+            m_textFormatPercent->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
             // Load selected steering wheel image if any
             loadSteeringWheelBitmap();
@@ -95,20 +92,29 @@ class OverlayInputs : public Overlay
             const float horizontalWidth = w * 0.6f;  // 60% for horizontal inputs
             const float barsWidth = w * 0.2f;        // 20% for vertical bars
             const float wheelWidth = w * 0.2f;       // 20% for steering wheel
-            
-            const float barsStartX = horizontalWidth;
-            const float wheelStartX = horizontalWidth + barsWidth;
+
+            const bool leftSide = g_cfg.getBool( m_name, "left_side", false );
+
+            const float horizontalStartX = leftSide ? (wheelWidth + barsWidth) : 0.0f;
+            const float barsStartX = leftSide ? wheelWidth : horizontalWidth;
+            const float wheelStartX = leftSide ? 0.0f : (horizontalWidth + barsWidth);
+            const float horizontalEndX = horizontalStartX + horizontalWidth;
 
             // Make code below safe against indexing into size-1 when sizes are zero
             if( m_throttleVtx.empty() )
                 m_throttleVtx.resize( 1 );
             if( m_brakeVtx.empty() )
                 m_brakeVtx.resize( 1 );
+            if( m_steeringVtx.empty() )
+                m_steeringVtx.resize( 1 );
 
             // Get current input values (use stub data in preview mode)
             const bool useStubData = StubDataManager::shouldUseStubData();
             const float currentThrottle = useStubData ? StubDataManager::getStubThrottle() : ir_Throttle.getFloat();
             const float currentBrake = useStubData ? StubDataManager::getStubBrake() : ir_Brake.getFloat();
+            const float currentSteeringAngle = useStubData ?
+                (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
+                ir_SteeringWheelAngle.getFloat();
 
             // Advance input vertices for horizontal graphs
             {
@@ -119,6 +125,15 @@ class OverlayInputs : public Overlay
                 for( int i=0; i<(int)m_brakeVtx.size()-1; ++i )
                     m_brakeVtx[i].y = m_brakeVtx[i+1].y;
                 m_brakeVtx[(int)m_brakeVtx.size()-1].y = currentBrake;
+
+                // Steering line history (normalize angle to [0..1] with 0.5 at straight)
+                float s = currentSteeringAngle / (3.14159f * 0.5f); // scale by 90 deg default
+                if( s < -1.0f ) s = -1.0f;
+                if( s > 1.0f ) s = 1.0f;
+                const float steeringNorm = 0.5f - s * 0.5f;
+                for( int i=0; i<(int)m_steeringVtx.size()-1; ++i )
+                    m_steeringVtx[i].y = m_steeringVtx[i+1].y;
+                m_steeringVtx[(int)m_steeringVtx.size()-1].y = steeringNorm;
             }
 
             const float thickness = g_cfg.getFloat( m_name, "line_thickness", 2.0f );
@@ -126,7 +141,7 @@ class OverlayInputs : public Overlay
             // Transform function for horizontal graphs
             auto vtx2coord = [&]( const float2& v )->float2 {
                 float scaledX = (v.x / (float)m_throttleVtx.size()) * horizontalWidth;
-                return float2( scaledX + 0.5f, h - 0.5f*thickness - v.y*(h*0.6f-thickness) - h*0.2f );
+                return float2( horizontalStartX + scaledX + 0.5f, h - 0.5f*thickness - v.y*(h*0.6f-thickness) - h*0.2f );
             };
 
             m_renderTarget->BeginDraw();
@@ -137,9 +152,8 @@ class OverlayInputs : public Overlay
                 float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
                 bgColor.w *= getGlobalOpacity();
 
-                // Compute wheel radius once to align right-side rounding to the steering area (reduced by 15%)
-                const float calcWheelRadius = std::min(wheelWidth, h) * (0.45f * 0.85f);
-                const float arcRadius = h * 0.5f; // keep right corners perfectly circular
+                // Keep steering side corners perfectly circular
+                const float arcRadius = h * 0.5f;
 
                 Microsoft::WRL::ComPtr<ID2D1PathGeometry> geom;
                 Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
@@ -150,63 +164,103 @@ class OverlayInputs : public Overlay
                     const float right  = w - 0.5f;
                     const float bottom = h - 0.5f;
 
-                    // Start at top-left after corner radius
-                    sink->BeginFigure( float2(left + cornerRadius, top), D2D1_FIGURE_BEGIN_FILLED );
-
-                    // Top edge to before top-right corner
-                    sink->AddLine( float2(right - arcRadius, top) );
-
-                    // Top-right quarter circle
+                    if( !leftSide )
                     {
-                        D2D1_ARC_SEGMENT arc = {};
-                        arc.point = float2(right, top + arcRadius);
-                        arc.size = D2D1::SizeF(arcRadius, arcRadius);
-                        arc.rotationAngle = 0.0f;
-                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                        sink->AddArc(arc);
+                        // Rounded on right side (default)
+                        sink->BeginFigure( float2(left + cornerRadius, top), D2D1_FIGURE_BEGIN_FILLED );
+                        sink->AddLine( float2(right - arcRadius, top) );
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(right, top + arcRadius);
+                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
+                        sink->AddLine( float2(right, bottom - arcRadius) );
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(right - arcRadius, bottom);
+                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
+                        sink->AddLine( float2(left + cornerRadius, bottom) );
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(left, bottom - cornerRadius);
+                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
+                        sink->AddLine( float2(left, top + cornerRadius) );
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(left + cornerRadius, top);
+                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
                     }
-
-                    // Right edge to before bottom-right corner
-                    sink->AddLine( float2(right, bottom - arcRadius) );
-
-                    // Bottom-right quarter circle
+                    else
                     {
-                        D2D1_ARC_SEGMENT arc = {};
-                        arc.point = float2(right - arcRadius, bottom);
-                        arc.size = D2D1::SizeF(arcRadius, arcRadius);
-                        arc.rotationAngle = 0.0f;
-                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                        sink->AddArc(arc);
-                    }
-
-                    // Bottom edge to before bottom-left corner
-                    sink->AddLine( float2(left + cornerRadius, bottom) );
-
-                    // Bottom-left small corner
-                    {
-                        D2D1_ARC_SEGMENT arc = {};
-                        arc.point = float2(left, bottom - cornerRadius);
-                        arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
-                        arc.rotationAngle = 0.0f;
-                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                        sink->AddArc(arc);
-                    }
-
-                    // Left edge to before top-left corner
-                    sink->AddLine( float2(left, top + cornerRadius) );
-
-                    // Top-left small corner back to start
-                    {
-                        D2D1_ARC_SEGMENT arc = {};
-                        arc.point = float2(left + cornerRadius, top);
-                        arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
-                        arc.rotationAngle = 0.0f;
-                        arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                        arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                        sink->AddArc(arc);
+                        // Rounded on left side (mirrored)
+                        sink->BeginFigure( float2(left + arcRadius, top), D2D1_FIGURE_BEGIN_FILLED );
+                        // Top edge to before small top-right corner
+                        sink->AddLine( float2(right - cornerRadius, top) );
+                        // Small top-right corner
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(right, top + cornerRadius);
+                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
+                        // Right edge to before small bottom-right corner
+                        sink->AddLine( float2(right, bottom - cornerRadius) );
+                        // Small bottom-right corner
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(right - cornerRadius, bottom);
+                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
+                        // Bottom edge to before large bottom-left corner
+                        sink->AddLine( float2(left + arcRadius, bottom) );
+                        // Large bottom-left quarter circle
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(left, bottom - arcRadius);
+                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
+                        // Left edge to before large top-left corner
+                        sink->AddLine( float2(left, top + arcRadius) );
+                        // Large top-left quarter circle back to start
+                        {
+                            D2D1_ARC_SEGMENT arc = {};
+                            arc.point = float2(left + arcRadius, top);
+                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                            arc.rotationAngle = 0.0f;
+                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                            sink->AddArc(arc);
+                        }
                     }
 
                     sink->EndFigure( D2D1_FIGURE_END_CLOSED );
@@ -226,10 +280,10 @@ class OverlayInputs : public Overlay
                 Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleFillSink;
                 m_d2dFactory->CreatePathGeometry( &throttleFillPath );
                 throttleFillPath->Open( &throttleFillSink );
-                throttleFillSink->BeginFigure( float2(0, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
+                throttleFillSink->BeginFigure( float2(horizontalStartX, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
                 for( int i=0; i<(int)m_throttleVtx.size(); ++i )
                     throttleFillSink->AddLine( vtx2coord(m_throttleVtx[i]) );
-                throttleFillSink->AddLine( float2(horizontalWidth, h*0.8f) );
+                throttleFillSink->AddLine( float2(horizontalEndX, h*0.8f) );
                 throttleFillSink->EndFigure( D2D1_FIGURE_END_CLOSED );
                 throttleFillSink->Close();
 
@@ -238,10 +292,10 @@ class OverlayInputs : public Overlay
                 Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeFillSink;
                 m_d2dFactory->CreatePathGeometry( &brakeFillPath );
                 brakeFillPath->Open( &brakeFillSink );
-                brakeFillSink->BeginFigure( float2(0, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
+                brakeFillSink->BeginFigure( float2(horizontalStartX, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
                 for( int i=0; i<(int)m_brakeVtx.size(); ++i )
                     brakeFillSink->AddLine( vtx2coord(m_brakeVtx[i]) );
-                brakeFillSink->AddLine( float2(horizontalWidth, h*0.8f) );
+                brakeFillSink->AddLine( float2(horizontalEndX, h*0.8f) );
                 brakeFillSink->EndFigure( D2D1_FIGURE_END_CLOSED );
                 brakeFillSink->Close();
 
@@ -278,10 +332,27 @@ class OverlayInputs : public Overlay
                 m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
                 m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) ) );
                 m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
+
+                // Optional steering angle line (white)
+                if( g_cfg.getBool( m_name, "show_steering_line", false ) && !m_steeringVtx.empty() )
+                {
+                    Microsoft::WRL::ComPtr<ID2D1PathGeometry1> steerLinePath;
+                    Microsoft::WRL::ComPtr<ID2D1GeometrySink>  steerLineSink;
+                    m_d2dFactory->CreatePathGeometry( &steerLinePath );
+                    steerLinePath->Open( &steerLineSink );
+                    steerLineSink->BeginFigure( vtx2coord(m_steeringVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
+                    for( int i=1; i<(int)m_steeringVtx.size(); ++i )
+                        steerLineSink->AddLine( vtx2coord(m_steeringVtx[i]) );
+                    steerLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
+                    steerLineSink->Close();
+
+                    m_brush->SetColor( g_cfg.getFloat4( m_name, "steering_line_col", float4(1.0f,1.0f,1.0f,0.9f) ) );
+                    m_renderTarget->DrawGeometry( steerLinePath.Get(), m_brush.Get(), thickness );
+                }
             }
 
             // SECTION 2: Vertical Percentage Bars
-            const float barWidth = barsWidth / 4.0f;
+            const float barWidth = barsWidth / 3.5f;
             const float barHeight = h * 0.55f;
             const float barY = h * 0.25f;
             
@@ -322,7 +393,7 @@ class OverlayInputs : public Overlay
                 swprintf_s( percentText, L"%d", (int)(bar.value * 100) );
                 m_brush->SetColor( float4(1.0f, 1.0f, 1.0f, 1.0f) );
                 D2D1_RECT_F percentRect = { bar.x - barWidth*0.5f, barY - 20, bar.x + barWidth*0.5f, barY };
-                m_renderTarget->DrawTextA( percentText, (UINT)wcslen(percentText), m_textFormatBold.Get(), &percentRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                m_renderTarget->DrawTextA( percentText, (UINT)wcslen(percentText), m_textFormatPercent.Get(), &percentRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
             }
 
             // SECTION 3: Steering Wheel with Speed/Gear or Image
@@ -436,7 +507,9 @@ class OverlayInputs : public Overlay
 
         std::vector<float2> m_throttleVtx;
         std::vector<float2> m_brakeVtx;
+        std::vector<float2> m_steeringVtx;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatBold;
+        Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatPercent;
         Microsoft::WRL::ComPtr<ID2D1Bitmap> m_wheelBitmap;
 
         void loadSteeringWheelBitmap()

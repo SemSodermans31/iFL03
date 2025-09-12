@@ -1,9 +1,9 @@
-// UI Edit Mode page JavaScript
+// Preview Mode page JavaScript
 let currentState = {};
 
 // Initialize the page
 document.addEventListener('DOMContentLoaded', function() {
-	console.log('UI Edit Mode page loaded');
+	console.log('Preview Mode page loaded');
 	
 	// Set up event listeners
 	setupEventListeners();

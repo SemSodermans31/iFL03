@@ -27,6 +27,7 @@ SOFTWARE.
 #include <windowsx.h>
 #include "Overlay.h"
 #include "Config.h"
+#include <string>
 
 using namespace Microsoft::WRL;
 
@@ -295,7 +296,7 @@ void Overlay::update()
         rr.radiusY = cornerRadius;
         
         // Apply global opacity setting
-        float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
+        float4 bgColor = g_cfg.getFloat4( m_name, "global_background_col", float4(0,0,0,1.0f) );
         float globalOpacity = g_cfg.getFloat( m_name, "opacity", 100.0f ) / 100.0f;
         bgColor.w *= globalOpacity;
         
@@ -442,4 +443,57 @@ float2 Overlay::getDefaultSize() { return float2(400,300); }
 bool Overlay::hasCustomBackground() { return false; }
 
 void Overlay::onMouseWheel( int /*delta*/, int /*x*/, int /*y*/ ) {}
+
+
+float Overlay::getGlobalFontSpacing() const
+{
+    return g_cfg.getFloat("Overlay", "font_spacing", 0.0f);
+}
+
+static DWRITE_FONT_STYLE s_toFontStyle(const std::string& style)
+{
+    if( style == "italic" )  return DWRITE_FONT_STYLE_ITALIC;
+    if( style == "oblique" ) return DWRITE_FONT_STYLE_OBLIQUE;
+    return DWRITE_FONT_STYLE_NORMAL;
+}
+
+void Overlay::createGlobalTextFormat( float scale,
+                                      Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
+{
+    const std::string family   = g_cfg.getString("Overlay", "font", "Poppins");
+    const float       baseSize = g_cfg.getFloat ("Overlay", "font_size", 16.0f);
+    const int         weight   = g_cfg.getInt   ("Overlay", "font_weight", 500);
+    const std::string styleStr = g_cfg.getString("Overlay", "font_style", "normal");
+
+    const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
+    const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
+
+    HRCHECK(m_dwriteFactory->CreateTextFormat(
+        toWide(family).c_str(), NULL,
+        (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+        size, L"en-us", &outFormat ));
+    outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+    outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+}
+
+void Overlay::createGlobalTextFormat( float scale,
+                                      int weightOverride,
+                                      const std::string& styleOverride,
+                                      Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
+{
+    const std::string family   = g_cfg.getString("Overlay", "font", "Poppins");
+    const float       baseSize = g_cfg.getFloat ("Overlay", "font_size", 16.0f);
+    const int         weight   = weightOverride > 0 ? weightOverride : g_cfg.getInt("Overlay", "font_weight", 500);
+    const std::string styleStr = styleOverride.empty() ? g_cfg.getString("Overlay", "font_style", "normal") : styleOverride;
+
+    const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
+    const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
+
+    HRCHECK(m_dwriteFactory->CreateTextFormat(
+        toWide(family).c_str(), NULL,
+        (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+        size, L"en-us", &outFormat ));
+    outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
+    outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+}
 

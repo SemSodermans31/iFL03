@@ -77,24 +77,8 @@ protected:
     virtual void onConfigChanged()
     {
         m_text.reset( m_dwriteFactory.Get() );
-
-        const std::string font = g_cfg.getString( m_name, "font", "Waukegan LDO" );
-        const float fontSize = g_cfg.getFloat( m_name, "font_size", 16.0f );
-        const int fontWeight = g_cfg.getInt( m_name, "font_weight", 500 );
-        const std::string fontStyleStr = g_cfg.getString( m_name, "font_style", "normal");
-
-        // Convert font style string to enum
-        DWRITE_FONT_STYLE fontStyle = DWRITE_FONT_STYLE_NORMAL;
-        if (fontStyleStr == "italic") fontStyle = DWRITE_FONT_STYLE_ITALIC;
-        else if (fontStyleStr == "oblique") fontStyle = DWRITE_FONT_STYLE_OBLIQUE;
-
-        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize, L"en-us", &m_textFormat ));
-        m_textFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-        m_textFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
-
-        HRCHECK(m_dwriteFactory->CreateTextFormat( toWide(font).c_str(), NULL, (DWRITE_FONT_WEIGHT)fontWeight, fontStyle, DWRITE_FONT_STRETCH_NORMAL, fontSize*0.7f, L"en-us", &m_textFormatSmall ));
-        m_textFormatSmall->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
-        m_textFormatSmall->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+        createGlobalTextFormat(1.0f, m_textFormat);
+        createGlobalTextFormat(0.7f, m_textFormatSmall);
     }
 
     virtual float2 getDefaultSize()
