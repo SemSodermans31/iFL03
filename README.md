@@ -6,6 +6,8 @@ This is a continuation of L. E. Spalt’s excellent iRon project. Many of the co
 
 Acknowledgement: Huge thanks to lespalt for the original work. iFL03’s CEF GUI and overlays are built upon that base. See Credits & License below.
 
+![Overview](assets/readmeimg/index.png)
+
 # Contents <!-- omit in toc -->
 
 - [Where to Download](#where-to-download)
@@ -60,6 +62,8 @@ Alongside the original overlays, iFL03 adds several new overlays and many qualit
 
 ## Overlays
 
+![Overlays Overview](assets/readmeimg/overlays.png)
+
 ### Relative
 
 Competitor list centered on your car with rich context:
@@ -72,7 +76,7 @@ Competitor list centered on your car with rich context:
 - Optional minimap (relative or absolute)
 - Scroll the list with the mouse wheel when there are many cars
 
-Screenshot: ![relative](relative.png)
+![relative](assets/readmeimg/relative.png)
 
 ### Standings
 
@@ -86,7 +90,7 @@ Full‑field view with class awareness and a compact, readable grid:
 - Configurable number of “top”, “ahead” and “behind” rows and auto scroll bar
 - SoF, track temp, session end and laps summary footer
 
-Screenshot: ![standings](standings.png)
+![standings](assets/readmeimg/standings.png)
 
 ### DDU (Dashboard)
 
@@ -101,7 +105,7 @@ Compact dashboard with everything you’d otherwise flip through in black boxes:
 - Fuel module with: remaining fuel, per‑lap average, estimated laps left, fuel to finish, scheduled add, progress bar; auto‑filters laps under cautions or pit to keep averages clean; safety factor configurable
 - Tire wear (LF/RF/LR/RR) and service indicators
 
-Screenshot: ![ddu](ddu.png)
+![ddu](assets/readmeimg/ddu.png)
 
 ### Inputs
 
@@ -111,7 +115,7 @@ Pedal traces and steering visualization for driving consistency work:
 - Steering indicator: ring + rotating column or an image wheel (Moza KS / RS v2)
 - On‑wheel speed and gear when using the built‑in ring
 
-Screenshot: ![inputs](inputs.png)
+![inputs](assets/readmeimg/inputs.png)
 
 ### Delta
 
@@ -122,7 +126,7 @@ Circular delta with trend‑aware coloring and prediction:
 - Side panel shows reference lap time and predicted current lap time (reference + delta)
 - Auto scales gracefully with overlay size
 
-Screenshot: ![delta](delta.png)
+![delta](assets/readmeimg/delta.png)
 
 ### Flags
 
@@ -131,7 +135,7 @@ High‑contrast two‑band banner for session and race control flags:
 - Handles iRacing’s full set of flags (black/penalty, meatball/repair, red, green, yellow, white, blue, debris, crossed, start‑ready/set/go, caution variants, one/five/ten‑to‑go, disqualify, etc.)
 - Preview mode lets you force a specific flag for stream layout testing
 
-Screenshot: ![flags](flags.png)
+![flags](assets/readmeimg/flags.png)
 
 ### Weather
 
@@ -142,7 +146,7 @@ Vertical weather pillar with clear typography and iconography:
 - Wind compass: car fixed in the center; arrow shows wind flow over the car (wind minus car yaw)
 - Updates at a sensible cadence (weather changes are gradual)
 
-Screenshot: ![weather](weather.png)
+![weather](assets/readmeimg/weather.png)
 
 ### Track Map
 
@@ -153,7 +157,7 @@ Scaled track rendering with start/finish markers and cars:
 - Self marker highlighted with number; optional opponents with class colors; pace/safety car handling
 - Auto‑detect start offset when crossing S/F; manual start offset and reverse direction supported
 
-Screenshot: ![track](track.png)
+![track map](assets/readmeimg/trackmap.png)
 
 ### Radar
 
@@ -164,7 +168,7 @@ Racelab‑style proximity radar with readable distance cues:
 - Red side zones for close lateral proximity, biased by the opponent’s along‑track location
 - Sticky timers to avoid flicker as cars move in/out of thresholds
 
-Screenshot: ![radar](radar.png)
+![radar](assets/readmeimg/radar.png)
 
 ### Cover
 
@@ -192,6 +196,12 @@ iFL03 ships with an embedded Chromium UI for a friendlier setup experience. Use 
 - Preview and fine‑tune positions and global opacity
 
 If you prefer, all settings remain available via config.json without opening the UI.
+
+![Preview Mode](assets/readmeimg/previewmode.png)
+
+![Settings UI](assets/readmeimg/settings.png)
+
+![User Settings](assets/readmeimg/usersettings.png)
 
 ---
 
