@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*"
+           Name="iFL03"
+           Manufacturer="iFL03"
+           Version="$(var.ProductVersion)"
+           Language="1033"
+           UpgradeCode="3D839F2B-91C6-4E7E-9A52-4CC2C2C9A9A2">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine"/>
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of iFL03 is already installed."/>
+    <MediaTemplate/>
+
+    <Feature Id="MainFeature" Title="iFL03" Level="1">
+      <ComponentGroupRef Id="AppFiles"/>
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFiles64Folder">
+        <Directory Id="INSTALLFOLDER" Name="iFL03"/>
+      </Directory>
+    </Directory>
+  </Product>
+</Wix>
+
+

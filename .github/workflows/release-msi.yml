@@ -1,0 +1,108 @@
+name: Build and Release MSI
+
+on:
+  push:
+    tags:
+      - 'v*'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-msi:
+    name: Build and package MSI
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Compute Product Version
+        id: version
+        shell: pwsh
+        run: |
+          $ref = $env:GITHUB_REF_NAME
+          if ([string]::IsNullOrWhiteSpace($ref)) { $ref = '${{ github.ref_name }}' }
+          if ([string]::IsNullOrWhiteSpace($ref)) { $ref = '${{ github.event.release.tag_name }}' }
+          if ([string]::IsNullOrWhiteSpace($ref)) { $ref = '0.0.0' }
+          $version = $ref.TrimStart('v')
+          $version = $version.Split('-')[0]
+          $segments = $version.Split('.')
+          if ($segments.Count -lt 3) {
+            while ($segments.Count -lt 3) { $segments += '0' }
+            $version = [string]::Join('.', $segments)
+          }
+          if ($segments.Count -gt 4) {
+            $version = [string]::Join('.', $segments[0..3])
+          }
+          echo "PRODUCT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build solution (Release x64)
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          msbuild .\ifl03.sln /m /p:Configuration=Release /p:Platform=x64 | cat
+
+      - name: Verify build artifacts exist
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'x64/Release/ifl03.exe')) {
+            Write-Error 'ifl03.exe not found in x64/Release. Ensure the solution builds or commit built artifacts.'
+            exit 1
+          }
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: |
+          choco install wixtoolset --version=3.11.2 --no-progress -y | cat
+          $wixBin = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
+          if (-not (Test-Path $wixBin)) { throw "WiX bin not found at $wixBin" }
+          echo "WIX_BIN=$wixBin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Harvest build output with heat.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path wix | Out-Null
+          & "$env:WIX_BIN\heat.exe" dir "${{ github.workspace }}\x64\Release" `
+            -cg AppFiles `
+            -dr INSTALLFOLDER `
+            -var var.SourceDir `
+            -out wix\AppFiles.wxs `
+            -srd -sreg -scom | cat
+
+      - name: Compile MSI with candle.exe and light.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\wix,dist | Out-Null
+          & "$env:WIX_BIN\candle.exe" -nologo -arch x64 `
+            -dSourceDir="${{ github.workspace }}\\x64\\Release" `
+            -dProductVersion="$env:PRODUCT_VERSION" `
+            -out build\wix\ `
+            wix\Product.wxs wix\AppFiles.wxs | cat
+          & "$env:WIX_BIN\light.exe" -nologo -spdb -sice:ICE61 -sice:ICE69 `
+            -out dist\iFL03-$env:PRODUCT_VERSION.msi `
+            build\wix\Product.wixobj build\wix\AppFiles.wixobj | cat
+          if (-not (Test-Path "dist/iFL03-$env:PRODUCT_VERSION.msi")) { throw 'MSI not produced' }
+
+      - name: Upload MSI as artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v4
+        with:
+          name: iFL03-msi-${{ steps.version.outputs.version }}
+          path: dist/*.msi
+
+      - name: Attach MSI to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.msi
+          fail_on_unmatched_files: true
+          generate_release_notes: false
+
+
