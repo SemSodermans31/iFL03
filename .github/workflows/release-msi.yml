@@ -6,6 +6,11 @@ on:
       - 'v*'
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to download assets from (e.g. v0.0.1). Leave blank to infer.
+        required: false
 
 permissions:
   contents: write
@@ -48,7 +53,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $tag = $env:TAG_NAME
+          $tag = if (![string]::IsNullOrWhiteSpace('${{ github.event.inputs.tag }}')) { '${{ github.event.inputs.tag }}' } else { $env:TAG_NAME }
           if ([string]::IsNullOrWhiteSpace($tag)) { $tag = '${{ github.ref_name }}' }
           if ([string]::IsNullOrWhiteSpace($tag)) { $tag = '${{ github.event.release.tag_name }}' }
           if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'v' + $env:PRODUCT_VERSION }
@@ -57,7 +62,7 @@ jobs:
           $zipPath = $null
           foreach ($p in $patterns) {
             try {
-              gh release download $tag --repo "$env:GITHUB_REPOSITORY" --pattern $p --dir dist | cat
+              gh release download $tag --repo "$env:GITHUB_REPOSITORY" --pattern $p --dir dist
               $candidate = Join-Path 'dist' $p
               if (Test-Path $candidate) { $zipPath = $candidate; break }
             } catch {
@@ -70,6 +75,12 @@ jobs:
           }
           New-Item -ItemType Directory -Force -Path 'x64/Release' | Out-Null
           Expand-Archive -Path $zipPath -DestinationPath 'x64/Release' -Force
+          # If the zip contained a single top-level folder, move its contents up
+          $entries = Get-ChildItem 'x64/Release'
+          if ($entries.Count -eq 1 -and $entries[0].PSIsContainer) {
+            Get-ChildItem $entries[0].FullName | Move-Item -Destination 'x64/Release' -Force
+            Remove-Item $entries[0].FullName -Force -Recurse
+          }
 
       - name: Verify build artifacts exist
         shell: pwsh
@@ -82,7 +93,7 @@ jobs:
       - name: Install WiX Toolset
         shell: pwsh
         run: |
-          choco install wixtoolset --version=3.11.2 --no-progress -y | cat
+          choco install wixtoolset --version=3.11.2 --no-progress -y
           $wixBin = "${env:ProgramFiles(x86)}\WiX Toolset v3.11\bin"
           if (-not (Test-Path $wixBin)) { throw "WiX bin not found at $wixBin" }
           echo "WIX_BIN=$wixBin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
@@ -97,7 +108,7 @@ jobs:
             -dr INSTALLFOLDER `
             -var var.SourceDir `
             -out wix\AppFiles.wxs `
-            -srd -sreg -scom | cat
+            -srd -sreg -scom
 
       - name: Compile MSI with candle.exe and light.exe
         shell: pwsh
@@ -107,10 +118,10 @@ jobs:
             -dSourceDir="${{ github.workspace }}\\x64\\Release" `
             -dProductVersion="$env:PRODUCT_VERSION" `
             -out build\wix\ `
-            wix\Product.wxs wix\AppFiles.wxs | cat
+            wix\Product.wxs wix\AppFiles.wxs
           & "$env:WIX_BIN\light.exe" -nologo -spdb -sice:ICE61 -sice:ICE69 `
             -out dist\iFL03-$env:PRODUCT_VERSION.msi `
-            build\wix\Product.wixobj build\wix\AppFiles.wixobj | cat
+            build\wix\Product.wixobj build\wix\AppFiles.wixobj
           if (-not (Test-Path "dist/iFL03-$env:PRODUCT_VERSION.msi")) { throw 'MSI not produced' }
 
       - name: Upload MSI as artifact
