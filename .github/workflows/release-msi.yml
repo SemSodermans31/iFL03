@@ -81,11 +81,23 @@ jobs:
             Get-ChildItem $entries[0].FullName | Move-Item -Destination 'x64/Release' -Force
             Remove-Item $entries[0].FullName -Force -Recurse
           }
+          # If exe is nested deeper, flatten from the folder that contains it
+          $exe = Get-ChildItem 'x64/Release' -Recurse -Filter 'ifl03.exe' | Select-Object -First 1
+          if ($exe) {
+            $root = (Resolve-Path 'x64/Release').Path
+            if ($exe.DirectoryName -ne $root) {
+              Get-ChildItem $exe.DirectoryName | Move-Item -Destination 'x64/Release' -Force
+              try { Remove-Item $exe.DirectoryName -Recurse -Force } catch { Write-Host $_ }
+            }
+          }
+          Write-Host 'Staged files in x64/Release:'
+          Get-ChildItem -Recurse 'x64/Release' | Select-Object FullName,Length | Format-Table -AutoSize | Out-String | Write-Host
 
       - name: Verify build artifacts exist
         shell: pwsh
         run: |
-          if (-not (Test-Path 'x64/Release/ifl03.exe')) {
+          $exe = Get-ChildItem 'x64/Release' -Recurse -Filter 'ifl03.exe' | Select-Object -First 1
+          if (-not $exe) {
             Write-Error 'ifl03.exe not found in x64/Release. Ensure the solution builds or commit built artifacts.'
             exit 1
           }
