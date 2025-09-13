@@ -18,9 +18,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@v2
-
       - name: Compute Product Version
         id: version
         shell: pwsh
@@ -40,13 +37,39 @@ jobs:
             $version = [string]::Join('.', $segments[0..3])
           }
           echo "PRODUCT_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          echo "TAG_NAME=$ref" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           echo "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
-      - name: Build solution (Release x64)
+      - name: Download prebuilt ZIP from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: pwsh
-        continue-on-error: true
         run: |
-          msbuild .\ifl03.sln /m /p:Configuration=Release /p:Platform=x64 | cat
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $tag = $env:TAG_NAME
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = '${{ github.ref_name }}' }
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = '${{ github.event.release.tag_name }}' }
+          if ([string]::IsNullOrWhiteSpace($tag)) { $tag = 'v' + $env:PRODUCT_VERSION }
+          Write-Host "Using tag: $tag"
+          $patterns = @("iFL03-$env:PRODUCT_VERSION.zip", "iFL03-v$env:PRODUCT_VERSION.zip")
+          $zipPath = $null
+          foreach ($p in $patterns) {
+            try {
+              gh release download $tag --repo "$env:GITHUB_REPOSITORY" --pattern $p --dir dist | cat
+              $candidate = Join-Path 'dist' $p
+              if (Test-Path $candidate) { $zipPath = $candidate; break }
+            } catch {
+              Write-Host "Pattern $p not found, trying next..."
+            }
+          }
+          if (-not $zipPath) {
+            Write-Error "Could not download a zip asset for tag $tag. Tried: $($patterns -join ', ')"
+            exit 1
+          }
+          New-Item -ItemType Directory -Force -Path 'x64/Release' | Out-Null
+          Expand-Archive -Path $zipPath -DestinationPath 'x64/Release' -Force
 
       - name: Verify build artifacts exist
         shell: pwsh
