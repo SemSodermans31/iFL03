@@ -527,6 +527,8 @@ namespace {
 			command_line->AppendSwitchWithValue("use-angle", "d3d11");
 			command_line->AppendSwitchWithValue("disable-features", "WebUSB,WebHID,WebSerial,UseGCMFromChrome,WebBluetooth");
 			command_line->AppendSwitch("disable-background-networking");
+			// Allow fetch/XHR to read local files like ui/version.json when loaded from file://
+			command_line->AppendSwitch("allow-file-access-from-files");
 		}
 		CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override { return this; }
 		CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override { return this; }

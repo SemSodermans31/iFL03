@@ -30,6 +30,11 @@ SOFTWARE.
 class IFL03GuiController {
     constructor() {
         this.isInitialized = false;
+        this.installedVersion = null;
+        this.latestVersion = null;
+        this.latestDownloadUrl = null;
+        this.repoOwner = 'SemSodermans31';
+        this.repoName = 'iFL03';
         this.setupEventListeners();
     }
 
@@ -57,9 +62,12 @@ class IFL03GuiController {
 
     async init() {
         try {
+            // Load local version first to avoid flicker and '-' placeholder
+            await this.loadInstalledVersion();
             const state = await this.send('getState');
             this.render(state);
             this.isInitialized = true;
+            await this.checkLatestRelease();
         } catch (e) { console.error('Init failed', e); }
     }
 
@@ -119,7 +127,11 @@ class IFL03GuiController {
         const updateBtn = document.getElementById('btn-update');
         if (updateBtn) {
             updateBtn.addEventListener('click', async () => {
-                try { await this.send('updateApp'); } catch (e) { console.error(e); }
+                try {
+                    if (this.latestDownloadUrl) {
+                        await this.send('openExternal', { url: this.latestDownloadUrl });
+                    }
+                } catch (e) { console.error(e); }
             });
         }
 
@@ -148,12 +160,65 @@ class IFL03GuiController {
         try {
             const versionEl = document.getElementById('app-version');
             const updateBtn = document.getElementById('btn-update');
-            const version = (state && (state.app?.version || state.version || state.appVersion)) || '-';
-            const updateAvailableRaw = state && (state.app?.updateAvailable ?? state.updateAvailable ?? false);
-            const updateAvailable = !!updateAvailableRaw;
+            const version = (this.installedVersion) || (state && (state.app?.version || state.version || state.appVersion)) || '-';
             if (versionEl) versionEl.textContent = String(version);
-            if (updateBtn) updateBtn.disabled = !updateAvailable;
+            if (updateBtn) updateBtn.disabled = !(this.latestVersion && this.compareSemver(this.latestVersion, version) > 0);
         } catch (e) { console.error('updateVersionInfo failed', e); }
+    }
+
+    async loadInstalledVersion() {
+        try {
+            const res = await fetch('version.json', { cache: 'no-store' });
+            if (!res.ok) throw new Error('version.json not found');
+            const data = await res.json();
+            if (data && data.version) {
+                this.installedVersion = String(data.version).replace(/^v/i, '');
+                const el = document.getElementById('app-version');
+                if (el) el.textContent = this.installedVersion;
+            }
+        } catch (e) {
+            // Silent; fallback to whatever the backend provided or the hardcoded value
+        }
+    }
+
+    async checkLatestRelease() {
+        try {
+            const res = await fetch('https://api.github.com/repos/SemSodermans31/iFL03/releases/latest', { headers: { 'Accept': 'application/vnd.github+json' } });
+            if (!res.ok) throw new Error('GitHub latest failed');
+            const json = await res.json();
+            const tag = (json && json.tag_name) ? String(json.tag_name) : '';
+            this.latestVersion = tag ? tag.replace(/^v/i, '') : null;
+            // Prefer the first asset that looks like our installer
+            let dl = null;
+            if (Array.isArray(json.assets)) {
+                const exe = json.assets.find(a => /setup/i.test(a.name) && /\.exe$/i.test(a.name)) || json.assets[0];
+                if (exe && exe.browser_download_url) dl = exe.browser_download_url;
+            }
+            if (!dl && json.html_url) dl = json.html_url;
+            this.latestDownloadUrl = dl;
+
+            const updateBtn = document.getElementById('btn-update');
+            if (this.installedVersion && this.latestVersion && this.compareSemver(this.latestVersion, this.installedVersion) > 0) {
+                if (updateBtn) updateBtn.disabled = false;
+            } else {
+                if (updateBtn) updateBtn.disabled = true;
+            }
+        } catch (e) {
+            // Network failure or rate limit; keep button disabled
+        }
+    }
+
+    compareSemver(a, b) {
+        // returns 1 if a>b, 0 if equal, -1 if a<b
+        const pa = String(a).split('.').map(n => parseInt(n, 10) || 0);
+        const pb = String(b).split('.').map(n => parseInt(n, 10) || 0);
+        const len = Math.max(pa.length, pb.length);
+        for (let i = 0; i < len; i++) {
+            const da = pa[i] || 0, db = pb[i] || 0;
+            if (da > db) return 1;
+            if (da < db) return -1;
+        }
+        return 0;
     }
 
     async openReleaseNotes() {
@@ -163,31 +228,48 @@ class IFL03GuiController {
         if (content) {
             content.textContent = 'Loading...';
             try {
-                const notes = await this.send('getReleaseNotes');
-                if (!notes) { content.textContent = 'No release notes available.'; return; }
-                if (typeof notes === 'string') { content.textContent = notes; return; }
-                if (notes.html) { content.innerHTML = notes.html; return; }
-                if (notes.text) { content.textContent = notes.text; return; }
-                content.textContent = 'No release notes available.';
+                const tag = this.installedVersion ? `v${this.installedVersion}` : null;
+                let body = '';
+                if (tag) {
+                    // Fetch release by tag
+                    const url = `https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases/tags/${encodeURIComponent(tag)}`;
+                    const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github+json' } });
+                    if (res.ok) {
+                        const json = await res.json();
+                        body = (json && typeof json.body === 'string') ? json.body : '';
+                    }
+                }
+                if (!body) {
+                    // Fallback to latest
+                    const res2 = await fetch(`https://api.github.com/repos/${this.repoOwner}/${this.repoName}/releases/latest`, { headers: { 'Accept': 'application/vnd.github+json' } });
+                    if (res2.ok) {
+                        const json2 = await res2.json();
+                        body = (json2 && typeof json2.body === 'string') ? json2.body : '';
+                    }
+                }
+                const html = this.formatReleaseNotes(body || 'No release notes available.');
+                content.innerHTML = html;
             } catch (e) {
                 console.error('Failed to load release notes', e);
-                content.textContent = `Alongside the original overlays, iFL03 adds several new overlays and many quality‑of‑life upgrades
-                New overlays
-                Delta: Circular delta with trend‑aware coloring and predicted lap time.
-                Flags: Clean, high‑contrast flag callouts with two‑band design.
-                Weather: Track temp, wetness bar, precipitation/air temp, and a wind compass relative to car.
-                Track Map: Scaled track rendering with start/finish markers and cars for most tracks.
-                Radar: Proximity radar with 8 m/2 m guides and sticky alerts.
-
-                Enhanced original overlays
-                Relative: Optional minimap, license or SR, iRating, pit age, last lap, average of last 5 laps, positions gained, class colors, buddy highlighting, scrollable list, optional iRating prediction in races.
-                Standings: Class‑aware grid with fastest‑lap highlighting, car brand icons, deltas/gaps, average of last 5 laps, configurable top/ahead/behind visibility, scroll bar.
-                DDU: Fuel calculator refinements, P1 last, delta vs session best, shift light behavior, temperatures, brake bias, incident count, RPM lights, etc.
-                Inputs: Dual graph plus vertical bars (clutch/brake/throttle), steering ring or image wheel (Moza KS / RS v2), on‑wheel speed/gear.
-                Preview mode: Populate overlays with stub data even when disconnected to place layouts.
-                Global opacity: All overlays respect a global opacity for easy blending with broadcasts/streams.`;
+                content.innerHTML = this.formatReleaseNotes('No release notes available.');
             }
         }
+    }
+
+    formatReleaseNotes(text) {
+        // Escape HTML
+        const escape = (s) => s
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        let t = escape(String(text));
+        // Insert double <br> after sentences ending with a period
+        t = t.replace(/\.\r?\n/g, '.<br><br>');
+        t = t.replace(/\.\s+(?=[A-Z])/g, '.<br><br>');
+        if (/\.$/.test(t)) t += '<br><br>';
+        // Normalize remaining newlines to single <br>
+        t = t.replace(/\r?\n/g, '<br>');
+        return t;
     }
 
     closeReleaseNotes() {
