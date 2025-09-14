@@ -468,10 +468,21 @@ void Overlay::createGlobalTextFormat( float scale,
     const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
     const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
 
-    HRCHECK(m_dwriteFactory->CreateTextFormat(
-        toWide(family).c_str(), NULL,
-        (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
-        size, L"en-us", &outFormat ));
+    {
+        HRESULT hr = m_dwriteFactory->CreateTextFormat(
+            toWide(family).c_str(), NULL,
+            (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+            size, L"en-us", &outFormat );
+        if( FAILED(hr) )
+        {
+            // Fallback to a ubiquitous system font
+            outFormat.Reset();
+            HRCHECK(m_dwriteFactory->CreateTextFormat(
+                L"Segoe UI", NULL,
+                (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+                size, L"en-us", &outFormat ));
+        }
+    }
     outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
     outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 }
@@ -489,10 +500,21 @@ void Overlay::createGlobalTextFormat( float scale,
     const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
     const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
 
-    HRCHECK(m_dwriteFactory->CreateTextFormat(
-        toWide(family).c_str(), NULL,
-        (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
-        size, L"en-us", &outFormat ));
+    {
+        HRESULT hr = m_dwriteFactory->CreateTextFormat(
+            toWide(family).c_str(), NULL,
+            (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+            size, L"en-us", &outFormat );
+        if( FAILED(hr) )
+        {
+            // Fallback to a ubiquitous system font
+            outFormat.Reset();
+            HRCHECK(m_dwriteFactory->CreateTextFormat(
+                L"Segoe UI", NULL,
+                (DWRITE_FONT_WEIGHT)weight, style, DWRITE_FONT_STRETCH_EXTRA_EXPANDED,
+                size, L"en-us", &outFormat ));
+        }
+    }
     outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
     outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 }

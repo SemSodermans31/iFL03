@@ -41,11 +41,12 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 
 [Files]
 Source: "..\\x64\\Release\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\\assets\\*"; DestDir: "{app}\\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\\{#MyAppName}"; Filename: "{app}\\ifl03.exe"; WorkingDir: "{app}"
 Name: "{group}\\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{commondesktop}\\{#MyAppName}"; Filename: "{app}\\ifl03.exe"; Tasks: desktopicon
+Name: "{userdesktop}\\{#MyAppName}"; Filename: "{app}\\ifl03.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\\ifl03.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
