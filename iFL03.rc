@@ -20,11 +20,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "iFL03 Overlay"
             VALUE "FileDescription", "iFL03 Overlay Application"
-            VALUE "FileVersion", "0.0.0.1"
+            VALUE "FileVersion", "0.0.0.2"
             VALUE "InternalName", "ifl03.exe"
             VALUE "OriginalFilename", "ifl03.exe"
             VALUE "ProductName", "iFL03 Overlay"
-            VALUE "ProductVersion", "0.0.0.1"
+            VALUE "ProductVersion", "0.0.0.2"
         END
     END
     BLOCK "VarFileInfo"

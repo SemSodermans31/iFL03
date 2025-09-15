@@ -92,6 +92,8 @@ class OverlayDDU : public Overlay
                 // Gear uses heavy and oblique and much larger size
                 createGlobalTextFormat(3.0f, (int)DWRITE_FONT_WEIGHT_BLACK, "oblique", m_textFormatGear);
             }
+            // Per-overlay FPS (configurable; default 10)
+            setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
 
             // Background geometry
             {
@@ -376,18 +378,18 @@ class OverlayDDU : public Overlay
                 const int totalLaps = ir_SessionLapsTotal.getInt();
             
                 if( totalLaps == SHRT_MAX )
-                    sprintf( lapsStr, "--" );
+                    _snprintf_s( lapsStr, _countof(lapsStr), _TRUNCATE, "--" );
                 else
-                    sprintf( lapsStr, "%d", totalLaps );
+                    _snprintf_s( lapsStr, _countof(lapsStr), _TRUNCATE, "%d", totalLaps );
                 swprintf( s, _countof(s), L"%d / %S", currentLap, lapsStr );
                 m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), m_boxLaps.x0, m_boxLaps.x1, m_boxLaps.y0+m_boxLaps.h*0.25f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
                 if( remainingLaps < 0 )
-                    sprintf( lapsStr, "--" );
+                    _snprintf_s( lapsStr, _countof(lapsStr), _TRUNCATE, "--" );
                 else if( sessionIsTimeLimited )
-                    sprintf( lapsStr, "~%d", remainingLaps );
+                    _snprintf_s( lapsStr, _countof(lapsStr), _TRUNCATE, "~%d", remainingLaps );
                 else
-                    sprintf( lapsStr, "%d", remainingLaps );
+                    _snprintf_s( lapsStr, _countof(lapsStr), _TRUNCATE, "%d", remainingLaps );
                 swprintf( s, _countof(s), L"%S", lapsStr );
                 m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), m_boxLaps.x0, m_boxLaps.x1, m_boxLaps.y0+m_boxLaps.h*0.55f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 

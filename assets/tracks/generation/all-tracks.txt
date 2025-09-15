@@ -10,7 +10,14 @@ Auto Club Speedway	\california
 Auto Club Speedway - Oval	\california\oval	
 Auto Club Speedway - Competition	\california\competition	
 Auto Club Speedway - Interior	\california\interior	
-Auto Club Speedway - Moto	\california\moto	
+Auto Club Speedway - Moto	\california\moto
+Autódromo Hermanos Rodríguez (Mexico City) - Grand Prix	\mexicocity\gp	
+Autódromo Hermanos Rodríguez (Mexico City) - Grand Prix Historic	\mexicocity\gphistoric	
+Autódromo Hermanos Rodríguez (Mexico City) - National	\mexicocity\national	
+Autódromo Hermanos Rodríguez (Mexico City) - National Historic	\mexicocity\nationalhistoric	
+Autódromo Hermanos Rodríguez (Mexico City) - EV Circuit	\mexicocity\ev	
+Autódromo Hermanos Rodríguez (Mexico City) - Oval	\mexicocity\oval	
+Autódromo Hermanos Rodríguez (Mexico City) - Oval Stadium	\mexicocity\ovalstadium	
 Autodromo Internazionale del Mugello	\mugello	
 Autodromo Internazionale del Mugello - Grand Prix	\mugello\gp	
 Autodromo Internazionale del Mugello - Short	\mugello\short	

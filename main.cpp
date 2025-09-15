@@ -341,21 +341,27 @@ int main()
         {
             if( !g_cfg.getBool("General", "performance_mode_30hz", false) )
             {
-                // Update everything every frame, roughly every 16ms (~60Hz)
+                // Update enabled overlays every frame, roughly every 16ms (~60Hz)
                 for( Overlay* o : overlays )
+                {
+                    if( !o->isEnabled() )
+                        continue; // skip hidden/disabled overlays entirely
                     o->update();
+                }
             }
             else
             {
-                // To save perf, update half of the (enabled) overlays on even frames and the other half on odd, for ~30Hz overall
-                int cnt = 0;
+                // Update half of the enabled overlays on even frames and the other half on odd frames (~30Hz per overlay)
+                int enabledIdx = 0;
                 for( Overlay* o : overlays )
                 {
-                    if( o->isEnabled() )
-                        cnt++;
+                    if( !o->isEnabled() )
+                        continue; // skip hidden/disabled overlays entirely
 
-                    if( (cnt & 1) == (frameCnt & 1) )
+                    if( (enabledIdx & 1) == (frameCnt & 1) )
                         o->update();
+
+                    enabledIdx++;
                 }
             }
         }

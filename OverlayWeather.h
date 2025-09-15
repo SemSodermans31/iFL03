@@ -126,6 +126,12 @@ class OverlayWeather : public Overlay
             if (m_wicFactory.Get()) {
                 loadIcons();
             }
+
+            // Invalidate static text cache on layout changes
+            m_staticTextBitmap.Reset();
+
+            // Per-overlay FPS (configurable; default 10)
+            setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
         }
 
                  virtual void onUpdate()
@@ -177,6 +183,16 @@ class OverlayWeather : public Overlay
                 m_renderTarget->FillRoundedRectangle( &roundedBg, m_brush.Get() );
             };
 
+            // Rebuild static text/labels bitmap when needed (titles and unit labels)
+            if (!m_staticTextBitmap) {
+                buildStaticTextBitmap();
+            }
+            if (m_staticTextBitmap) {
+                D2D1_SIZE_F s = m_staticTextBitmap->GetSize();
+                D2D1_RECT_F dest = { 0, 0, s.width, s.height };
+                m_renderTarget->DrawBitmap(m_staticTextBitmap.Get(), dest);
+            }
+
             // Track Temperature Section
             {
                 drawSectionBackground(m_trackTempBox);
@@ -187,9 +203,7 @@ class OverlayWeather : public Overlay
                     trackTemp = celsiusToFahrenheit( trackTemp );
 
                 // Title - left aligned, larger and bolder with more room from edge
-                m_brush->SetColor( finalTextCol );
-                m_text.render( m_renderTarget.Get(), L"TRACK TEMP", m_textFormatBold.Get(), 
-                              m_trackTempBox.x0 + titlePadding, m_trackTempBox.x1 - titleMargin, m_trackTempBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+                // Title is cached in static bitmap
 
                 // Temperature value - larger, centered
                 m_brush->SetColor( trackTempCol );
@@ -228,10 +242,7 @@ class OverlayWeather : public Overlay
                     wetnessText = getTrackWetnessText((float)wetEnum);
                 }
 
-                // Wetness title - left aligned
-                m_brush->SetColor( finalTextCol );
-                m_text.render( m_renderTarget.Get(), L"TRACK WETNESS", m_textFormatBold.Get(), 
-                              m_trackWetnessBox.x0 + titlePadding, m_trackWetnessBox.x1 - titleMargin, m_trackWetnessBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+                // Title is cached in static bitmap
 
                 // Progress bar showing wetness level
                 {
@@ -283,10 +294,7 @@ class OverlayWeather : public Overlay
                 
                 const bool showPrecip = shouldShowPrecipitation();
                 
-                // Title - left aligned, larger and bolder with more room from edge
-                m_brush->SetColor( finalTextCol );
-                m_text.render( m_renderTarget.Get(), showPrecip ? L"PRECIPITATION" : L"AIR TEMP", m_textFormatBold.Get(), 
-                              m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+                // Title is cached in static bitmap (both labels)
 
                 const float valueY = m_precipitationBox.y0 + m_precipitationBox.h * 0.65f;
                 const float iconX = m_precipitationBox.x0 + titlePadding; // Align with title
@@ -338,10 +346,7 @@ class OverlayWeather : public Overlay
                 while (windDir < 0.0f) windDir += twoPi;
                 while (windDir >= twoPi) windDir -= twoPi;
 
-                // Title - left aligned, larger and bolder with more room from edge
-                m_brush->SetColor( finalTextCol );
-                m_text.render( m_renderTarget.Get(), L"WIND", m_textFormatBold.Get(), 
-                              m_windBox.x0 + titlePadding, m_windBox.x1 - titleMargin, m_windBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+                // Title is cached in static bitmap
 
                 // Draw compass - dynamically positioned and sized with safety checks
                 const float compassCenterX = m_windBox.x0 + m_windBox.w/2;
@@ -721,4 +726,30 @@ class OverlayWeather : public Overlay
         Microsoft::WRL::ComPtr<IWICImagingFactory> m_wicFactory;
         TextCache m_text;
         float m_fontSpacing = getGlobalFontSpacing();
+
+        // Cached static labels bitmap (section titles and common labels)
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_staticTextBitmap;
+        void buildStaticTextBitmap()
+        {
+            if (!m_renderTarget) return;
+            Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> rt;
+            if (FAILED(m_renderTarget->CreateCompatibleRenderTarget(&rt))) return;
+            rt->BeginDraw();
+            rt->Clear(float4(0,0,0,0));
+
+            const float titlePadding = std::max(1.5f, 20.0f * m_scaleFactor);
+            const float titleMargin  = std::max(1.5f, 20.0f * m_scaleFactor);
+
+            m_brush->SetColor(float4(1,1,1,1));
+            // Titles
+            m_text.render( rt.Get(), L"TRACK TEMP", m_textFormatBold.Get(), m_trackTempBox.x0 + titlePadding, m_trackTempBox.x1 - titleMargin, m_trackTempBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+            m_text.render( rt.Get(), L"TRACK WETNESS", m_textFormatBold.Get(), m_trackWetnessBox.x0 + titlePadding, m_trackWetnessBox.x1 - titleMargin, m_trackWetnessBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+            // Precipitation/Air Temp: draw both labels; the dynamic value picks one at runtime
+            m_text.render( rt.Get(), L"PRECIPITATION", m_textFormatBold.Get(), m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+            m_text.render( rt.Get(), L"AIR TEMP", m_textFormatBold.Get(), m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+            m_text.render( rt.Get(), L"WIND", m_textFormatBold.Get(), m_windBox.x0 + titlePadding, m_windBox.x1 - titleMargin, m_windBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+
+            rt->EndDraw();
+            rt->GetBitmap(&m_staticTextBitmap);
+        }
 };

@@ -257,6 +257,13 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			// Performance mode (30Hz) toggle from Settings UI
+			if (has("\"cmd\":\"setPerformanceMode\"")) {
+				bool on = false; (void)extractBoolField(req, "on", on);
+				app_set_config_bool("General", "performance_mode_30hz", on);
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			if (has("\"cmd\":\"openExternal\"")) {
 				std::string url;
 				if (extractStringField(req, "url", url)) {
@@ -503,6 +510,13 @@ namespace {
 				DeleteFileW(L"config.json");
 				g_cfg.load();
 				app_handleConfigChange_external();
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			// SaveSettings supports a small set of keys sent from UI (currently performance_mode_30hz)
+			if (has("\"cmd\":\"saveSettings\"")) {
+				bool perf30 = false; (void)extractBoolField(req, "performance_mode_30hz", perf30);
+				app_set_config_bool("General", "performance_mode_30hz", perf30);
 				callback->Success(app_get_state_json());
 				return true;
 			}

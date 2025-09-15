@@ -71,6 +71,8 @@ protected:
 		const float baseScale = std::max(0.5f, std::min(6.0f, m_scaleFactor));
 		createGlobalTextFormat(baseScale * 3.6f, 900, "oblique", m_textFormatBold);
 		createGlobalTextFormat(baseScale * 3.2f, 900, "oblique", m_textFormatLarge);
+		// Per-overlay FPS (configurable; default 10)
+		setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
 	}
 
 	virtual void onUpdate()

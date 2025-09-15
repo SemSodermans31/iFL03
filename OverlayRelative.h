@@ -67,6 +67,8 @@ class OverlayRelative : public Overlay
             m_text.reset( m_dwriteFactory.Get() );
             createGlobalTextFormat(1.0f, m_textFormat);
             createGlobalTextFormat(0.8f, m_textFormatSmall);
+            // Per-overlay FPS (configurable; default 10)
+            setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
 
             // Determine widths of text columns
             m_columns.reset();

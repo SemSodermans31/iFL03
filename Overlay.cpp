@@ -209,6 +209,7 @@ void Overlay::enable( bool on )
         //
 
         m_enabled = true;
+        m_lastUpdateTick = GetTickCount();
         onEnable();
     }
     else if( !on && m_hwnd ) // disable
@@ -269,17 +270,34 @@ void Overlay::configChanged()
     applyPositionSetting();
 
     onConfigChanged();
+    // Ensure static overlays refresh once after config updates
+    requestRedraw();
 }
 
 void Overlay::sessionChanged()
 {
     onSessionChanged();
+    // Ensure static overlays refresh once after session changes
+    requestRedraw();
 }
 
 void Overlay::update()
 {
     if( !m_enabled )
         return;
+
+    // Lightweight frame limiter to reduce CPU pressure when nothing urgent
+    // Default 60 FPS, configurable via config per overlay name: target_fps
+    const int cfgFps = std::max( 10, g_cfg.getInt(m_name, "target_fps", m_targetFPS) );
+    m_targetFPS = cfgFps;
+    const DWORD now = GetTickCount();
+    const DWORD minDelta = (DWORD)std::max(1, 1000 / std::max(10, m_targetFPS));
+    if( !m_forceNextUpdate && (now - m_lastUpdateTick) < minDelta )
+        return;
+    m_lastUpdateTick = now;
+    if( m_staticMode && !m_forceNextUpdate )
+        return; // static mode only redraws when explicitly requested
+    m_forceNextUpdate = false;
 
     const float w = (float)m_width;
     const float h = (float)m_height;
@@ -517,5 +535,25 @@ void Overlay::createGlobalTextFormat( float scale,
     }
     outFormat->SetParagraphAlignment( DWRITE_PARAGRAPH_ALIGNMENT_CENTER );
     outFormat->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
+}
+
+void Overlay::setTargetFPS( int fps )
+{
+    m_targetFPS = std::max(10, fps);
+}
+
+int Overlay::getTargetFPS() const
+{
+    return m_targetFPS;
+}
+
+void Overlay::setStaticMode( bool on )
+{
+    m_staticMode = on;
+}
+
+bool Overlay::isStaticMode() const
+{
+    return m_staticMode;
 }
 

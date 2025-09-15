@@ -67,6 +67,11 @@ protected:
         m_trendSamples = g_cfg.getInt(m_name, "trend_samples", 10);
         m_text.reset(m_dwriteFactory.Get());
         m_fontSpacing = getGlobalFontSpacing();
+        m_staticLabelsBitmap.Reset();
+        m_lastLabelScale = -1.0f;
+        m_lastRefText.clear();
+        // Per-overlay FPS (configurable; default 10)
+        setTargetFPS(g_cfg.getInt(m_name, "target_fps", 15));
     }
 
 
@@ -298,12 +303,7 @@ protected:
             drawArcProgress(centerX, centerY, radius - (4.0f * scale), deltaProgress, deltaColor, scale);
         }
         
-        // Draw "DELTA" label at top (scaled positioning)
-        const float4 labelColor = float4(0.6f, 0.6f, 0.6f, 1.0f);
-        float labelWidth = 60.0f * scale;
-        float labelHeight = 16.0f * scale;
-        m_brush->SetColor(labelColor);
-        m_text.render( m_renderTarget.Get(), L"DELTA", m_scaledSmallFormat.Get(), centerX - labelWidth/2, centerX + labelWidth/2, centerY - radius + (15.0f * scale), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+        // Label is cached and drawn via static labels bitmap
         
         // Draw delta value in center (scaled positioning)
         wchar_t deltaBuffer[32];
@@ -399,11 +399,7 @@ protected:
             m_brush->SetColor(timeColor);
             m_text.render( m_renderTarget.Get(), timeBuffer, m_scaledDeltaFormat.Get(), leftX, leftX + columnWidth, timeY + (timeHeight * 0.6f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing * 3.0f );
             
-            // Draw reference mode label
-            std::string refText = getReferenceText();
-            std::wstring refTextW(refText.begin(), refText.end());
-            m_brush->SetColor(textColor);
-            m_text.render( m_renderTarget.Get(), refTextW.c_str(), m_scaledSmallFormat.Get(), leftX, leftX + columnWidth, labelY + (timeHeight * 0.2f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+            // Reference label drawn via static labels bitmap
         }
         
         // Predicted time section (right side)
@@ -433,8 +429,7 @@ protected:
                 
                 m_brush->SetColor(predictedColor);
                 m_text.render( m_renderTarget.Get(), timeBuffer, m_scaledDeltaFormat.Get(), rightX, rightX + columnWidth, timeY + (timeHeight * 0.6f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing * 3.0f );
-                m_brush->SetColor(textColor);
-                m_text.render( m_renderTarget.Get(), L"PREDICTED", m_scaledSmallFormat.Get(), rightX, rightX + columnWidth, labelY + (timeHeight * 0.2f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+                // Predicted label drawn via static labels bitmap
             }
         }
     }
@@ -500,14 +495,31 @@ protected:
         
         const float infoY = circleY - infoHeight / 2;
 
-        // Create scaled text formats
-        createScaledTextFormats(scale);
+        // Create scaled text formats only when scale changes to avoid per-frame allocations
+        static float s_lastScale = -1.0f;
+        if (fabsf(scale - s_lastScale) > 0.01f || !m_scaledDeltaFormat || !m_scaledSmallFormat || !m_scaledTitleFormat) {
+            createScaledTextFormats(scale);
+            s_lastScale = scale;
+        }
 
-        // Draw circular delta display
+        // Draw circular delta display first so cached 'DELTA' text can be drawn over it
         drawCircularDelta(circleX, circleY, circleRadius, displayDelta, scale);
         
-        // Draw session info panel
+        // Draw session info panel backgrounds and dynamic values
         drawSessionInfo(infoX, infoY, infoWidth, infoHeight, scale);
+
+        // Draw cached static labels last so they do not get covered by backgrounds
+        {
+            const std::string refText = getReferenceText();
+            const bool needRebuild = !m_staticLabelsBitmap || fabsf(scale - m_lastLabelScale) > 0.01f || refText != m_lastRefText || m_staticSizeX != m_width || m_staticSizeY != m_height;
+            if (needRebuild) {
+                buildStaticLabelsBitmap(scale, refText, circleX, circleY, circleRadius, infoX, infoY, infoWidth, infoHeight);
+            }
+            if (m_staticLabelsBitmap) {
+                D2D1_RECT_F dest = { 0.0f, 0.0f, (float)m_width, (float)m_height };
+                m_renderTarget->DrawBitmap(m_staticLabelsBitmap.Get(), dest);
+            }
+        }
 
         m_renderTarget->EndDraw();
     }
@@ -545,4 +557,57 @@ protected:
 
     TextCache m_text;
 	float m_fontSpacing = getGlobalFontSpacing();
+
+    // Cached static labels to reduce per-frame text draws
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_staticLabelsBitmap;
+    float m_lastLabelScale = -1.0f;
+    std::string m_lastRefText;
+    int m_staticSizeX = 0;
+    int m_staticSizeY = 0;
+
+    void buildStaticLabelsBitmap(float scale,
+                                 const std::string& refText,
+                                 float circleX, float circleY, float circleRadius,
+                                 float infoX, float infoY, float infoWidth, float infoHeight)
+    {
+        if (!m_renderTarget) return;
+        Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> rt;
+        if (FAILED(m_renderTarget->CreateCompatibleRenderTarget(D2D1::SizeF((float)m_width, (float)m_height), &rt))) return;
+        rt->BeginDraw();
+        rt->Clear(float4(0,0,0,0));
+
+        // Ensure text formats exist at current scale
+        createScaledTextFormats(scale);
+
+        // Draw "DELTA" label at top of circle
+        const float4 labelColor = float4(0.6f, 0.6f, 0.6f, 1.0f);
+        m_brush->SetColor(labelColor);
+        float labelWidth = 60.0f * scale;
+        m_text.render( rt.Get(), L"DELTA", m_scaledSmallFormat.Get(), circleX - labelWidth/2, circleX + labelWidth/2, circleY - circleRadius + (15.0f * scale), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+
+        // Draw reference label and "PREDICTED" labels in info panel
+        const float padding = 8.0f * scale;
+        const float columnWidth = (infoWidth - (3.0f * padding)) / 2;
+        const float leftX = infoX + padding;
+        const float rightX = infoX + (2.0f * padding) + columnWidth;
+        const float panelCenterY = infoY + infoHeight * 0.5f;
+        const float innerSpacing = 6.0f * scale;
+        float timeHeight = 22.0f * scale;
+        float labelHeight = 15.0f * scale;
+        const float totalBlockH = timeHeight + innerSpacing + labelHeight;
+        const float blockTop = panelCenterY - (totalBlockH * 0.5f);
+        float labelY = blockTop + timeHeight + innerSpacing;
+
+        std::wstring refW(refText.begin(), refText.end());
+        m_brush->SetColor(float4(0.8f, 0.8f, 0.8f, 1.0f));
+        m_text.render( rt.Get(), refW.c_str(), m_scaledSmallFormat.Get(), leftX, leftX + columnWidth, labelY + (timeHeight * 0.2f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+        m_text.render( rt.Get(), L"PREDICTED", m_scaledSmallFormat.Get(), rightX, rightX + columnWidth, labelY + (timeHeight * 0.2f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+
+        rt->EndDraw();
+        rt->GetBitmap(&m_staticLabelsBitmap);
+        m_lastLabelScale = scale;
+        m_lastRefText = refText;
+        m_staticSizeX = m_width;
+        m_staticSizeY = m_height;
+    }
 };

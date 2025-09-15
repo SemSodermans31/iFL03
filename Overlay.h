@@ -46,6 +46,12 @@ class Overlay
         virtual bool    canEnableWhileNotDriving() const;
         virtual bool    canEnableWhileDisconnected() const;
 
+        // Performance controls
+        void            setTargetFPS( int fps );
+        int             getTargetFPS() const;
+        void            setStaticMode( bool on );
+        bool            isStaticMode() const;
+
         void            enable( bool on );
         bool            isEnabled() const;
 
@@ -107,4 +113,13 @@ class Overlay
         Microsoft::WRL::ComPtr<IDCompositionVisual>     m_compositionVisual;
         Microsoft::WRL::ComPtr<IDWriteFactory>          m_dwriteFactory;
         Microsoft::WRL::ComPtr<ID2D1SolidColorBrush>    m_brush;
+
+        // Simple frame pacing (CPU optimization)
+        DWORD           m_lastUpdateTick = 0;
+        int             m_targetFPS = 60;
+        bool            m_forceNextUpdate = false;
+        bool            m_staticMode = false;
+
+        // Allow derived/owners to request a redraw outside normal cadence
+        void            requestRedraw() { m_forceNextUpdate = true; }
 };

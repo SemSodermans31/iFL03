@@ -284,9 +284,9 @@ inline std::string formatLaptime( float secs )
     char s[32];
     const int mins = int(secs/60.0f);
     if( mins )
-        sprintf( s, "%d:%06.3f", mins, fmodf(secs,60.0f) );
+        _snprintf_s( s, _countof(s), _TRUNCATE, "%d:%06.3f", mins, fmodf(secs,60.0f) );
     else
-        sprintf( s, "%.03f", secs );
+        _snprintf_s( s, _countof(s), _TRUNCATE, "%.03f", secs );
     return std::string( s );
 }
 

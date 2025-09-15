@@ -81,6 +81,9 @@ class OverlayInputs : public Overlay
 
             // Load selected steering wheel image if any
             loadSteeringWheelBitmap();
+
+            // Per-overlay FPS (configurable; default 30)
+            setTargetFPS(g_cfg.getInt(m_name, "target_fps", 30));
         }
 
         virtual void onUpdate()

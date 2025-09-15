@@ -79,6 +79,10 @@ protected:
         m_text.reset( m_dwriteFactory.Get() );
         createGlobalTextFormat(1.0f, m_textFormat);
         createGlobalTextFormat(0.7f, m_textFormatSmall);
+        // Rebuild cached geometry on size changes
+        m_cachedPathGeometry.Reset();
+        // Per-overlay FPS (configurable; default 10)
+        setTargetFPS(g_cfg.getInt(m_name, "target_fps", 15));
     }
 
     virtual float2 getDefaultSize()
@@ -190,48 +194,37 @@ protected:
             const float offsetX = (overlayW - scaledW) * 0.5f;
             const float offsetY = (overlayH - scaledH) * 0.5f;
 
-            // Draw track path as a smooth outlined path
-            if (m_trackPath.size() >= 3)
-            {
-                // Create geometry for the track path
-                Microsoft::WRL::ComPtr<ID2D1PathGeometry> pathGeometry;
-                Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
-                
-                if (SUCCEEDED(m_d2dFactory->CreatePathGeometry(&pathGeometry)))
-                {
-                    if (SUCCEEDED(pathGeometry->Open(&sink)))
-                    {
-                        // Start the path
+            // Build track geometry once per size/bounds change and reuse
+            if (!m_cachedPathGeometry) {
+                if (m_trackPath.size() >= 3) {
+                    Microsoft::WRL::ComPtr<ID2D1PathGeometry> pathGeometry;
+                    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+                    if (SUCCEEDED(m_d2dFactory->CreatePathGeometry(&pathGeometry)) && SUCCEEDED(pathGeometry->Open(&sink))) {
                         const float2 start = m_trackPath[0];
                         const float startX = dest.left + offsetX + (start.x - minX) * scale;
                         const float startY = dest.top + offsetY + (start.y - minY) * scale;
                         sink->BeginFigure(D2D1::Point2F(startX, startY), D2D1_FIGURE_BEGIN_HOLLOW);
-                        
-                        // Add all points to create a smooth path
-                        for (size_t i = 1; i < m_trackPath.size(); ++i)
-                        {
+                        for (size_t i = 1; i < m_trackPath.size(); ++i) {
                             const float2 pt = m_trackPath[i];
                             const float ptX = dest.left + offsetX + (pt.x - minX) * scale;
                             const float ptY = dest.top + offsetY + (pt.y - minY) * scale;
                             sink->AddLine(D2D1::Point2F(ptX, ptY));
                         }
-                        
                         sink->EndFigure(D2D1_FIGURE_END_CLOSED);
                         sink->Close();
-                        
-                        // Get configurable track width
-                        const float trackWidth = g_cfg.getFloat(m_name, "track_width", 6.0f);
-                        const float outlineWidth = trackWidth * 2.0f; // Outline is twice as thick
-
-                        // Draw black outline first (thicker)
-                        m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * globalOpacity));
-                        m_renderTarget->DrawGeometry(pathGeometry.Get(), m_brush.Get(), outlineWidth);
-
-                        // Draw white track path on top (configurable width)
-                        m_brush->SetColor(trackCol);
-                        m_renderTarget->DrawGeometry(pathGeometry.Get(), m_brush.Get(), trackWidth);
+                        m_cachedPathGeometry = pathGeometry;
+                        m_cachedTrackWidth = g_cfg.getFloat(m_name, "track_width", 6.0f);
                     }
                 }
+            }
+
+            if (m_cachedPathGeometry) {
+                const float trackWidth = m_cachedTrackWidth;
+                const float outlineWidth = trackWidth * 2.0f;
+                m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * globalOpacity));
+                m_renderTarget->DrawGeometry(m_cachedPathGeometry.Get(), m_brush.Get(), outlineWidth);
+                m_brush->SetColor(trackCol);
+                m_renderTarget->DrawGeometry(m_cachedPathGeometry.Get(), m_brush.Get(), trackWidth);
             }
 
             // Store scaling info for marker positioning
@@ -537,6 +530,9 @@ private:
     Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;     // For self car (16pt)
     Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatSmall; // For other cars (12pt)
     TextCache    m_text;
+    // Cached drawing data to avoid rebuilding each frame
+    Microsoft::WRL::ComPtr<ID2D1PathGeometry> m_cachedPathGeometry;
+    float m_cachedTrackWidth = 6.0f;
 
     void loadPathFromJson()
     {
@@ -616,7 +612,7 @@ private:
         m_lastTrackId = id;
         
         char buf[128];
-        sprintf(buf, "OverlayTrack: loaded %zu points and %zu extended lines for trackId %d\n", 
+        _snprintf_s(buf, _countof(buf), _TRUNCATE, "OverlayTrack: loaded %zu points and %zu extended lines for trackId %d\n", 
                m_trackPath.size(), m_extendedLines.size(), id);
         OutputDebugStringA(buf);
     }
