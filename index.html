@@ -11,59 +11,43 @@
 	<meta name="description" content="iFL03 is a lightweight, modern overlay suite for iRacing with a polished CEF-based settings UI.">
 </head>
 <body class="min-h-dvh bg-[#000000] text-[#a8a8a8]">
-	<!-- Nav -->
-	<header class="sticky top-0 z-10 bg-[#121212]">
-		<div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-			<a href="#" class="text-slate-100 font-semibold tracking-wide">iFL03 Overlays</a>
-			<nav class="flex gap-4 text-sm">
-				<a class="hover:text-slate-100" href="#features">Features</a>
-				<a class="hover:text-slate-100" href="#overlays">Overlays</a>
-				<a class="hover:text-slate-100" href="#install">Install</a>
-				<a class="hover:text-slate-100" href="#links">Links</a>
-			</nav>
-		</div>
-	</header>
-
 	<!-- Hero -->
 	<section class="relative">
-		<div class="relative h-56 md:h-80 overflow-hidden">
-			<div class="absolute inset-0 bg-cover bg-center" style="background-image:url('assets/covers/max.jpg')"></div>
+		<div class="relative h-[90vh] overflow-hidden md:overflow-visible">
+			<div class="absolute inset-0 bg-cover bg-center" style="background-image:url('assets/covers/website.jpg')"></div>
 			<div class="absolute inset-0 bg-[#1f1f1f]/40"></div>
-			<div class="relative h-full mx-auto max-w-6xl px-4 flex items-end pb-6">
-				<h1 class="text-5xl font-extrabold tracking-wide text-slate-100">iFL03 Overlays</h1>
+			
+			<!-- Nav -->
+			<header class="relative z-10">
+				<div class="mx-auto max-w-7xl px-4 py-6 flex items-center justify-between">
+					<a href="#" class="text-lg text-slate-100 font-semibold tracking-wide hidden md:block">iFL03 Overlays</a>
+					<nav class="flex gap-4 text-lg justify-center md:justify-start">
+						<a class="font-semibold text-slate-100 hover:text-slate-300" href="#features">Features</a>
+						<a class="font-semibold text-slate-100 hover:text-slate-300" href="#overlays">Overlays</a>
+						<a class="font-semibold text-slate-100 hover:text-slate-300" href="#install">Install</a>
+						<a class="font-semibold text-slate-100 hover:text-slate-300" href="#links">Links</a>
+					</nav>
+				</div>
+			</header>
+
+			<div class="relative h-[50vh] mx-auto max-w-7xl px-4 flex items-center justify-center">
+				<h1 class="text-3xl md:text-7xl font-michroma tracking-wide text-slate-100">iFL03 OVERLAYS</h1>
+			</div>
+			<!-- Hero video preview -->
+			<div class="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-20 w-full max-w-7xl px-4 hidden md:flex justify-center">
+				<figure class="w-full rounded-xl overflow-hidden bg-black/60">
+					<video class="w-full h-auto" src="assets/readmeimg/overlays.mp4" poster="assets/readmeimg/overlay_preview.jpg" playsinline muted autoplay loop></video>
+				</figure>
 			</div>
 		</div>
 	</section>
 
 	<main>
-		<!-- Intro / CTA -->
-		<section class="mx-auto max-w-6xl px-4 py-8 grid gap-6 md:grid-cols-2 items-center">
-			<div>
-				<h2 class="text-xl text-slate-100 font-semibold mb-2">Lightweight, polished, configurable</h2>
-				<p>iFL03 is a continuation of the iRon project with a refreshed visual style, sensible defaults, and a friendlier setup experience via a built‑in Chromium (CEF) UI. It runs well on modest PCs and keeps dependencies to a minimum.</p>
-				<div class="mt-3 flex gap-3">
-					<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Download</a>
-					<a href="#install" class="rounded-lg bg-[#1f1f1f] px-4 py-2 text-sm hover:bg-[#3c3c3c]">Install guide</a>
-				</div>
-			</div>
-			<figure class="rounded-xl overflow-hidden border border-[#1f1f1f]">
-				<img src="assets/readmeimg/index.png" alt="Overview screenshot">
-			</figure>
-		</section>
-
 		<!-- Upcoming -->
-		<section id="Upcoming" class="bg-[#121212] py-8">
-			<div class="mx-auto max-w-6xl px-4">
+		<section id="Upcoming" class="md:pt-80 lg:pt-96 xl:pt-112 bg-[#121212] py-8">
+			<div class="mx-auto max-w-7xl px-4">
 				<h3 class="text-xl text-slate-100 font-semibold mb-4">Upcoming</h3>
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">Roadmap</h4>
-						<ul class="list-disc ml-0.5 space-y-2 text-sm">
-							<li>All iRacing trackmaps, some new ones are still missing</li>
-							<li>Dedicated Tire Overlay</li>
-							<li>Dedicated Fuel Calculator</li>
-						</ul>
-					</div>
 					<div class="rounded-xl bg-[#1f1f1f] p-6">
 						<h4 class="text-slate-100 font-semibold mb-2">Quality of Life</h4>
 						<p class="text-sm">More customization options per overlay and different key shortcuts for each configured overlay json file.</p>
@@ -78,7 +62,7 @@
 
 		<!-- Features -->
 		<section id="features" class="bg-[#121212] py-8">
-			<div class="mx-auto max-w-6xl px-4">
+			<div class="mx-auto max-w-7xl px-4">
 				<h3 class="text-xl text-slate-100 font-semibold mb-4">What’s inside</h3>
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 					<div class="rounded-xl bg-[#1f1f1f] p-6">
@@ -99,9 +83,93 @@
 				</div>
 			</div>
 		</section>
+		
+		<!-- Intro / CTA -->
+		<section class="mx-auto max-w-7xl px-4 py-24 grid gap-6 md:grid-cols-2 items-center">
+			<div>
+				<h2 class="text-xl text-slate-100 font-semibold mb-2">Modern, Intuitive, Configurable and Free to use</h2>
+				<p>iFL03 is a continuation of the iRon project with a refreshed visual style, new features and overlays, and a friendlier setup experience via a built‑in Chromium (CEF) UI. It runs well on modest PCs and keeps dependencies to a minimum.</p>
+				<div class="mt-3 flex gap-3">
+					<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Download</a>
+					<a href="#install" class="rounded-lg bg-[#1f1f1f] px-4 py-2 text-sm hover:bg-[#3c3c3c]">Install guide</a>
+				</div>
+			</div>
+			<figure class="rounded-lg overflow-hidden border border-[#1f1f1f]">
+				<img src="assets/readmeimg/overlay_preview.jpg" alt="Overview screenshot" class="md:hidden">
+				<img src="assets/readmeimg/index.png" alt="Overview screenshot" class="hidden md:block">
+			</figure>
+		</section>
+
+		<!-- Roadmap -->
+		<section id="roadmap" class="relative bg-[#0f1f18] py-12">
+			<div class="relative mx-auto max-w-7xl px-4">
+				<div class="flex items-center gap-3 mb-6">
+					<div class="h-6 w-1 rounded-full bg-green-600"></div>
+					<h3 class="text-xl text-emerald-100 font-semibold">Roadmap</h3>
+				</div>
+				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+					<!-- Card 1 -->
+					<div class="group relative rounded-xl p-6 bg-[#173a2a] border border-[#216040] text-emerald-100" style="clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);">
+						<div class="text-emerald-300 text-xs font-semibold mb-4">[01]</div>
+						<div class="text-sm">All iRacing trackmaps</div>
+						<div class="absolute right-4 bottom-4 grid grid-cols-2 gap-0.5 opacity-50">
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+						</div>
+					</div>
+					<!-- Card 2 -->
+					<div class="group relative rounded-xl p-6 bg-[#173a2a] border border-[#216040] text-emerald-100" style="clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);">
+						<div class="text-emerald-300 text-xs font-semibold mb-4">[02]</div>
+						<div class="text-sm">Dedicated Tire Overlay</div>
+						<div class="absolute right-4 bottom-4 grid grid-cols-2 gap-0.5 opacity-50">
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+						</div>
+					</div>
+					<!-- Card 3 -->
+					<div class="group relative rounded-xl p-6 bg-[#173a2a] border border-[#216040] text-emerald-100" style="clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);">
+						<div class="text-emerald-300 text-xs font-semibold mb-4">[03]</div>
+						<div class="text-sm">Dedicated Fuel Calculator</div>
+						<div class="absolute right-4 bottom-4 grid grid-cols-2 gap-0.5 opacity-50">
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+						</div>
+					</div>
+					<!-- Card 4 -->
+					<div class="group relative rounded-xl p-6 bg-[#173a2a] border border-[#216040] text-emerald-100" style="clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);">
+						<div class="text-emerald-300 text-xs font-semibold mb-4">[04]</div>
+						<div class="text-sm">Per‑overlay customization</div>
+						<div class="absolute right-4 bottom-4 grid grid-cols-2 gap-0.5 opacity-50">
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+						</div>
+					</div>
+					<!-- Card 5 -->
+					<div class="group relative rounded-xl p-6 bg-[#173a2a] border border-[#216040] text-emerald-100" style="clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);">
+						<div class="text-emerald-300 text-xs font-semibold mb-4">[05]</div>
+						<div class="text-sm">Separate hotkeys per overlay config</div>
+						<div class="absolute right-4 bottom-4 grid grid-cols-2 gap-0.5 opacity-50">
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+						</div>
+					</div>
+					<!-- Card 6 -->
+					<div class="group relative rounded-xl p-6 bg-[#173a2a] border border-[#216040] text-emerald-100" style="clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);">
+						<div class="text-emerald-300 text-xs font-semibold mb-4">[06]</div>
+						<div class="text-sm">Performance polish</div>
+						<div class="absolute right-4 bottom-4 grid grid-cols-2 gap-0.5 opacity-50">
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+							<span class="w-2 h-2 bg-emerald-300/40"></span><span class="w-2 h-2 bg-emerald-300/40"></span>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		
 
 		<!-- Overlay gallery -->
-		<section id="overlays" class="mx-auto max-w-6xl px-4 py-8">
+		<section id="overlays" class="mx-auto max-w-7xl px-4 py-8">
 			<h3 class="text-xl text-slate-100 font-semibold mb-4">Overlay selection</h3>
 			<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
 				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/relative.png" alt="Relative"></figure>
@@ -117,7 +185,7 @@
 
 		<!-- Install -->
 		<section id="install" class="bg-[#121212] py-8">
-			<div class="mx-auto max-w-6xl px-4 grid gap-6 md:grid-cols-2 items-start">
+			<div class="mx-auto max-w-7xl px-4 grid gap-6 md:grid-cols-2 items-start">
 				<div>
 					<h3 class="text-xl text-slate-100 font-semibold mb-3">Install & run</h3>
 					<ol class="list-decimal ml-0.5 space-y-2 text-sm">
@@ -137,7 +205,7 @@
 
 	<!-- Footer -->
 	<footer id="links" class="bg-[#000000] border-t border-[#1f1f1f]">
-		<div class="mx-auto max-w-6xl px-4 py-6 grid gap-6 md:grid-cols-3 items-start">
+		<div class="mx-auto max-w-7xl px-4 py-6 grid gap-6 md:grid-cols-3 items-start">
 			<div>
 				<div class="text-slate-100 font-semibold mb-2">Links</div>
 				<ul class="text-sm space-y-2">

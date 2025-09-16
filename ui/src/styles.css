@@ -1,4 +1,19 @@
 @import "tailwindcss";
+@source "../../index.html";
+@source "./**/*.html";
+@source "./**/*.js";
+
+@font-face {
+  font-family: "Michroma";
+  src: url("../../assets/fonts/Michroma-Regular.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-michroma: "Michroma", var(--font-sans);
+}
 
 /* Hide CEF status bar and any browser chrome elements */
 ::-webkit-status-bar,
