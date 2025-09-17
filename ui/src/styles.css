@@ -141,6 +141,25 @@ ul {
   .glass-btn, .glass-btn::after { transition: none; animation: none; }
 }
 
+/* Hide scrollbar while keeping functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Scroll snap container */
+.scroll-snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+}
+
+/* Scroll snap alignment */
+.scroll-snap-align-center {
+  scroll-snap-align: center;
+}
+
 /* Liquid glass frame border */
 .glass-frame {
   position: relative;
@@ -274,97 +293,4 @@ ul {
   opacity: 1;
   visibility: visible;
   position: static;
-}
-
-/* Carousel Styles */
-.carousel-container {
-  position: relative;
-  width: 100%;
-}
-
-.carousel-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.carousel-slides {
-  display: flex;
-  width: 100%;
-}
-
-.carousel-slide {
-  flex: 0 0 100%;
-  min-width: 0;
-}
-
-.carousel-nav {
-  transition: all 0.3s ease;
-  opacity: 0.7;
-}
-
-.carousel-nav:hover {
-  opacity: 1;
-  transform: translateY(-50%) scale(1.1);
-}
-
-.carousel-indicators {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
-  padding: 0.5rem;
-  z-index: 10;
-}
-
-.carousel-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.4);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-  flex-shrink: 0;
-}
-
-.carousel-indicator:hover {
-  background-color: rgba(255, 255, 255, 0.7);
-  border-color: rgba(255, 255, 255, 0.5);
-  transform: scale(1.1);
-}
-
-.carousel-indicator.active-indicator,
-.carousel-indicator.bg-white\/80 {
-  background-color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(255, 255, 255, 0.8);
-  transform: scale(1.2);
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
-}
-
-.carousel-indicator.bg-white\/30 {
-  background-color: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-/* Smooth transitions for carousel */
-.carousel-slides {
-  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Touch feedback */
-.carousel-nav:active {
-  transform: translateY(-50%) scale(0.95);
-}
-
-.carousel-indicator:active {
-  transform: scale(0.9);
-}
-
-/* Ensure indicators are properly positioned */
-.carousel-container .carousel-indicators {
-  width: 100%;
-  text-align: center;
 }
