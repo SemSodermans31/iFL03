@@ -241,7 +241,7 @@ class OverlayRelative : public Overlay
             const float4 iratingBgCol       = g_cfg.getFloat4( m_name, "irating_background_col", float4(1,1,1,0.85f) );
             const float4 licenseTextCol     = g_cfg.getFloat4( m_name, "license_text_col", float4(1,1,1,0.9f) );
             const float  licenseBgAlpha     = g_cfg.getFloat( m_name, "license_background_alpha", 0.8f );
-            const float4 alternateLineBgCol = g_cfg.getFloat4( m_name, "alternate_line_background_col", float4(0.5f,0.5f,0.5f,0) );
+            const float4 alternateLineBgCol = g_cfg.getFloat4( m_name, "alternate_line_background_col", float4(0.5f,0.5f,0.5f,0.1f) );
             const float4 buddyCol           = g_cfg.getFloat4( m_name, "buddy_col", float4(0.2f,0.75f,0,1) );
             const float4 flaggedCol         = g_cfg.getFloat4( m_name, "flagged_col", float4(0.6f,0.35f,0.2f,1) );
             const float4 headerCol          = g_cfg.getFloat4( m_name, "header_col", float4(0.7f,0.7f,0.7f,0.9f) );
@@ -352,7 +352,17 @@ class OverlayRelative : public Overlay
                 const ColumnLayout::Column* clm = nullptr;
                 
                 // Position
-                int position = useStubData ? (ci.carIdx + 1) : ir_getPosition(ci.carIdx);
+                int position = 0;
+                if (useStubData) {
+                    // For stub data, use the position in the current display order
+                    // The first car shown is P1, second is P2, etc.
+                    int displayIndex = selfCarInfoIdx - entriesAbove + cnt;
+                    if (displayIndex >= 0 && displayIndex < (int)relatives.size()) {
+                        position = displayIndex + 1; // P1, P2, P3, etc.
+                    }
+                } else {
+                    position = ir_getPosition(ci.carIdx);
+                }
                 if( position > 0 )
                 {
                     clm = m_columns.get( (int)Columns::POSITION );
@@ -595,19 +605,45 @@ class OverlayRelative : public Overlay
                         if( phase == 5 && !car.isSelf )
                             continue;
                         
-                        float e = ir_CarIdxLapDistPct.getFloat(ci.carIdx);
-
-                        const float eself = ir_CarIdxLapDistPct.getFloat(ir_session.driverCarIdx);
-
-                        if( minimapIsRelative )
-                        {
-                            e = e - eself + 0.5f;
-                            if( e > 1 )
-                                e -= 1;
-                            if( e < 0 )
-                                e += 1;
+                        float e;
+                        if (useStubData) {
+                            // Use stub data minimap positions if available
+                            auto relativeData = StubDataManager::getRelativeData();
+                            bool foundMinimapPos = false;
+                            for (const auto& rel : relativeData) {
+                                if (rel.carIdx == ci.carIdx) {
+                                    e = rel.minimapX * w + x;
+                                    foundMinimapPos = true;
+                                    break;
+                                }
+                            }
+                            if (!foundMinimapPos) {
+                                // Fallback to lap distance calculation
+                                e = ir_CarIdxLapDistPct.getFloat(ci.carIdx);
+                                const float eself = ir_CarIdxLapDistPct.getFloat(ir_session.driverCarIdx);
+                                if( minimapIsRelative )
+                                {
+                                    e = e - eself + 0.5f;
+                                    if( e > 1 )
+                                        e -= 1;
+                                    if( e < 0 )
+                                        e += 1;
+                                }
+                                e = e * w + x;
+                            }
+                        } else {
+                            e = ir_CarIdxLapDistPct.getFloat(ci.carIdx);
+                            const float eself = ir_CarIdxLapDistPct.getFloat(ir_session.driverCarIdx);
+                            if( minimapIsRelative )
+                            {
+                                e = e - eself + 0.5f;
+                                if( e > 1 )
+                                    e -= 1;
+                                if( e < 0 )
+                                    e += 1;
+                            }
+                            e = e * w + x;
                         }
-                        e = e * w + x;
 
                         float4 col = baseCol;
                         if( !car.isSelf && ir_CarIdxOnPitRoad.getBool(ci.carIdx) )

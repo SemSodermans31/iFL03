@@ -26,8 +26,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const pauseIcon = document.getElementById('pause-icon');
 
     let currentSlide = 0;
-    let isPlaying = false;
+    let isPlaying = true; // Start with auto-play enabled
     let autoScrollInterval;
+    let isProgrammaticScroll = false;
 
     // Function to update active dot
     function updateActiveDot() {
@@ -45,14 +46,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // Function to scroll to specific slide
     function scrollToSlide(slideIndex) {
         const slides = document.querySelectorAll('.scroll-snap-align-center');
-        if (slides[slideIndex]) {
+        const container = document.querySelector('.scrollbar-hide');
+        if (slides[slideIndex] && container) {
             currentSlide = slideIndex;
-            slides[slideIndex].scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'center'
+            const slide = slides[slideIndex];
+            const containerRect = container.getBoundingClientRect();
+            const slideRect = slide.getBoundingClientRect();
+            const scrollLeft = container.scrollLeft + (slideRect.left - containerRect.left) - (containerRect.width / 2) + (slideRect.width / 2);
+
+            isProgrammaticScroll = true;
+            container.scrollTo({
+                left: scrollLeft,
+                behavior: 'smooth'
             });
             updateActiveDot();
+            setTimeout(() => { isProgrammaticScroll = false; }, 300);
         }
     }
 
@@ -87,9 +95,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function startAutoScroll() {
         if (autoScrollInterval) clearInterval(autoScrollInterval);
         autoScrollInterval = setInterval(() => {
-            currentSlide = (currentSlide + 1) % 5; // 5 slides total
+            currentSlide = (currentSlide + 1) % 5;
             scrollToSlide(currentSlide);
-        }, 3000); // Change slide every 3 seconds
+        }, 6000);
     }
 
     // Function to stop auto-scrolling
@@ -143,21 +151,69 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listener for play/pause button
     playPauseBtn.addEventListener('click', togglePlayPause);
 
-    // Listen for scroll events to update active dot
+    // Listen for scroll events to update active dot and limit scroll bounds
     scrollContainer.addEventListener('scroll', () => {
+        // Skip if this is a programmatic scroll
+        if (isProgrammaticScroll) return;
+
         // Use requestAnimationFrame for better performance
-        requestAnimationFrame(updateCurrentSlideFromScroll);
+        requestAnimationFrame(() => {
+            updateCurrentSlideFromScroll();
+
+            // Prevent scrolling beyond the 5th slide (index 4)
+            const slides = document.querySelectorAll('.scroll-snap-align-center');
+            if (slides.length >= 5 && currentSlide > 4) {
+                // User scrolled to empty slides, snap back to 5th slide
+                isProgrammaticScroll = true;
+                scrollToSlide(4);
+                setTimeout(() => { isProgrammaticScroll = false; }, 300);
+            }
+        });
     });
 
     // Initialize active dot
     updateActiveDot();
 
-    // Ensure initial icon state shows Play only
-    playIcon.classList.remove('hidden');
-    pauseIcon.classList.add('hidden');
+    // Start auto-play by default
+    startAutoScroll();
 
-    // Optional: Start with first slide centered on load
-    setTimeout(() => {
-        scrollToSlide(0);
-    }, 100);
+    // Ensure initial icon state shows Pause (since auto-play is active)
+    playIcon.classList.add('hidden');
+    pauseIcon.classList.remove('hidden');
+
+    // Overlay Gallery Navigation
+    const overlayGallery = document.getElementById('overlay-gallery');
+    const overlayPrevBtn = document.getElementById('overlay-nav-prev');
+    const overlayNextBtn = document.getElementById('overlay-nav-next');
+    let currentOverlayIndex = 0;
+    const overlayItems = document.querySelectorAll('.overlay-gallery-item');
+
+    function updateOverlayNavigation() {
+        overlayPrevBtn.disabled = currentOverlayIndex === 0;
+        overlayNextBtn.disabled = currentOverlayIndex === overlayItems.length - 1;
+    }
+
+    function scrollToOverlay(index) {
+        if (index >= 0 && index < overlayItems.length) {
+            currentOverlayIndex = index;
+            const targetItem = overlayItems[index];
+            targetItem.scrollIntoView({
+                behavior: 'smooth',
+                block: 'nearest',
+                inline: 'start'
+            });
+            updateOverlayNavigation();
+        }
+    }
+
+    overlayPrevBtn.addEventListener('click', () => {
+        scrollToOverlay(currentOverlayIndex - 1);
+    });
+
+    overlayNextBtn.addEventListener('click', () => {
+        scrollToOverlay(currentOverlayIndex + 1);
+    });
+
+    // Initialize overlay navigation
+    updateOverlayNavigation();
 });
