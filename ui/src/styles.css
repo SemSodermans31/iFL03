@@ -62,3 +62,309 @@ html::after {
   background-clip: padding-box;
   border-radius: 10px;
 }
+
+ul {
+  list-style-type: none;
+}
+
+/* Liquid glass buttons (iOS-like) */
+:root {
+  --glass-fg: #e5e7eb;
+}
+.glass-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04)), var(--glass-tint, rgba(0,0,0,0));
+  border: 1px solid var(--glass-border, rgba(255,255,255,0.16));
+  color: var(--glass-fg);
+  text-decoration: none;
+  backdrop-filter: blur(26px) saturate(140%);
+  -webkit-backdrop-filter: blur(26px) saturate(140%);
+  transition: transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s, background .25s, color .25s, filter .25s;
+  overflow: hidden;
+  isolation: isolate;
+}
+.glass-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 180% at 0% 0%, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.06) 38%, transparent 60%), radial-gradient(100% 140% at 100% 0%, rgba(255,255,255,0.10) 0%, transparent 50%);
+  mix-blend-mode: screen;
+  pointer-events: none;
+  filter: blur(6px);
+  opacity: .9;
+  animation: liquidFlow 6s ease-in-out infinite alternate;
+}
+.glass-btn::after {
+  content: "";
+  position: absolute;
+  inset: -200% -50% auto -50%;
+  /* inset: -225% -75% auto -75%; */
+  height: 180%;
+  background: linear-gradient(60deg, transparent 0%, rgba(255,255,255,0.55) 45%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0.55) 55%, transparent 100%);
+  transform: translateY(60%) rotate(8deg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .25s, transform .6s cubic-bezier(.2,.7,.2,1);
+}
+.glass-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255,255,255,0.28);
+}
+.glass-btn:hover::after {
+  opacity: .9;
+  transform: translateY(-10%) rotate(8deg);
+}
+.glass-btn:active {
+  transform: translateY(0);
+  filter: saturate(120%);
+}
+/* Button Gradiant */
+.glass-primary {
+  --glass-tint: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+  --glass-border: rgba(255,255,255,0.22);
+  --glass-fg: #f3f4f6;
+}
+/* Keyframes */
+@keyframes liquidFlow {
+  0% { filter: blur(6px); transform: translate3d(0,0,0); }
+  100% { filter: blur(12px); transform: translate3d(0,-1%,0); }
+}
+/* Reduce motion */
+@media (prefers-reduced-motion: reduce) {
+  .glass-btn, .glass-btn::after { transition: none; animation: none; }
+}
+
+/* Liquid glass frame border */
+.glass-frame {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background:
+    linear-gradient(rgba(0,0,0,0.55), rgba(0,0,0,0.55)) padding-box,
+    conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0.06), rgba(255,255,255,0.22), rgba(255,255,255,0.06)) border-box;
+}
+
+/* Apple-inspired liquid glass roadmap cards */
+.glass-roadmap-card {
+  position: relative;
+  border-radius: 24px;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg,
+      rgba(255,255,255,0.08) 0%,
+      rgba(255,255,255,0.04) 25%,
+      rgba(255,255,255,0.02) 50%,
+      rgba(255,255,255,0.01) 75%,
+      transparent 100%
+    ),
+    linear-gradient(180deg,
+      rgba(0,0,0,0.1) 0%,
+      rgba(0,0,0,0.05) 50%,
+      rgba(0,0,0,0.02) 100%
+    );
+  border: 1px solid rgba(255,255,255,0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.1),
+    inset 0 -1px 0 rgba(255,255,255,0.05);
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.glass-roadmap-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(120, 119, 198, 0.1) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.glass-roadmap-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow:
+    0 20px 60px rgba(0,0,0,0.2),
+    0 0 0 1px rgba(255,255,255,0.1),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    inset 0 -1px 0 rgba(255,255,255,0.08);
+}
+
+.glass-roadmap-card:hover::before {
+  opacity: 1;
+}
+
+.glass-roadmap-card .card-content {
+  position: relative;
+  z-index: 1;
+  padding: 1.5rem;
+}
+
+.glass-roadmap-card .card-dots {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.125rem;
+}
+
+.glass-roadmap-card .card-dots span {
+  width: 0.375rem;
+  height: 0.375rem;
+  background: rgba(255,255,255,0.3);
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.glass-roadmap-card:hover .card-dots span {
+  background: rgba(255,255,255,0.6);
+  transform: scale(1.2);
+}
+
+/* Preview section buttons: smooth title->explanation fade and radius cap */
+.preview-btn {
+  border-radius: 9999px;
+  min-height: 2.5rem;
+  position: relative;
+}
+.preview-btn .preview-text {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  will-change: height;
+}
+.preview-btn .title,
+.preview-btn .explanation {
+  transition: opacity .25s ease, visibility .25s ease;
+  text-align: center;
+  white-space: normal;
+  word-wrap: break-word;
+  line-height: 1.35;
+}
+.preview-btn .explanation {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+}
+.preview-btn.show-explanation {
+  border-radius: 20px; /* cap radius for long, multiline explanations */
+}
+.preview-btn.show-explanation .title {
+  opacity: 0;
+  display: none;
+}
+.preview-btn.show-explanation .explanation {
+  opacity: 1;
+  visibility: visible;
+  position: static;
+}
+
+/* Carousel Styles */
+.carousel-container {
+  position: relative;
+  width: 100%;
+}
+
+.carousel-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.carousel-slides {
+  display: flex;
+  width: 100%;
+}
+
+.carousel-slide {
+  flex: 0 0 100%;
+  min-width: 0;
+}
+
+.carousel-nav {
+  transition: all 0.3s ease;
+  opacity: 0.7;
+}
+
+.carousel-nav:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+}
+
+.carousel-indicators {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding: 0.5rem;
+  z-index: 10;
+}
+
+.carousel-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.4);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.carousel-indicator:hover {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
+}
+
+.carousel-indicator.active-indicator,
+.carousel-indicator.bg-white\/80 {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.8);
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+.carousel-indicator.bg-white\/30 {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Smooth transitions for carousel */
+.carousel-slides {
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Touch feedback */
+.carousel-nav:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.carousel-indicator:active {
+  transform: scale(0.9);
+}
+
+/* Ensure indicators are properly positioned */
+.carousel-container .carousel-indicators {
+  width: 100%;
+  text-align: center;
+}
