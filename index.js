@@ -1,4 +1,21 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Smooth scroll for navigation links
+    const navLinks = document.querySelectorAll('a[href^="#"]');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const targetId = this.getAttribute('href').substring(1);
+            const targetElement = document.getElementById(targetId);
+
+            if (targetElement) {
+                targetElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
+    });
+
     // Preview buttons functionality
     var buttons = document.querySelectorAll('.preview-btn');
     buttons.forEach(function(btn) {
@@ -181,39 +198,4 @@ document.addEventListener('DOMContentLoaded', function() {
     playIcon.classList.add('hidden');
     pauseIcon.classList.remove('hidden');
 
-    // Overlay Gallery Navigation
-    const overlayGallery = document.getElementById('overlay-gallery');
-    const overlayPrevBtn = document.getElementById('overlay-nav-prev');
-    const overlayNextBtn = document.getElementById('overlay-nav-next');
-    let currentOverlayIndex = 0;
-    const overlayItems = document.querySelectorAll('.overlay-gallery-item');
-
-    function updateOverlayNavigation() {
-        overlayPrevBtn.disabled = currentOverlayIndex === 0;
-        overlayNextBtn.disabled = currentOverlayIndex === overlayItems.length - 1;
-    }
-
-    function scrollToOverlay(index) {
-        if (index >= 0 && index < overlayItems.length) {
-            currentOverlayIndex = index;
-            const targetItem = overlayItems[index];
-            targetItem.scrollIntoView({
-                behavior: 'smooth',
-                block: 'nearest',
-                inline: 'start'
-            });
-            updateOverlayNavigation();
-        }
-    }
-
-    overlayPrevBtn.addEventListener('click', () => {
-        scrollToOverlay(currentOverlayIndex - 1);
-    });
-
-    overlayNextBtn.addEventListener('click', () => {
-        scrollToOverlay(currentOverlayIndex + 1);
-    });
-
-    // Initialize overlay navigation
-    updateOverlayNavigation();
 });
