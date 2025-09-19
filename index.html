@@ -11,146 +11,616 @@
 	<meta name="description" content="iFL03 is a lightweight, modern overlay suite for iRacing with a polished CEF-based settings UI.">
 </head>
 <body class="min-h-dvh bg-[#000000] text-[#a8a8a8]">
-	<!-- Nav -->
-	<header class="sticky top-0 z-10 bg-[#121212]">
-		<div class="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-			<a href="#" class="text-slate-100 font-semibold tracking-wide">iFL03 Overlays</a>
-			<nav class="flex gap-4 text-sm">
-				<a class="hover:text-slate-100" href="#features">Features</a>
-				<a class="hover:text-slate-100" href="#overlays">Overlays</a>
-				<a class="hover:text-slate-100" href="#install">Install</a>
-				<a class="hover:text-slate-100" href="#links">Links</a>
-			</nav>
-		</div>
-	</header>
+	<main>	
+		<!-- Hero -->
+		<section class="relative">
+			<div class="relative h-[100vh] overflow-hidden md:overflow-visible">
+				<div class="absolute inset-0 bg-cover bg-center" style="background-image:url('assets/covers/website.jpg')"></div>
+				<div class="absolute inset-0 bg-[#1f1f1f]/40"></div>
+				
+				<!-- Nav -->
+				<header class="relative z-10">
+					<div class="mx-auto max-w-7xl px-4 py-6 flex items-center justify-between">
+						<a href="#" class="text-lg text-slate-100 font-michroma tracking-wide hidden md:block">iFL03 OVERLAYS</a>
+						<nav class="flex gap-4 text-sm justify-center md:justify-start">
+							<a class="font-semibold text-slate-100 hover:text-slate-300 glass-btn glass-primary" href="#whats-inside">What's inside</a>
+							<a class="font-semibold text-slate-100 hover:text-slate-300 glass-btn glass-primary" href="#overlays">Overlays</a>
+							<a class="font-semibold text-slate-100 hover:text-slate-300 glass-btn glass-primary" href="#install">Install</a>
+							<a class="font-semibold text-slate-100 hover:text-slate-300 glass-btn glass-primary" href="#links">Links</a>
+						</nav>
+					</div>
+				</header>
 
-	<!-- Hero -->
-	<section class="relative">
-		<div class="relative h-56 md:h-80 overflow-hidden">
-			<div class="absolute inset-0 bg-cover bg-center" style="background-image:url('assets/covers/max.jpg')"></div>
-			<div class="absolute inset-0 bg-[#1f1f1f]/40"></div>
-			<div class="relative h-full mx-auto max-w-6xl px-4 flex items-end pb-6">
-				<h1 class="text-5xl font-extrabold tracking-wide text-slate-100">iFL03 Overlays</h1>
+				<div class="relative h-[60vh] mx-auto max-w-7xl px-4 flex flex-col items-center justify-center">
+					<h1 class="text-3xl md:text-7xl md:text-center font-michroma tracking-wide text-slate-100">iFL03 OVERLAYS</h1>
+					<h2 class="text-xl md:text-3xl md:text-center text-center font-michroma tracking-wide text-slate-100 py-12">iRACING OVERLAYS FOR EVERYONE</h2>
+					<div class="mt-4 flex gap-3">
+						<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="glass-btn glass-primary text-lg font-medium">Download</a>
+						<a href="#install" class="glass-btn glass-primary text-lg font-medium">Install Guide</a>
+					</div>
+				</div>
+
+				<!-- Preview mobile -->
+				<section class="relative md:-mt-[40vh] md:z-10 py-12 md:hidden">
+					<div class="w-full max-w-7xl px-4 flex flex-col mx-auto">
+						<figure class="w-full glass-frame items-center justify-center">
+							<video class="w-full max-w-7xl h-auto" src="assets/readmeimg/preview.mp4" poster="assets/readmeimg/overlay_preview.jpg" playsinline muted autoplay loop></video>
+						</figure>
+					</div>
+				</section>
 			</div>
-		</div>
-	</section>
+		</section>		
 
-	<main>
-		<!-- Intro / CTA -->
-		<section class="mx-auto max-w-6xl px-4 py-8 grid gap-6 md:grid-cols-2 items-center">
-			<div>
-				<h2 class="text-xl text-slate-100 font-semibold mb-2">Lightweight, polished, configurable</h2>
-				<p>iFL03 is a continuation of the iRon project with a refreshed visual style, sensible defaults, and a friendlier setup experience via a built‑in Chromium (CEF) UI. It runs well on modest PCs and keeps dependencies to a minimum.</p>
-				<div class="mt-3 flex gap-3">
-					<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Download</a>
-					<a href="#install" class="rounded-lg bg-[#1f1f1f] px-4 py-2 text-sm hover:bg-[#3c3c3c]">Install guide</a>
+		<!-- Preview no mobile -->
+		<section class="relative md:-mt-[15vh] md:z-10 py-12">
+			<div class="w-full max-w-7xl px-4 hidden md:flex flex-col mx-auto">
+				<figure class="w-full glass-frame items-center justify-center">
+					<video class="w-full max-w-7xl h-auto" src="assets/readmeimg/preview.mp4" poster="assets/readmeimg/overlay_preview.jpg" playsinline muted autoplay loop></video>
+				</figure>
+				<div class="mt-3 flex gap-3 w-full max-w-7xl items-end">
+					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
+						<span class="preview-text">
+							<span class="title">Overlays running in iRacing</span>
+							<span class="explanation">Live capture from an active iRacing session using the iFL03 overlays.</span>
+						</span>
+					</a>
+					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
+						<span class="preview-text">
+							<span class="title">Performance Mode</span>
+							<span class="explanation">Caps all overlays to 30fps and also allows for per overlay fram cap.</span>
+						</span>
+					</a>
+					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
+						<span class="preview-text">
+							<span class="title">About 4% extra CPU Usage</span>
+							<span class="explanation">Measured on test rig with i7-10700k, iFL03 typically adds roughly 4% CPU an iRacing Session.</span>
+						</span>
+					</a>
+					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
+						<span class="preview-text">
+							<span class="title">Online & AI racing support</span>
+							<span class="explanation">Footage recorded in 30fps but shows the fps counter. Scenario: 20+ AI driver race data throughput and UI responsiveness.</span>
+						</span>
+					</a>
+					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
+						<span class="preview-text">
+							<span class="title">Oulton Park (new)</span>
+							<span class="explanation">Footage captured at Reskinned Oulton Park with custom graphics settings.</span>
+						</span>
+					</a>
+				</div>
+				<div class="mt-3 flex gap-3 w-full max-w-7xl">
+					<p class="text-sm font-medium">*Delta Overlay does not display on first lap</p>
+					<p class="text-sm font-medium">*tested on 3440x1440 res with RTX-5080 and i7-10700k</p>
 				</div>
 			</div>
-			<figure class="rounded-xl overflow-hidden border border-[#1f1f1f]">
-				<img src="assets/readmeimg/index.png" alt="Overview screenshot">
-			</figure>
 		</section>
 
-		<!-- Upcoming -->
-		<section id="Upcoming" class="bg-[#121212] py-8">
-			<div class="mx-auto max-w-6xl px-4">
-				<h3 class="text-xl text-slate-100 font-semibold mb-4">Upcoming</h3>
+		<!-- Roadmap -->
+		<section id="roadmap" class="relative bg-[#121212] py-16">
+			<div class="relative mx-auto max-w-7xl px-4">
+				<div class="flex items-center gap-3 mb-8">
+					<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
+					<h3 class="text-2xl text-white font-semibold tracking-tight">Roadmap</h3>
+				</div>
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">Roadmap</h4>
-						<ul class="list-disc ml-0.5 space-y-2 text-sm">
-							<li>All iRacing trackmaps, some new ones are still missing</li>
-							<li>Dedicated Tire Overlay</li>
-							<li>Dedicated Fuel Calculator</li>
-						</ul>
+					<!-- Card 1 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div class="pb-2 text-lg font-bold text-green-600">[01] - Sep 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Fuel Calculator Overlay</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
 					</div>
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">Quality of Life</h4>
-						<p class="text-sm">More customization options per overlay and different key shortcuts for each configured overlay json file.</p>
+					<!-- Card 2 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div class="pb-2 text-lg font-bold text-green-600">[02] - Oct 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Dedicated Tire Overlay</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
 					</div>
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">Other</h4>
-						<p class="text-sm">Community feedback and suggestions.</p>
+					<!-- Card 3 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div class="pb-2 text-lg font-bold text-green-600">[03] - Oct 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">All iRacing trackmaps</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
+					</div>
+					<!-- Card 4 -->
+					<div class="glass-roadmap-card group">
+						<div class="px-8 py-6">
+							<div class="pb-2 text-lg font-bold text-green-600">[04] - Oct 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Expanded per‑overlay customization</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
+					</div>
+					<!-- Card 5 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div class="pb-2 text-lg font-bold text-green-600">[05] - Nov 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Separate hotkeys per overlay config</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
+					</div>
+					<!-- Card 6 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div class="pb-2 text-lg font-bold text-green-600">[06] - tbd</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">VR Support is a long term goal</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
 		</section>
 
-		<!-- Features -->
-		<section id="features" class="bg-[#121212] py-8">
-			<div class="mx-auto max-w-6xl px-4">
-				<h3 class="text-xl text-slate-100 font-semibold mb-4">What’s inside</h3>
+		<!-- Design -->
+		<section id="Design" class="relative py-16">
+			<div class="relative mx-auto max-w-7xl px-4">
+				<div class="flex items-center gap-3 mb-8">
+					<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
+					<h3 class="text-2xl text-white font-semibold tracking-tight">Design</h3>
+				</div>
+			</div>
+			<div class="relative w-full overflow-x-auto scrollbar-hide scroll-snap-x-mandatory">
+				<div class="flex items-center gap-12" style="padding-left: max(1rem, calc((100vw - 80rem) / 2 + 1rem));">
+					<div class="max-w-[90vw] sm:max-w-5xl flex-shrink-0 bg-[#121212] sm:rounded-xl rounded-md scroll-snap-align-center">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/index.png" alt="index"></figure>
+					</div>
+					<div class="max-w-[90vw] sm:max-w-5xl flex-shrink-0 bg-[#121212] sm:rounded-xl rounded-md scroll-snap-align-center">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/overlays.png" alt="overlays"></figure>
+					</div>
+					<div class="max-w-[90vw] sm:max-w-5xl flex-shrink-0 bg-[#121212] sm:rounded-xl rounded-md scroll-snap-align-center">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/previewmode.png" alt="previewmode"></figure>
+					</div>
+					<div class="max-w-[90vw] sm:max-w-5xl flex-shrink-0 bg-[#121212] sm:rounded-xl rounded-md scroll-snap-align-center">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/usersettings.png" alt="usersettings"></figure>
+					</div>
+					<div class="max-w-[90vw] sm:max-w-5xl flex-shrink-0 bg-[#121212] sm:rounded-xl rounded-md scroll-snap-align-center">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/settings.png" alt="settings"></figure>
+					</div>
+					<div class="min-w-[90vw] max-w-[90vw] sm:max-w-5xl sm:min-w-5xl flex-shrink-0 rounded-xl">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full"></figure>
+					</div>
+					<div class="min-w-[90vw] max-w-[90vw] sm:max-w-5xl sm:min-w-5xl flex-shrink-0 sm:rounded-xl rounded-md">
+						<figure class="sm:p-4 p-1"><img class="rounded-md w-full"></figure>
+					</div>
+				</div>
+			</div>
+
+			<!-- Horizontal Scroll Controls -->
+			<div class="flex justify-center mt-4 gap-4">
+				<button class="glass-btn glass-primary flex items-center gap-2 px-4 py-2" id="scroll-dots">
+					<div class="flex gap-4">
+						<div class="w-2 h-2 rounded-full bg-slate-400 transition-colors duration-300" data-slide="0"></div>
+						<div class="w-2 h-2 rounded-full bg-slate-400 transition-colors duration-300" data-slide="1"></div>
+						<div class="w-2 h-2 rounded-full bg-slate-400 transition-colors duration-300" data-slide="2"></div>
+						<div class="w-2 h-2 rounded-full bg-slate-400 transition-colors duration-300" data-slide="3"></div>
+						<div class="w-2 h-2 rounded-full bg-slate-400 transition-colors duration-300" data-slide="4"></div>
+					</div>
+				</button>
+				<button class="glass-btn glass-primary flex items-center gap-2 px-4 py-2" id="play-pause-btn">
+					<span class="" id="play-icon"><i class="fas fa-play"></i></span>
+					<span class="" id="pause-icon"><i class="fas fa-pause" ></i></span>
+				</button>
+			</div>
+		</section>
+
+		<!-- Overlays -->
+		<section id="overlays" class="relative py-16">
+			<div class="relative mx-auto max-w-7xl px-4 ">
+				<div class="flex items-center gap-3 mb-8">
+					<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
+					<h3 class="text-2xl text-white font-semibold tracking-tight">Overlays</h3>
+				</div>
+				<div class="bg-[#121212] rounded-4xl sm:py-16 sm:px-16 py-4 px-4">
+					<div class="grid sm:gap-10 gap-4 sm:grid-cols-1 lg:grid-cols-2">
+						<!-- Card 1 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Standings</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Classic overview of the session standings</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/standings.png" alt="standings"></figure>
+							</div>
+						</div>
+						<!-- Card 2 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">DDU</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">All in one dashboard for the driver with many features</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/ddu.png" alt="ddu"></figure>
+							</div>
+						</div>
+						<!-- Card 3 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Relative</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Competitor list centered on your car with opitional minimap, and customizable columns</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/relative.png" alt="relative"></figure>
+							</div>
+						</div>
+						<!-- Card 4 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Inputs</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Often used pedals and steering visualization for driving consistency</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/inputs.png" alt="inputs"></figure>
+							</div>
+						</div>
+						<!-- Card 5 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Delta</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Circular delta with changeable reference time and predicted lap time</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/delta.png" alt="delta"></figure>
+							</div>
+						</div>
+						<!-- Card 6 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Flags</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">High contrast two band banner for session and race control flags</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/flags.png" alt="flags"></figure>
+							</div>
+						</div>
+						<!-- Card 7 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Track Map</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Handcrafted trackmap with support for multi class racing</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/trackmap.png" alt="trackmap"></figure>
+							</div>
+						</div>
+						<!-- Card 8 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Weather</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">All in one weather overlay that displays all data relative to your car and track position</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/weather.png" alt="weather"></figure>
+							</div>
+						</div>
+						<!-- Card 9 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Radar</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Proximity radar with customizable distance guides and sticky alerts</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-[50%] mx-auto block" src="assets/readmeimg/radar.png" alt="radar"></figure>
+							</div>
+						</div>
+						<!-- Card 10 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Fuel Calculator</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Fuel calculator with remaining fuel, per lap average, estimated laps left, fuel to finish, scheduled add, progress bar</div>
+								<h1 class="text-2xl font-bold tracking-tight text-slate-400 text-center">Coming soon</h1>
+							</div>
+						</div>
+					</div>
+				</div>
+				
+			</div>
+		</section>
+
+		<!-- What's inside -->
+		<section id="whats-inside" class="relative bg-[#121212] py-16">
+			<div class="relative mx-auto max-w-7xl px-4">
+				<div class="flex items-center gap-3 mb-8">
+					<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
+					<h3 class="text-2xl text-white font-semibold tracking-tight">What's inside</h3>
+				</div>
 				<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">New overlays</h4>
-						<ul class="list-disc ml-0.5 space-y-2 text-sm">
-							<li>Delta, Flags, Weather</li>
-							<li>Track Map and Radar</li>
-						</ul>
+					<!-- Card 1 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div>
+								<div class="pb-2 text-lg font-bold text-green-600">Overlays</div>
+								<div class="pt-2 font-bold text-sm text-slate-100">
+									<div class="flex">
+										<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+											<li>Delta</li>
+											<li>Flags</li>
+											<li>Weather</li>
+										</ul>
+										<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+											<li>Relative</li>
+											<li>Standings</li>
+											<li>DDU</li>
+										</ul>
+										<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+											<li>Track Map</li>
+											<li>Radar</li>
+											<li>Inputs</li>
+										</ul>
+									</div>
+								</div>
+							</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
 					</div>
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">Refined classics</h4>
-						<p class="text-sm">Relative, Standings, DDU and Inputs get cleaner typography, better data, and useful options like averages, class colors and iRating hints.</p>
+					<!-- Card 2 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div>
+								<div class="pb-2 text-lg font-bold text-green-600">Configuration</div>
+								<div class="pt-2 font-bold text-sm text-slate-100">Seperate configurations per car, with the option to have multiple custom configurations for each car.</div>
+							</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
 					</div>
-					<div class="rounded-xl bg-[#1f1f1f] p-6">
-						<h4 class="text-slate-100 font-semibold mb-2">Preview & UI</h4>
-						<p class="text-sm">Preview mode fills data so you can place overlays off‑track. The CEF UI exposes common settings with live reload from <code>config.json</code>.</p>
+					<!-- Card 3 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div>
+								<div class="pb-2 text-lg font-bold text-green-600">Preview Mode</div>
+								<div class="pt-2 font-bold text-sm text-slate-100">To setup you overlays before you start iRacing, use Preview Mode to get your perfect setup.</div>
+							</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
+					</div>
+					<!-- Card 4 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div>
+								<div class="pb-2 text-lg font-bold text-green-600">New Interface</div>
+								<div class="pt-2 font-bold text-sm text-slate-100">A sleek and modern interface using CEF, for an intuitive setup experience.</div>
+							</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
+					</div>
+					<!-- Card 5 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div>
+								<div class="pb-2 text-lg font-bold text-green-600">Community Suggestions</div>
+								<div class="pt-2 font-bold text-sm text-slate-100">If you have any suggestions, found bugs or have any feedback, create an issue in the repository.</div>
+							</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
+					</div>
+					<!-- Card 6 -->
+					<div class="glass-roadmap-card group">
+						<div class="card-content">
+							<div>
+								<div class="pb-2 text-lg font-bold text-green-600">Future VR Support</div>
+								<div class="pt-2 font-bold text-sm text-slate-100">As of now VR has not been tested yet, this will be a long term goal, but I cannot yet add a date to it.</div>
+							</div>
+							<div class="card-dots">
+								<span></span><span></span>
+								<span></span><span></span>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
 		</section>
 
-		<!-- Overlay gallery -->
-		<section id="overlays" class="mx-auto max-w-6xl px-4 py-8">
-			<h3 class="text-xl text-slate-100 font-semibold mb-4">Overlay selection</h3>
-			<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/relative.png" alt="Relative"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/standings.png" alt="Standings"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/ddu.png" alt="DDU"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/inputs.png" alt="Inputs"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/delta.png" alt="Delta"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/flags.png" alt="Flags"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/weather.png" alt="Weather"></figure>
-				<figure class="rounded-xl overflow-hidden bg-[#121212]"><img src="assets/readmeimg/trackmap.png" alt="Track Map"></figure>
-			</div>
-		</section>
+		<!-- Install Guide -->
+		<section id="install" class="glass-section py-20">
+			<div class="mx-auto max-w-7xl px-4">
+				<div class="flex items-center gap-3 mb-8">
+					<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
+					<h3 class="text-2xl text-white font-semibold tracking-tight">Install Guide</h3>
+				</div>
 
-		<!-- Install -->
-		<section id="install" class="bg-[#121212] py-8">
-			<div class="mx-auto max-w-6xl px-4 grid gap-6 md:grid-cols-2 items-start">
-				<div>
-					<h3 class="text-xl text-slate-100 font-semibold mb-3">Install & run</h3>
-					<ol class="list-decimal ml-0.5 space-y-2 text-sm">
-						<li>Download the latest installer exe from Releases and install anywhere writable.</li>
-						<li>Launch iFL03. Start iRacing; overlays show when you’re in the car.</li>
-						<li>Use Preview Mode to place overlays. Tweak options in the UI or <code>config.json</code>.</li>
-					</ol>
-					<div class="mt-3 flex gap-3">
-						<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Get the latest release</a>
-						<a href="README.md" class="rounded-lg bg-[#1f1f1f] px-4 py-2 text-sm hover:bg-[#3c3c3c]">Read the full README</a>
+				<div class="space-y-16">
+					<!-- Step 1 -->
+					<div class="glass-container p-8 md:p-12">
+						<div class="grid gap-8 lg:grid-cols-2 items-center">
+							<div class="order-2 lg:order-1">
+								<div class="flex items-center gap-4 mb-6">
+									<div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl">
+										<i class="fa-solid fa-cloud-download-alt"></i>
+									</div>
+									<h3 class="text-2xl md:text-3xl font-bold text-white">Download & Install</h3>
+								</div>
+								<p class="text-slate-300 text-lg leading-relaxed mb-6">
+									Get the latest iFL03 installer from the Github Releases. The setup is straightforward and installs all necessary components automatically.
+								</p>
+								<div class="flex flex-wrap gap-4">
+									<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="glass-btn glass-primary text-sm px-8 py-3">
+										Download
+									</a>
+									<a href="https://github.com/SemSodermans31/iFL03/releases" class="glass-btn text-sm px-8 py-3">
+										View Old Releases
+									</a>
+								</div>
+							</div>
+							<div class="order-1 lg:order-2">
+								<div class="glass-frame max-w-md mx-auto">
+									<div class="aspect-square bg-gradient-to-br from-green-600/20 to-blue-600/20 rounded-lg flex items-center justify-center">
+										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/readmeimg/install-1.jpg" alt="install"></figure>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Step 2 -->
+					<div class="glass-container p-8 md:p-12">
+						<div class="grid gap-8 lg:grid-cols-2 items-center">
+							<div>
+								<div class="flex items-center gap-4 mb-6">
+									<div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl">
+										<i class="fa-solid fa-sliders"></i>
+									</div>
+									<h3 class="text-2xl md:text-3xl font-bold text-white">Launch & Configure</h3>
+								</div>
+								<p class="text-slate-300 text-lg leading-relaxed mb-6">
+									Start iFL03 and use Preview Mode to position your overlays perfectly before hitting the track. Customize colors, sizes, and positions to match your setup.
+								</p>
+								<div class="grid gap-3 text-sm text-slate-400">
+									<div class="flex items-center gap-3">
+										<i class="fa-solid fa-check text-green-500 w-4"></i>
+										<span>Automatic iRacing detection</span>
+									</div>
+									<div class="flex items-center gap-3">
+										<i class="fa-solid fa-check text-green-500 w-4"></i>
+										<span>Real-time overlay positioning</span>
+									</div>
+									<div class="flex items-center gap-3">
+										<i class="fa-solid fa-check text-green-500 w-4"></i>
+										<span>Performance optimization</span>
+									</div>
+								</div>
+							</div>
+							<div class="order-1 lg:order-2">
+								<div class="glass-frame max-w-md mx-auto">
+									<div class="aspect-square bg-gradient-to-br from-green-600/20 to-blue-600/20 rounded-lg flex items-center justify-center">
+										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/readmeimg/install-2.jpg" alt="install"></figure>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- Step 3 -->
+					<div class="glass-container p-8 md:p-12">
+						<div class="grid gap-8 lg:grid-cols-2 items-center">
+							<div class="order-2 lg:order-1">
+								<div class="flex items-center gap-4 mb-6">
+									<div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl">
+										<i class="fa-solid fa-bolt"></i>
+									</div>
+									<h3 class="text-2xl md:text-3xl font-bold text-white">Race & Enjoy</h3>
+								</div>
+								<p class="text-slate-300 text-lg leading-relaxed mb-6">
+									Jump into iRacing and experience the difference. Your custom overlays will appear automatically, providing real-time data and insights throughout your session.
+								</p>
+								<div class="glass-roadmap-card group">
+									<div class="card-content">
+										<div>
+											<div class="pb-2 text-lg font-bold text-green-600">Overlays</div>
+											<div class="pt-2 font-bold text-sm text-slate-100">
+												<div class="flex">
+													<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+														<li>Delta</li>
+														<li>Flags</li>
+														<li>Weather</li>
+													</ul>
+													<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+														<li>Relative</li>
+														<li>Standings</li>
+														<li>DDU</li>
+													</ul>
+													<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+														<li>Track Map</li>
+														<li>Radar</li>
+														<li>Inputs</li>
+													</ul>
+												</div>
+											</div>
+										</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+							</div>
+							<div class="order-1 lg:order-2">
+								<div class="glass-frame max-w-md mx-auto">
+									<div class="aspect-square bg-gradient-to-br from-green-600/20 to-blue-600/20 rounded-lg flex items-center justify-center">
+										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/readmeimg/install-3.jpg" alt="install"></figure>
+									</div>
+								</div>
+							</div>
+						</div>
 					</div>
 				</div>
-				<figure class="rounded-xl overflow-hidden border border-[#1f1f1f]"><img src="assets/readmeimg/settings.png" alt="Settings UI"></figure>
+
+				<!-- Call to action -->
+				<div class="text-center mt-16">
+					<div class="glass-container p-8 max-w-7xl mx-auto">
+						<h3 class="text-2xl font-bold text-white mb-4">Ready to enhance your racing?</h3>
+						<p class="text-slate-300 mb-6">Join our community and help us make iFL03 even better.</p>
+						<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="glass-btn glass-primary text-xl px-12 py-4 inline-flex items-center gap-3">
+							
+							<span class="text-sm">Start Racing with iFL03</span>
+						</a>
+					</div>
+				</div>
 			</div>
 		</section>
 	</main>
 
 	<!-- Footer -->
-	<footer id="links" class="bg-[#000000] border-t border-[#1f1f1f]">
-		<div class="mx-auto max-w-6xl px-4 py-6 grid gap-6 md:grid-cols-3 items-start">
-			<div>
-				<div class="text-slate-100 font-semibold mb-2">Links</div>
-				<ul class="text-sm space-y-2">
-					<li><a href="https://github.com/SemSodermans31/iFL03" class="hover:text-slate-100"><i class="fa-brands fa-github mr-2"></i>Repository</a></li>
-					<li><a href="https://paypal.me/sems0drmans" class="hover:text-slate-100"><i class="fa-solid fa-heart mr-2"></i>Donations (optional)</a></li>
-				</ul>
+	<footer id="links" class="glass-footer">
+		<div class="mx-auto w-full px-4 py-12">
+			<div class="glass-container p-8">
+				<div class="grid gap-8 md:grid-cols-2 lg:grid-cols-4 items-start">
+					<div>
+						<div class="text-white font-semibold mb-3 text-lg tracking-wide">Links</div>
+						<ul class="text-slate-200 text-sm space-y-3">
+							<li><a href="https://github.com/SemSodermans31/iFL03" class="glass-btn flex items-center gap-2 min-w-32 justify-center"><i class="fa-brands fa-github"></i>Repository</a></li>
+							<li><a href="README.md" class="glass-btn flex items-center gap-2 min-w-32 justify-center"><i class="fa-solid fa-book"></i>ReadMe</a></li>
+						</ul>
+					</div>
+					<div>
+						<div class="text-white font-semibold mb-3 text-lg tracking-wide">Socials</div>
+						<ul class="text-slate-200 text-sm space-y-3">
+							<li><a href="https://instagram.com/sem_sodermans" target="_blank" rel="noopener noreferrer" class="glass-btn flex items-center gap-2 min-w-32 justify-center"><i class="fa-brands fa-instagram"></i>Instagram</a></li>
+							<li><a href="https://linkedin.com/in/sem-sodermans" target="_blank" rel="noopener noreferrer" class="glass-btn flex items-center gap-2 min-w-32 justify-center"><i class="fa-brands fa-linkedin"></i>LinkedIn</a></li>
+							<li><a href="https://github.com/SemSodermans31/iFL03/" target="_blank" rel="noopener noreferrer" class="glass-btn flex items-center gap-2 min-w-32 justify-center"><i class="fa-brands fa-github"></i>GitHub</a></li>
+							<li><a href="https://paypal.me/sems0drmans" target="_blank" rel="noopener noreferrer" class="glass-btn flex items-center gap-2 min-w-32 justify-center"><i class="fa-brands fa-paypal"></i>PayPal</a></li>
+						</ul>
+					</div>
+					<div>
+						<div class="text-white font-semibold mb-4 text-lg tracking-wide">Credits</div>
+						<p class="text-slate-200 text-sm leading-relaxed mb-6">Built on iRon by L. E. Spalt.<br>iFL03 UI and overlays by Sem Sodermans.</p>
+						<div class="border-t border-slate-600/30 pt-4">
+							<div class="text-slate-400 text-xs leading-relaxed">
+								<p class="text-slate-500">This website doesn't use cookies or tracking.</p>
+							</div>
+						</div>
+					</div>
+					<div>
+						<div class="text-white font-semibold mb-4 text-lg tracking-wide">Legal</div>
+						<div class="space-y-2">
+							<div class="text-slate-300 text-sm font-medium tracking-wide">MIT License</div>
+							<div class="text-slate-400 text-xs leading-relaxed">
+								<p>© 2025 Sem Sodermans. All rights reserved.</p>
+							</div>
+						</div>
+					</div>
+				</div>
 			</div>
-			<div>
-				<div class="text-slate-100 font-semibold mb-2">Credits</div>
-				<p class="text-sm">Built on iRon by L. E. Spalt. iFL03 UI and overlays by Sem Sodermans.</p>
-			</div>
-			<div class="text-right text-xs">MIT License</div>
 		</div>
 	</footer>
+	<script src="index.js"></script>
 </body>
 </html>

@@ -91,6 +91,8 @@ public:
         float delta;
         int lapDelta;
         int pitAge;
+        float minimapX;  // X position on track map (0.0 to 1.0)
+        float minimapY;  // Y position on track map (0.0 to 1.0)
     };
     static std::vector<RelativeInfo> getRelativeData();
     

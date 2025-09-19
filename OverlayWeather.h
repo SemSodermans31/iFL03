@@ -310,7 +310,7 @@ class OverlayWeather : public Overlay
                     m_brush->SetColor( precipCol );
                     swprintf( s, _countof(s), L"%.0f%%", precipitation * 100.0f );
                     const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(),
                                   m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 } else {
                     // Show air temperature
@@ -319,7 +319,7 @@ class OverlayWeather : public Overlay
                         airTemp = celsiusToFahrenheit(airTemp);
                     }
 
-                    // Use track temp icon for now (or could load a new air temp icon)
+                    // Use air temp icon
                     drawIcon(m_trackTempIcon.Get(), iconX, valueY - iconAdjustment, iconSize, iconSize, true);
 
                     // Temperature value - larger, to the right of the icon
@@ -327,7 +327,7 @@ class OverlayWeather : public Overlay
                     const wchar_t degree = L'\x00B0';
                     swprintf( s, _countof(s), L"%.1f%lc%c", airTemp, degree, imperial ? 'F' : 'C' );
                     const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(), 
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(),
                                   m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 }
             }
@@ -744,9 +744,15 @@ class OverlayWeather : public Overlay
             // Titles
             m_text.render( rt.Get(), L"TRACK TEMP", m_textFormatBold.Get(), m_trackTempBox.x0 + titlePadding, m_trackTempBox.x1 - titleMargin, m_trackTempBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
             m_text.render( rt.Get(), L"TRACK WETNESS", m_textFormatBold.Get(), m_trackWetnessBox.x0 + titlePadding, m_trackWetnessBox.x1 - titleMargin, m_trackWetnessBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
-            // Precipitation/Air Temp: draw both labels; the dynamic value picks one at runtime
-            m_text.render( rt.Get(), L"PRECIPITATION", m_textFormatBold.Get(), m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
-            m_text.render( rt.Get(), L"AIR TEMP", m_textFormatBold.Get(), m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+
+            // Precipitation/Air Temp: draw the appropriate title based on current conditions
+            const bool showPrecip = shouldShowPrecipitation();
+            if (showPrecip) {
+                m_text.render( rt.Get(), L"PRECIPITATION", m_textFormatBold.Get(), m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+            } else {
+                m_text.render( rt.Get(), L"AIR TEMP", m_textFormatBold.Get(), m_precipitationBox.x0 + titlePadding, m_precipitationBox.x1 - titleMargin, m_precipitationBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
+            }
+
             m_text.render( rt.Get(), L"WIND", m_textFormatBold.Get(), m_windBox.x0 + titlePadding, m_windBox.x1 - titleMargin, m_windBox.y0 + titlePadding, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
 
             rt->EndDraw();

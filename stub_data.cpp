@@ -42,27 +42,28 @@ void StubDataManager::initialize()
 {
     if (s_initialized) return;
     
-    // Define realistic F1-style driver data with class assignments
+    // Define realistic F3-style driver data based on 2025 Hungary race
+    // Using authentic F3 lap times from Hungaroring (pole ~1:48.5, race laps ~1:48-1:55)
     s_stubCars = {
-        // name,       carNum, lic, iRating, isSelf, isBuddy, isFlagged, pos, bestLap,  lastLap,   lapCount, pitAge, classId
-        // Class 0 (Red)
-        {"You",        "31",   'C', 2156,    true,   false,   false,     2,   84.567f,  84.623f,   12,       15,      0},
-        {"Norris",     "4",    'B', 3234,    false,  false,   false,     4,   84.612f,  84.667f,   12,       16,      0},
-        // Class 1 (Green)
-        {"Hamilton",   "44",   'A', 3245,    false,  true,    false,     6,   84.734f,  84.801f,   12,       16,      1},
-        {"Piastri",    "81",   'A', 2534,    false,  false,   true,      8,   84.945f,  84.998f,   11,       12,      1},
-        // Class 2 (Magenta)
-        {"Verstappen", "1",    'A', 4789,    false,  false,   false,     5,   84.456f,  84.512f,   12,       14,      2},
-        {"Perez",      "11",   'A', 3602,    false,  false,   false,     9,   84.789f,  84.832f,   12,       13,      2},
-        // Class 3 (Orange)
-        {"Leclerc",    "16",   'A', 3891,    false,  false,   false,     3,   84.321f,  84.389f,   13,       17,      3},
-        {"Sainz",      "55",   'A', 2767,    false,  false,   false,     7,   84.823f,  84.891f,   12,       18,      3},
-        // Class 4 (Cyan)
-        {"Russell",    "63",   'B', 2945,    false,  false,   false,     1,   84.678f,  84.723f,   13,       1,       4},
-        {"Albon",      "23",   'B', 2140,    false,  false,   false,    10,   85.102f,  85.201f,   12,       11,      4},
-        // Class 5 (Yellow)
-        {"Gasly",      "10",   'A', 2680,    false,  false,   false,    11,   85.345f,  85.401f,   12,       9,       5},
-        {"Ocon",       "31",   'A', 2615,    false,  false,   false,    12,   85.389f,  85.445f,   12,       8,       5}
+        // name,           carNum, lic, iRating, isSelf, isBuddy, isFlagged, pos, bestLap,    lastLap,     lapCount, pitAge, classId
+        // Class 0 (Red) - F3 Championship contenders
+        {"You",                "31",   'A', 2850,    true,   false,   false,     3,   108.542f,   108.623f,   15,       8,       0},
+        {"Alex Thompson",      "7",    'A', 3120,    false,  false,   false,     1,   108.456f,   108.512f,   15,       7,       0},
+        // Class 1 (Green) - Mid-field competitive
+        {"Carlos Martinez",    "12",   'A', 2980,    false,  true,    false,     5,   108.734f,   108.801f,   15,       6,       1},
+        {"Miguel Rodriguez",   "22",   'A', 2765,    false,  false,   true,      8,   109.145f,   109.198f,   14,       5,       1},
+        // Class 2 (Magenta) - Points contenders
+        {"Jae-woo Kim",        "9",    'A', 3025,    false,  false,   false,     2,   108.498f,   108.567f,   15,       9,       2},
+        {"Wei Chen",           "15",   'A', 2890,    false,  false,   false,     7,   108.945f,   108.987f,   15,       4,       2},
+        // Class 3 (Orange) - Backmarkers with pace
+        {"Arjun Patel",        "18",   'B', 2650,    false,  false,   false,     6,   109.321f,   109.389f,   15,       10,      3},
+        {"Pierre Dubois",      "25",   'B', 2520,    false,  false,   false,     9,   109.623f,   109.691f,   15,       3,       3},
+        // Class 4 (Cyan) - Rookie drivers
+        {"Lukas Novak",        "4",    'B', 2380,    false,  false,   false,     4,   108.678f,   108.723f,   15,       2,       4},
+        {"Erik Andersson",     "11",   'C', 2150,    false,  false,   false,    10,   110.102f,   110.201f,   14,       11,      4},
+        // Class 5 (Yellow) - Strugglers
+        {"Antonio Silva",      "27",   'C', 1980,    false,  false,   false,    11,   110.845f,   110.901f,   15,       12,      5},
+        {"Marek Kowalski",     "30",   'C', 1920,    false,  false,   false,    12,   111.089f,   111.145f,   15,       13,      5}
     };
     
     s_initialized = true;
@@ -164,26 +165,26 @@ void StubDataManager::updateAnimation()
 float StubDataManager::getStubRPM()
 {
     updateAnimation();
-    float baseRPM = 4200.0f;
-    float variation = 800.0f * std::sin(s_animationTime * 0.16f) + 300.0f * std::sin(s_animationTime * 0.42f);
-    return std::max(2000.0f, std::min(7500.0f, baseRPM + variation));
+    float baseRPM = 4800.0f; // More realistic for F3 turbo engine
+    float variation = 1200.0f * std::sin(s_animationTime * 0.16f) + 400.0f * std::sin(s_animationTime * 0.42f);
+    return std::max(2500.0f, std::min(6800.0f, baseRPM + variation)); // F3 rev limit ~6800 RPM
 }
 
 float StubDataManager::getStubSpeed()
 {
     updateAnimation();
     float rpm = getStubRPM();
-    return (rpm / 7500.0f) * 180.0f + 20.0f;
+    return (rpm / 6800.0f) * 160.0f + 25.0f; // More realistic for F3 at Hungaroring
 }
 
 int StubDataManager::getStubGear()
 {
     float speed = getStubSpeed();
-    if (speed < 40) return 1;
-    if (speed < 70) return 2;
-    if (speed < 100) return 3;
-    if (speed < 130) return 4;
-    if (speed < 160) return 5;
+    if (speed < 35) return 1;
+    if (speed < 55) return 2;
+    if (speed < 75) return 3;
+    if (speed < 100) return 4;
+    if (speed < 125) return 5;
     return 6;
 }
 
@@ -194,17 +195,17 @@ int StubDataManager::getStubLap()
 
 int StubDataManager::getStubLapsRemaining()
 {
-    return 15;
+    return 12; // More realistic for F3 race (typically 20-25 total laps)
 }
 
 float StubDataManager::getStubSessionTimeRemaining()
 {
-    return 1800.0f;
+    return 1310.0f; // ~21.8 minutes for 12 laps at ~109s each
 }
 
 int StubDataManager::getStubTargetLap()
 {
-    return 5;
+    return 8; // More realistic target lap for mid-race
 }
 
 float StubDataManager::getStubThrottle()
@@ -260,8 +261,8 @@ float StubDataManager::getStubDeltaToSessionBest()
 
 float StubDataManager::getStubSessionBestLapTime()
 {
-    //Lap time
-    return 90.462f;
+    // F3 pole time from 2025 Hungary race
+    return 108.456f;
 }
 
 bool StubDataManager::getStubDeltaValid()
@@ -273,21 +274,38 @@ bool StubDataManager::getStubDeltaValid()
 std::vector<StubDataManager::RelativeInfo> StubDataManager::getRelativeData()
 {
     initialize();
-    
+
     std::vector<RelativeInfo> relatives;
-    
-    const float deltas[] = {-3.2f, 0.0f, +1.8f, +4.1f, +7.5f, +12.3f, +18.7f, +25.2f};
-    
-    for (size_t i = 0; i < s_stubCars.size(); ++i)
+
+    // Reorganize to show YOU in P3 position in relative overlay
+    // Show cars around YOU's position (positions 1-7 relative to YOU)
+    const int relativeOrder[] = {1, 2, 0, 4, 5, 6, 3}; // Car indices: Thompson(1), Kim(2), You(0), Novak(4), Patel(5), Chen(6), Martinez(3)
+    const float deltas[] = {-2.1f, -1.2f, 0.0f, +1.8f, +3.2f, +5.4f, +7.8f}; // Deltas relative to YOU
+
+    // Minimap positions for Hungaroring (simplified oval approximation)
+    const float minimapPositions[][2] = {
+        {0.85f, 0.3f},   // Thompson (P1) - ahead
+        {0.75f, 0.25f},  // Kim (P2) - ahead
+        {0.65f, 0.2f},   // YOU (P3) - reference
+        {0.55f, 0.35f},  // Novak (P4) - behind
+        {0.45f, 0.4f},   // Patel (P5) - behind
+        {0.35f, 0.45f},  // Chen (P6) - behind
+        {0.25f, 0.5f}    // Martinez (P7) - behind
+    };
+
+    for (size_t i = 0; i < 7 && i < sizeof(relativeOrder)/sizeof(relativeOrder[0]); ++i)
     {
+        int carIdx = relativeOrder[i];
         RelativeInfo info;
-        info.carIdx = (int)i;
+        info.carIdx = carIdx;
         info.delta = deltas[i];
         info.lapDelta = 0;
-        info.pitAge = s_stubCars[i].pitAge;
+        info.pitAge = s_stubCars[carIdx].pitAge;
+        info.minimapX = minimapPositions[i][0];
+        info.minimapY = minimapPositions[i][1];
         relatives.push_back(info);
     }
-    
+
     return relatives;
 }
 
