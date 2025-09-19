@@ -235,8 +235,22 @@ ul {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   height: 100%;
+}
+
+.glass-roadmap-card .card-content > h1 {
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.glass-roadmap-card .card-content > div:not(.card-dots) {
+  flex-shrink: 0;
+  margin-bottom: auto;
+}
+
+.glass-roadmap-card .card-content > figure {
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .glass-roadmap-card .card-dots {

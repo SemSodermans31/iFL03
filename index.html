@@ -33,20 +33,29 @@
 
 				<div class="relative h-[60vh] mx-auto max-w-7xl px-4 flex flex-col items-center justify-center">
 					<h1 class="text-3xl md:text-7xl md:text-center font-michroma tracking-wide text-slate-100">iFL03 OVERLAYS</h1>
-					<h2 class="text-2xl md:text-3xl md:text-center font-michroma tracking-wide text-slate-100 py-12">iRACING OVERLAYS FOR EVERYONE</h2>
+					<h2 class="text-xl md:text-3xl md:text-center text-center font-michroma tracking-wide text-slate-100 py-12">iRACING OVERLAYS FOR EVERYONE</h2>
 					<div class="mt-4 flex gap-3">
 						<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="glass-btn glass-primary text-lg font-medium">Download</a>
 						<a href="#install" class="glass-btn glass-primary text-lg font-medium">Install Guide</a>
 					</div>
 				</div>
-			</div>
-		</section>
 
-		<!-- Preview -->
+				<!-- Preview mobile -->
+				<section class="relative md:-mt-[40vh] md:z-10 py-12 md:hidden">
+					<div class="w-full max-w-7xl px-4 flex flex-col mx-auto">
+						<figure class="w-full glass-frame items-center justify-center">
+							<video class="w-full max-w-7xl h-auto" src="assets/readmeimg/preview.mp4" poster="assets/readmeimg/overlay_preview.jpg" playsinline muted autoplay loop></video>
+						</figure>
+					</div>
+				</section>
+			</div>
+		</section>		
+
+		<!-- Preview no mobile -->
 		<section class="relative md:-mt-[15vh] md:z-10 py-12">
 			<div class="w-full max-w-7xl px-4 hidden md:flex flex-col mx-auto">
 				<figure class="w-full glass-frame items-center justify-center">
-					<video class="w-full max-w-7xl h-auto" src="assets/readmeimg/overlays.mp4" poster="assets/readmeimg/overlay_preview.jpg" playsinline muted autoplay loop></video>
+					<video class="w-full max-w-7xl h-auto" src="assets/readmeimg/preview.mp4" poster="assets/readmeimg/overlay_preview.jpg" playsinline muted autoplay loop></video>
 				</figure>
 				<div class="mt-3 flex gap-3 w-full max-w-7xl items-end">
 					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
@@ -69,19 +78,19 @@
 					</a>
 					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
 						<span class="preview-text">
-							<span class="title">Practice Session with 46 entries</span>
-							<span class="explanation">Footage recorded in 30fps but shows the fps counter. Scenario: 46‑driver practice to stress‑test data throughput and UI responsiveness.</span>
+							<span class="title">Online & AI racing support</span>
+							<span class="explanation">Footage recorded in 30fps but shows the fps counter. Scenario: 20+ AI driver race data throughput and UI responsiveness.</span>
 						</span>
 					</a>
 					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
 						<span class="preview-text">
-							<span class="title">Laguna Seca</span>
-							<span class="explanation">Footage captured at WeatherTech Raceway Laguna Seca with custom graphics settings.</span>
+							<span class="title">Oulton Park (new)</span>
+							<span class="explanation">Footage captured at Reskinned Oulton Park with custom graphics settings.</span>
 						</span>
 					</a>
 				</div>
 				<div class="mt-3 flex gap-3 w-full max-w-7xl">
-					<p class="text-sm font-medium">*driver names are blurred out</p>
+					<p class="text-sm font-medium">*Delta Overlay does not display on first lap</p>
 					<p class="text-sm font-medium">*tested on 3440x1440 res with RTX-5080 and i7-10700k</p>
 				</div>
 			</div>
@@ -219,38 +228,96 @@
 
 		<!-- Overlays -->
 		<section id="overlays" class="relative py-16">
-			<div class="relative mx-auto max-w-7xl px-4">
+			<div class="relative mx-auto max-w-7xl px-4 ">
 				<div class="flex items-center gap-3 mb-8">
 					<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
 					<h3 class="text-2xl text-white font-semibold tracking-tight">Overlays</h3>
 				</div>
-				<div class="glass-container">
-          			<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/standings.png" alt="standings"></figure>
+				<div class="bg-[#121212] rounded-4xl sm:py-16 sm:px-16 py-4 px-4">
+					<div class="grid sm:gap-10 gap-4 sm:grid-cols-1 lg:grid-cols-2">
+						<!-- Card 1 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Standings</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Classic overview of the session standings</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/standings.png" alt="standings"></figure>
+							</div>
+						</div>
+						<!-- Card 2 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">DDU</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">All in one dashboard for the driver with many features</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/ddu.png" alt="ddu"></figure>
+							</div>
+						</div>
+						<!-- Card 3 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Relative</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Competitor list centered on your car with opitional minimap, and customizable columns</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/relative.png" alt="relative"></figure>
+							</div>
+						</div>
+						<!-- Card 4 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Inputs</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Often used pedals and steering visualization for driving consistency</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/inputs.png" alt="inputs"></figure>
+							</div>
+						</div>
+						<!-- Card 5 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Delta</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Circular delta with changeable reference time and predicted lap time</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/delta.png" alt="delta"></figure>
+							</div>
+						</div>
+						<!-- Card 6 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Flags</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">High contrast two band banner for session and race control flags</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/flags.png" alt="flags"></figure>
+							</div>
+						</div>
+						<!-- Card 7 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Track Map</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Handcrafted trackmap with support for multi class racing</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/trackmap.png" alt="trackmap"></figure>
+							</div>
+						</div>
+						<!-- Card 8 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Weather</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">All in one weather overlay that displays all data relative to your car and track position</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/weather.png" alt="weather"></figure>
+							</div>
+						</div>
+						<!-- Card 9 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Radar</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Proximity radar with customizable distance guides and sticky alerts</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-[50%] mx-auto block" src="assets/readmeimg/radar.png" alt="radar"></figure>
+							</div>
+						</div>
+						<!-- Card 10 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Fuel Calculator</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Fuel calculator with remaining fuel, per lap average, estimated laps left, fuel to finish, scheduled add, progress bar</div>
+								<h1 class="text-2xl font-bold tracking-tight text-slate-400 text-center">Coming soon</h1>
+							</div>
+						</div>
+					</div>
 				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/ddu.png" alt="ddu"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/relative.png" alt="relative"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/inputs.png" alt="inputs"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/delta.png" alt="delta"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/flags.png" alt="flags"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/weather.png" alt="weather"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/trackmap.png" alt="trackmap"></figure>
-				</div>
-				<div class="glass-container">
-					<figure class="sm:p-4 p-1"><img class="rounded-md w-full" src="assets/readmeimg/radar.png" alt="radar"></figure>
-				</div>
+				
 			</div>
 		</section>
 
@@ -396,7 +463,7 @@
 							<div class="order-1 lg:order-2">
 								<div class="glass-frame max-w-md mx-auto">
 									<div class="aspect-square bg-gradient-to-br from-green-600/20 to-blue-600/20 rounded-lg flex items-center justify-center">
-										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/covers/website.jpg" alt="install"></figure>
+										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/readmeimg/install-1.jpg" alt="install"></figure>
 									</div>
 								</div>
 							</div>
@@ -434,7 +501,7 @@
 							<div class="order-1 lg:order-2">
 								<div class="glass-frame max-w-md mx-auto">
 									<div class="aspect-square bg-gradient-to-br from-green-600/20 to-blue-600/20 rounded-lg flex items-center justify-center">
-										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/covers/website.jpg" alt="install"></figure>
+										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/readmeimg/install-2.jpg" alt="install"></figure>
 									</div>
 								</div>
 							</div>
@@ -488,7 +555,7 @@
 							<div class="order-1 lg:order-2">
 								<div class="glass-frame max-w-md mx-auto">
 									<div class="aspect-square bg-gradient-to-br from-green-600/20 to-blue-600/20 rounded-lg flex items-center justify-center">
-										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/covers/website.jpg" alt="install"></figure>
+										<figure class="w-full h-full"><img class="w-full h-full object-cover rounded-lg" src="assets/readmeimg/install-3.jpg" alt="install"></figure>
 									</div>
 								</div>
 							</div>
@@ -498,12 +565,12 @@
 
 				<!-- Call to action -->
 				<div class="text-center mt-16">
-					<div class="glass-container p-8 max-w-2xl mx-auto">
+					<div class="glass-container p-8 max-w-7xl mx-auto">
 						<h3 class="text-2xl font-bold text-white mb-4">Ready to enhance your racing?</h3>
-						<p class="text-slate-300 mb-6">Join thousands of sim racers who have upgraded their iRacing experience with iFL03.</p>
+						<p class="text-slate-300 mb-6">Join our community and help us make iFL03 even better.</p>
 						<a href="https://github.com/SemSodermans31/iFL03/releases/download/v0.0.0.2/iFL03-Setup-0.0.0.2-x64.exe" class="glass-btn glass-primary text-xl px-12 py-4 inline-flex items-center gap-3">
-							<i class="fa-solid fa-rocket"></i>
-							<span>Start Racing with iFL03</span>
+							
+							<span class="text-sm">Start Racing with iFL03</span>
 						</a>
 					</div>
 				</div>
