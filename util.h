@@ -501,7 +501,7 @@ class TextCache
 
         IDWriteTextLayout* getOrCreateTextLayout( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
-            if( xmax < xmin )
+            if( xmax < xmin || !str )
                 return nullptr;
 
             const float fontSize = textFormat->GetFontSize();

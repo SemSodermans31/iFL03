@@ -82,8 +82,8 @@ protected:
 		const float4 darkBg = float4(0,0,0,0.7f * getGlobalOpacity());
 		const float globalOpacity = getGlobalOpacity();
 
-		wchar_t sTop[256];
-		wchar_t sBottom[256];
+		wchar_t sTop[256] = L"";
+		wchar_t sBottom[256] = L"";
 
 		// Resolve active flag info from iracing bitfield
 		FlagInfo info = resolveActiveFlag();
