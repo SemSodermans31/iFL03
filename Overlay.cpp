@@ -265,19 +265,15 @@ void Overlay::configChanged()
     const int w = g_cfg.getInt(m_name,"window_size_x", (int)defaultSize.x);
     const int h = g_cfg.getInt(m_name,"window_size_y", (int)defaultSize.y);
     setWindowPosAndSize( x, y, w, h );
-    
-    // Apply position setting if specified
     applyPositionSetting();
 
     onConfigChanged();
-    // Ensure static overlays refresh once after config updates
     requestRedraw();
 }
 
 void Overlay::sessionChanged()
 {
     onSessionChanged();
-    // Ensure static overlays refresh once after session changes
     requestRedraw();
 }
 
@@ -296,7 +292,7 @@ void Overlay::update()
         return;
     m_lastUpdateTick = now;
     if( m_staticMode && !m_forceNextUpdate )
-        return; // static mode only redraws when explicitly requested
+        return;
     m_forceNextUpdate = false;
 
     const float w = (float)m_width;
@@ -357,7 +353,7 @@ void Overlay::setWindowPosAndSize( int x, int y, int w, int h, bool callSetWindo
     m_width = w;
     m_height = h;
 
-    m_renderTarget.Reset();  // need to release all references to swap chain's back buffers before calling ResizeBuffers
+    m_renderTarget.Reset(); 
 
     HRCHECK(m_swapChain->ResizeBuffers( 0, w, h, DXGI_FORMAT_UNKNOWN, 0 ));
 
@@ -465,7 +461,8 @@ void Overlay::onMouseWheel( int /*delta*/, int /*x*/, int /*y*/ ) {}
 
 float Overlay::getGlobalFontSpacing() const
 {
-    return g_cfg.getFloat("Overlay", "font_spacing", 0.0f);
+    // Per-overlay override with fallback to global Overlay setting
+    return g_cfg.getFloat(m_name, "font_spacing", g_cfg.getFloat("Overlay", "font_spacing", 0.0f));
 }
 
 static DWRITE_FONT_STYLE s_toFontStyle(const std::string& style)
@@ -478,10 +475,11 @@ static DWRITE_FONT_STYLE s_toFontStyle(const std::string& style)
 void Overlay::createGlobalTextFormat( float scale,
                                       Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
 {
-    const std::string family   = g_cfg.getString("Overlay", "font", "Poppins");
-    const float       baseSize = g_cfg.getFloat ("Overlay", "font_size", 16.0f);
-    const int         weight   = g_cfg.getInt   ("Overlay", "font_weight", 500);
-    const std::string styleStr = g_cfg.getString("Overlay", "font_style", "normal");
+    // Prefer per-overlay typography settings; fall back to global Overlay settings
+    const std::string family   = g_cfg.getString(m_name,   "font",        g_cfg.getString("Overlay", "font",        "Poppins"));
+    const float       baseSize = g_cfg.getFloat (m_name,   "font_size",   g_cfg.getFloat ("Overlay", "font_size",   16.0f));
+    const int         weight   = g_cfg.getInt   (m_name,   "font_weight", g_cfg.getInt   ("Overlay", "font_weight", 500));
+    const std::string styleStr = g_cfg.getString(m_name,   "font_style",  g_cfg.getString("Overlay", "font_style",  "normal"));
 
     const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
     const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
@@ -510,10 +508,11 @@ void Overlay::createGlobalTextFormat( float scale,
                                       const std::string& styleOverride,
                                       Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
 {
-    const std::string family   = g_cfg.getString("Overlay", "font", "Poppins");
-    const float       baseSize = g_cfg.getFloat ("Overlay", "font_size", 16.0f);
-    const int         weight   = weightOverride > 0 ? weightOverride : g_cfg.getInt("Overlay", "font_weight", 500);
-    const std::string styleStr = styleOverride.empty() ? g_cfg.getString("Overlay", "font_style", "normal") : styleOverride;
+    // Prefer per-overlay typography settings; fall back to global Overlay settings
+    const std::string family   = g_cfg.getString(m_name,   "font",        g_cfg.getString("Overlay", "font",        "Poppins"));
+    const float       baseSize = g_cfg.getFloat (m_name,   "font_size",   g_cfg.getFloat ("Overlay", "font_size",   16.0f));
+    const int         weight   = weightOverride > 0 ? weightOverride : g_cfg.getInt(m_name, "font_weight", g_cfg.getInt("Overlay", "font_weight", 500));
+    const std::string styleStr = styleOverride.empty() ? g_cfg.getString(m_name, "font_style", g_cfg.getString("Overlay", "font_style", "normal")) : styleOverride;
 
     const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
     const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);

@@ -73,7 +73,7 @@
 					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
 						<span class="preview-text">
 							<span class="title">About 4% extra CPU Usage</span>
-							<span class="explanation">Measured on test rig with i7-10700k, iFL03 typically adds roughly 4% CPU an iRacing Session.</span>
+							<span class="explanation">Measured on test rig with i7-10700k, iFL03 typically adds roughly 4% CPU with all overlays on, in an iRacing Session.</span>
 						</span>
 					</a>
 					<a class="glass-btn glass-primary text-sm font-medium preview-btn max-w-3xs">
@@ -108,7 +108,7 @@
 					<div class="glass-roadmap-card group">
 						<div class="card-content">
 							<div class="pb-2 text-lg font-bold text-green-600">[01] - Sep 2025</div>
-							<div class="pt-2 font-bold text-sm text-slate-100">Fuel Calculator Overlay</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Radar overlay update</div>
 							<div class="card-dots">
 								<span></span><span></span>
 								<span></span><span></span>
@@ -118,8 +118,8 @@
 					<!-- Card 2 -->
 					<div class="glass-roadmap-card group">
 						<div class="card-content">
-							<div class="pb-2 text-lg font-bold text-green-600">[02] - Oct 2025</div>
-							<div class="pt-2 font-bold text-sm text-slate-100">Dedicated Tire Overlay</div>
+							<div class="pb-2 text-lg font-bold text-green-600">[02] - Sep 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Overlay styling update</div>
 							<div class="card-dots">
 								<span></span><span></span>
 								<span></span><span></span>
@@ -130,7 +130,7 @@
 					<div class="glass-roadmap-card group">
 						<div class="card-content">
 							<div class="pb-2 text-lg font-bold text-green-600">[03] - Oct 2025</div>
-							<div class="pt-2 font-bold text-sm text-slate-100">All iRacing trackmaps</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">Expanded per‑overlay customization</div>
 							<div class="card-dots">
 								<span></span><span></span>
 								<span></span><span></span>
@@ -140,8 +140,8 @@
 					<!-- Card 4 -->
 					<div class="glass-roadmap-card group">
 						<div class="px-8 py-6">
-							<div class="pb-2 text-lg font-bold text-green-600">[04] - Oct 2025</div>
-							<div class="pt-2 font-bold text-sm text-slate-100">Expanded per‑overlay customization</div>
+							<div class="pb-2 text-lg font-bold text-green-600">[04] - Nov 2025</div>
+							<div class="pt-2 font-bold text-sm text-slate-100">All iRacing trackmaps</div>
 							<div class="card-dots">
 								<span></span><span></span>
 								<span></span><span></span>
@@ -310,9 +310,25 @@
 						<!-- Card 10 -->
 						<div class="glass-roadmap-card group">
 							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Pit</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Pit stop progress bar and digital 'PE' warning when entering/exiting pit road</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-[40%] mx-auto block" src="assets/readmeimg/pit.png" alt="pit"></figure>
+							</div>
+						</div>
+						<!-- Card 11 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
 								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Fuel Calculator</h1>
-								<div class="font-bold text-lg text-slate-400 text-center">Fuel calculator with remaining fuel, per lap average, estimated laps left, fuel to finish, scheduled add, progress bar</div>
-								<h1 class="text-2xl font-bold tracking-tight text-slate-400 text-center">Coming soon</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Shows all data relative to your fuel level etc.</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-[60%] mx-auto block" src="assets/readmeimg/fuel.png" alt="radar"></figure>
+							</div>
+						</div>
+						<!-- Card 12 -->
+						<div class="glass-roadmap-card group">
+							<div class="card-content">
+								<h1 class="text-4xl font-bold tracking-tight text-slate-400 text-center">Tire</h1>
+								<div class="font-bold text-lg text-slate-400 text-center">Tire wear and service indicators in pit lane. (no live updates)</div>
+								<figure class="sm:p-4 p-1"><img class="rounded-md w-full mx-auto block" src="assets/readmeimg/tire.png" alt="tire"></figure>
 							</div>
 						</div>
 					</div>
@@ -350,6 +366,11 @@
 											<li>Track Map</li>
 											<li>Radar</li>
 											<li>Inputs</li>
+										</ul>
+										<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+											<li>Pitlane</li>
+											<li>Fuel</li>
+											<li>Tires</li>
 										</ul>
 									</div>
 								</div>
@@ -541,6 +562,11 @@
 														<li>Track Map</li>
 														<li>Radar</li>
 														<li>Inputs</li>
+													</ul>
+													<ul class="list-disc ml-0.5 space-y-2 text-sm flex-1">
+														<li>Pitlane</li>
+														<li>Fuel</li>
+														<li>Tires</li>
 													</ul>
 												</div>
 											</div>

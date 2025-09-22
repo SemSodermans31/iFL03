@@ -14,6 +14,11 @@ const overlayConfig = {
 		configKey: 'OverlayDDU',
 		description: 'Driver display unit'
 	},
+	'fuel': {
+		name: 'Fuel',
+		configKey: 'OverlayFuel',
+		description: 'Fuel calculator'
+	},
 	'inputs': {
 		name: 'Inputs',
 		configKey: 'OverlayInputs',
@@ -44,6 +49,11 @@ const overlayConfig = {
 		configKey: 'OverlayDelta',
 		description: 'Lap time delta comparison to best lap'
 	},
+	'tire': {
+		name: 'Tire',
+		configKey: 'OverlayTire',
+		description: 'Tire health, temperature, pressure and laps'
+	},
 	'radar': {
 		name: 'Radar',
 		configKey: 'OverlayRadar',
@@ -53,6 +63,11 @@ const overlayConfig = {
 		name: 'Track Map',
 		configKey: 'OverlayTrack',
 		description: 'Track map with live car position'
+	},
+	'pit': {
+		name: 'Pit Entry',
+		configKey: 'OverlayPit',
+		description: 'Distance to pitlane entry'
 	}
 };
 
@@ -180,6 +195,26 @@ function setupEventListeners() {
 		});
 	}
 
+	// Target FPS slider
+	const targetFpsSlider = document.getElementById('overlay-target-fps');
+	if (targetFpsSlider) {
+		targetFpsSlider.addEventListener('input', function() {
+			const value = parseInt(this.value);
+			document.getElementById('target-fps-value').textContent = value;
+		});
+
+		targetFpsSlider.addEventListener('change', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('setConfigInt', {
+					component: configKey,
+					key: 'target_fps',
+					value: parseInt(this.value)
+				});
+			}
+		});
+	}
+
 	// Save settings button
 	const saveButton = document.getElementById('save-overlay-settings');
 	if (saveButton) {
@@ -237,6 +272,177 @@ function setupEventListeners() {
 	}
 
 
+	// Tire: Temperature thresholds
+	const tireTempCoolInput = document.getElementById('overlay-tire-temp-cool');
+	if (tireTempCoolInput) {
+		tireTempCoolInput.addEventListener('input', function() {
+			if (selectedOverlay === 'tire') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayTire',
+					key: 'temp_cool_c',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const tireTempOptInput = document.getElementById('overlay-tire-temp-opt');
+	if (tireTempOptInput) {
+		tireTempOptInput.addEventListener('input', function() {
+			if (selectedOverlay === 'tire') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayTire',
+					key: 'temp_opt_c',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const tireTempHotInput = document.getElementById('overlay-tire-temp-hot');
+	if (tireTempHotInput) {
+		tireTempHotInput.addEventListener('input', function() {
+			if (selectedOverlay === 'tire') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayTire',
+					key: 'temp_hot_c',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	// Standings: Font Settings
+	const standingsFontSel = document.getElementById('overlay-standings-font');
+	if (standingsFontSel) {
+		standingsFontSel.addEventListener('change', function() {
+			if (selectedOverlay === 'standings') {
+				sendCommand('setConfigString', {
+					component: 'OverlayStandings',
+					key: 'font',
+					value: this.value
+				});
+			}
+		});
+	}
+
+	const standingsFontSizeInput = document.getElementById('overlay-standings-font-size');
+	if (standingsFontSizeInput) {
+		standingsFontSizeInput.addEventListener('input', function() {
+			if (selectedOverlay === 'standings') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayStandings',
+					key: 'font_size',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const standingsFontSpacingInput = document.getElementById('overlay-standings-font-spacing');
+	if (standingsFontSpacingInput) {
+		standingsFontSpacingInput.addEventListener('input', function() {
+			if (selectedOverlay === 'standings') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayStandings',
+					key: 'font_spacing',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const standingsFontStyleSel = document.getElementById('overlay-standings-font-style');
+	if (standingsFontStyleSel) {
+		standingsFontStyleSel.addEventListener('change', function() {
+			if (selectedOverlay === 'standings') {
+				sendCommand('setConfigString', {
+					component: 'OverlayStandings',
+					key: 'font_style',
+					value: this.value
+				});
+			}
+		});
+	}
+
+	const standingsFontWeightSlider = document.getElementById('overlay-standings-font-weight');
+	if (standingsFontWeightSlider) {
+		standingsFontWeightSlider.addEventListener('input', function() {
+			const value = parseInt(this.value);
+			document.getElementById('overlay-standings-font-weight-value').textContent = value;
+			sendCommand('setConfigInt', {
+				component: 'OverlayStandings',
+				key: 'font_weight',
+				value
+			});
+		});
+	}
+
+	// Relative: Font Settings
+	const relativeFontSel = document.getElementById('overlay-relative-font');
+	if (relativeFontSel) {
+		relativeFontSel.addEventListener('change', function() {
+			if (selectedOverlay === 'relative') {
+				sendCommand('setConfigString', {
+					component: 'OverlayRelative',
+					key: 'font',
+					value: this.value
+				});
+			}
+		});
+	}
+
+	const relativeFontSizeInput = document.getElementById('overlay-relative-font-size');
+	if (relativeFontSizeInput) {
+		relativeFontSizeInput.addEventListener('input', function() {
+			if (selectedOverlay === 'relative') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayRelative',
+					key: 'font_size',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const relativeFontSpacingInput = document.getElementById('overlay-relative-font-spacing');
+	if (relativeFontSpacingInput) {
+		relativeFontSpacingInput.addEventListener('input', function() {
+			if (selectedOverlay === 'relative') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayRelative',
+					key: 'font_spacing',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const relativeFontStyleSel = document.getElementById('overlay-relative-font-style');
+	if (relativeFontStyleSel) {
+		relativeFontStyleSel.addEventListener('change', function() {
+			if (selectedOverlay === 'relative') {
+				sendCommand('setConfigString', {
+					component: 'OverlayRelative',
+					key: 'font_style',
+					value: this.value
+				});
+			}
+		});
+	}
+
+	const relativeFontWeightSlider = document.getElementById('overlay-relative-font-weight');
+	if (relativeFontWeightSlider) {
+		relativeFontWeightSlider.addEventListener('input', function() {
+			const value = parseInt(this.value);
+			document.getElementById('overlay-relative-font-weight-value').textContent = value;
+			sendCommand('setConfigInt', {
+				component: 'OverlayRelative',
+				key: 'font_weight',
+				value
+			});
+		});
+	}
 
 	// Track: Track Width slider
 	const trackWidthSlider = document.getElementById('track-width-slider');
@@ -251,6 +457,72 @@ function setupEventListeners() {
 					value: value
 				});
 			}
+		});
+	}
+
+	// Fuel: Font Settings
+	const fuelFontSel = document.getElementById('overlay-fuel-font');
+	if (fuelFontSel) {
+		fuelFontSel.addEventListener('change', function() {
+			if (selectedOverlay === 'fuel') {
+				sendCommand('setConfigString', {
+					component: 'OverlayFuel',
+					key: 'font',
+					value: this.value
+				});
+			}
+		});
+	}
+
+	const fuelFontSizeInput = document.getElementById('overlay-fuel-font-size');
+	if (fuelFontSizeInput) {
+		fuelFontSizeInput.addEventListener('input', function() {
+			if (selectedOverlay === 'fuel') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayFuel',
+					key: 'font_size',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const fuelFontSpacingInput = document.getElementById('overlay-fuel-font-spacing');
+	if (fuelFontSpacingInput) {
+		fuelFontSpacingInput.addEventListener('input', function() {
+			if (selectedOverlay === 'fuel') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayFuel',
+					key: 'font_spacing',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	const fuelFontStyleSel = document.getElementById('overlay-fuel-font-style');
+	if (fuelFontStyleSel) {
+		fuelFontStyleSel.addEventListener('change', function() {
+			if (selectedOverlay === 'fuel') {
+				sendCommand('setConfigString', {
+					component: 'OverlayFuel',
+					key: 'font_style',
+					value: this.value
+				});
+			}
+		});
+	}
+
+	const fuelFontWeightSlider = document.getElementById('overlay-fuel-font-weight');
+	if (fuelFontWeightSlider) {
+		fuelFontWeightSlider.addEventListener('input', function() {
+			const value = parseInt(this.value);
+			document.getElementById('overlay-fuel-font-weight-value').textContent = value;
+			sendCommand('setConfigInt', {
+				component: 'OverlayFuel',
+				key: 'font_weight',
+				value
+			});
 		});
 	}
 }
@@ -396,6 +668,33 @@ function updateOverlaySettings(overlayKey) {
 		document.getElementById('opacity-value').textContent = opacity + '%';
 	}
 
+	// Update target FPS
+	const targetFpsSlider = document.getElementById('overlay-target-fps');
+	if (targetFpsSlider && currentState.config && currentState.config[config.configKey]) {
+		// Per-overlay default fallbacks (UI only). If not present, use 10.
+		const defaults = {
+			OverlayInputs: 30,
+			OverlayPit: 30,
+			OverlayDelta: 15,
+			OverlayTrack: 15,
+			OverlayDDU: 10,
+			OverlayFuel: 10,
+			OverlayWeather: 10,
+			OverlayFlags: 10,
+			OverlayRelative: 10,
+			OverlayCover: 10,
+			OverlayTire: 10,
+			OverlayRadar: 10,
+			OverlayStandings: 10
+		};
+		const cfg = currentState.config[config.configKey];
+		const def = defaults[config.configKey] !== undefined ? defaults[config.configKey] : 10;
+		const fps = (cfg.target_fps !== undefined ? cfg.target_fps : def);
+		targetFpsSlider.value = fps;
+		const vEl = document.getElementById('target-fps-value');
+		if (vEl) vEl.textContent = fps;
+	}
+
 	// Flags-specific: preview flag selector removed; no flags-specific UI
 
 	// Inputs-specific: show steering wheel selector when Inputs overlay selected
@@ -422,6 +721,71 @@ function updateOverlaySettings(overlayKey) {
 		}
 	}
 
+	// Standings-specific: show font settings when Standings overlay selected
+	const standingsFontRow = document.getElementById('overlay-standings-font-row');
+	if (standingsFontRow) standingsFontRow.classList.add('hidden');
+	if (overlayKey === 'standings') {
+		if (standingsFontRow) standingsFontRow.classList.remove('hidden');
+		// Update font settings from config
+		const cfg = currentState.config && currentState.config['OverlayStandings'] || {};
+		const fontSel = document.getElementById('overlay-standings-font');
+		const fontSizeInput = document.getElementById('overlay-standings-font-size');
+		const fontSpacingInput = document.getElementById('overlay-standings-font-spacing');
+		const fontStyleSel = document.getElementById('overlay-standings-font-style');
+		const fontWeightSlider = document.getElementById('overlay-standings-font-weight');
+		const fontWeightValue = document.getElementById('overlay-standings-font-weight-value');
+
+		if (fontSel) fontSel.value = cfg.font || (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font) || 'Poppins';
+		if (fontSizeInput) fontSizeInput.value = (cfg.font_size !== undefined ? cfg.font_size : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_size) || 16);
+		if (fontSpacingInput) fontSpacingInput.value = (cfg.font_spacing !== undefined ? cfg.font_spacing : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_spacing) || 0.30);
+		if (fontStyleSel) fontStyleSel.value = cfg.font_style || (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_style) || 'normal';
+		if (fontWeightSlider) fontWeightSlider.value = (cfg.font_weight !== undefined ? cfg.font_weight : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_weight) || 500);
+		if (fontWeightValue) fontWeightValue.textContent = fontWeightSlider ? fontWeightSlider.value : '';
+	}
+
+	// Fuel-specific: show font settings when Fuel overlay selected
+	const fuelFontRow = document.getElementById('overlay-fuel-font-row');
+	if (fuelFontRow) fuelFontRow.classList.add('hidden');
+	if (overlayKey === 'fuel') {
+		if (fuelFontRow) fuelFontRow.classList.remove('hidden');
+		// Update font settings from config
+		const cfg = currentState.config && currentState.config['OverlayFuel'] || {};
+		const fontSel = document.getElementById('overlay-fuel-font');
+		const fontSizeInput = document.getElementById('overlay-fuel-font-size');
+		const fontSpacingInput = document.getElementById('overlay-fuel-font-spacing');
+		const fontStyleSel = document.getElementById('overlay-fuel-font-style');
+		const fontWeightSlider = document.getElementById('overlay-fuel-font-weight');
+		const fontWeightValue = document.getElementById('overlay-fuel-font-weight-value');
+
+		if (fontSel) fontSel.value = cfg.font || (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font) || 'Poppins';
+		if (fontSizeInput) fontSizeInput.value = (cfg.font_size !== undefined ? cfg.font_size : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_size) || 16);
+		if (fontSpacingInput) fontSpacingInput.value = (cfg.font_spacing !== undefined ? cfg.font_spacing : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_spacing) || 0.30);
+		if (fontStyleSel) fontStyleSel.value = cfg.font_style || (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_style) || 'normal';
+		if (fontWeightSlider) fontWeightSlider.value = (cfg.font_weight !== undefined ? cfg.font_weight : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_weight) || 500);
+		if (fontWeightValue) fontWeightValue.textContent = fontWeightSlider ? fontWeightSlider.value : '';
+	}
+
+	// Relative-specific: show font settings when Relative overlay selected
+	const relativeFontRow = document.getElementById('overlay-relative-font-row');
+	if (relativeFontRow) relativeFontRow.classList.add('hidden');
+	if (overlayKey === 'relative') {
+		if (relativeFontRow) relativeFontRow.classList.remove('hidden');
+		// Update font settings from config
+		const cfg = currentState.config && currentState.config['OverlayRelative'] || {};
+		const fontSel = document.getElementById('overlay-relative-font');
+		const fontSizeInput = document.getElementById('overlay-relative-font-size');
+		const fontSpacingInput = document.getElementById('overlay-relative-font-spacing');
+		const fontStyleSel = document.getElementById('overlay-relative-font-style');
+		const fontWeightSlider = document.getElementById('overlay-relative-font-weight');
+		const fontWeightValue = document.getElementById('overlay-relative-font-weight-value');
+
+		if (fontSel) fontSel.value = cfg.font || (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font) || 'Poppins';
+		if (fontSizeInput) fontSizeInput.value = (cfg.font_size !== undefined ? cfg.font_size : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_size) || 16);
+		if (fontSpacingInput) fontSpacingInput.value = (cfg.font_spacing !== undefined ? cfg.font_spacing : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_spacing) || 0.30);
+		if (fontStyleSel) fontStyleSel.value = cfg.font_style || (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_style) || 'normal';
+		if (fontWeightSlider) fontWeightSlider.value = (cfg.font_weight !== undefined ? cfg.font_weight : (currentState.config && currentState.config.Overlay && currentState.config.Overlay.font_weight) || 500);
+		if (fontWeightValue) fontWeightValue.textContent = fontWeightSlider ? fontWeightSlider.value : '';
+	}
 	// Delta-specific: show reference mode selector when Delta overlay selected
 	const deltaReferenceRow = document.getElementById('overlay-delta-reference-row');
 	if (deltaReferenceRow) deltaReferenceRow.classList.add('hidden');
@@ -435,6 +799,23 @@ function updateOverlaySettings(overlayKey) {
 		}
 	}
 
+
+	// Tire-specific: show tire settings when Tire overlay selected
+	const tireSettingsRow = document.getElementById('overlay-tire-settings-row');
+	if (tireSettingsRow) tireSettingsRow.classList.add('hidden');
+	if (overlayKey === 'tire') {
+		if (tireSettingsRow) tireSettingsRow.classList.remove('hidden');
+
+		// Update tire settings from config
+		const cfg = currentState.config && currentState.config['OverlayTire'] || {};
+		const tempCoolInput = document.getElementById('overlay-tire-temp-cool');
+		const tempOptInput = document.getElementById('overlay-tire-temp-opt');
+		const tempHotInput = document.getElementById('overlay-tire-temp-hot');
+
+		if (tempCoolInput) tempCoolInput.value = (cfg.temp_cool_c !== undefined ? cfg.temp_cool_c : 60);
+		if (tempOptInput) tempOptInput.value = (cfg.temp_opt_c !== undefined ? cfg.temp_opt_c : 85);
+		if (tempHotInput) tempHotInput.value = (cfg.temp_hot_c !== undefined ? cfg.temp_hot_c : 105);
+	}
 
 	// Track-specific: show track width slider when Track overlay selected
 	const trackWidthRow = document.getElementById('overlay-track-width-row');

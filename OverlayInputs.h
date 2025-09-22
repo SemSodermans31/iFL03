@@ -152,7 +152,7 @@ class OverlayInputs : public Overlay
             m_renderTarget->Clear( float4(0,0,0,0) );
             {
                 const float cornerRadius = g_cfg.getFloat( m_name, "corner_radius", 2.0f );
-                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.7f) );
+                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,1.0f) );
                 bgColor.w *= getGlobalOpacity();
 
                 // Keep steering side corners perfectly circular
@@ -218,7 +218,6 @@ class OverlayInputs : public Overlay
                         sink->BeginFigure( float2(left + arcRadius, top), D2D1_FIGURE_BEGIN_FILLED );
                         // Top edge to before small top-right corner
                         sink->AddLine( float2(right - cornerRadius, top) );
-                        // Small top-right corner
                         {
                             D2D1_ARC_SEGMENT arc = {};
                             arc.point = float2(right, top + cornerRadius);
@@ -228,9 +227,7 @@ class OverlayInputs : public Overlay
                             arc.arcSize = D2D1_ARC_SIZE_SMALL;
                             sink->AddArc(arc);
                         }
-                        // Right edge to before small bottom-right corner
                         sink->AddLine( float2(right, bottom - cornerRadius) );
-                        // Small bottom-right corner
                         {
                             D2D1_ARC_SEGMENT arc = {};
                             arc.point = float2(right - cornerRadius, bottom);
@@ -240,9 +237,7 @@ class OverlayInputs : public Overlay
                             arc.arcSize = D2D1_ARC_SIZE_SMALL;
                             sink->AddArc(arc);
                         }
-                        // Bottom edge to before large bottom-left corner
                         sink->AddLine( float2(left + arcRadius, bottom) );
-                        // Large bottom-left quarter circle
                         {
                             D2D1_ARC_SEGMENT arc = {};
                             arc.point = float2(left, bottom - arcRadius);
@@ -252,9 +247,7 @@ class OverlayInputs : public Overlay
                             arc.arcSize = D2D1_ARC_SIZE_SMALL;
                             sink->AddArc(arc);
                         }
-                        // Left edge to before large top-left corner
                         sink->AddLine( float2(left, top + arcRadius) );
-                        // Large top-left quarter circle back to start
                         {
                             D2D1_ARC_SEGMENT arc = {};
                             arc.point = float2(left + arcRadius, top);
@@ -392,11 +385,13 @@ class OverlayInputs : public Overlay
                 m_renderTarget->FillRectangle( fillRect, m_brush.Get() );
                 
                 // Draw percentage text
-                wchar_t percentText[16];
-                swprintf_s( percentText, L"%d", (int)(bar.value * 100) );
+                wchar_t percentText[32];
+                int percentValue = (int)(bar.value * 100);
+                percentValue = std::max(-999, std::min(999, percentValue)); // Clamp to reasonable range
+                swprintf_s( percentText, L"%d", percentValue );
                 m_brush->SetColor( float4(1.0f, 1.0f, 1.0f, 1.0f) );
                 D2D1_RECT_F percentRect = { bar.x - barWidth*0.5f, barY - 20, bar.x + barWidth*0.5f, barY };
-                m_renderTarget->DrawTextA( percentText, (UINT)wcslen(percentText), m_textFormatPercent.Get(), &percentRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                m_renderTarget->DrawText( percentText, (UINT)wcslen(percentText), m_textFormatPercent.Get(), &percentRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
             }
 
             // SECTION 3: Steering Wheel with Speed/Gear or Image
@@ -410,8 +405,6 @@ class OverlayInputs : public Overlay
             const bool useImageWheel = (wheelMode != "builtin");
             
             // Draw a single thick circular ring (inner circle outward) for builtin mode only
-            
-            // Draw steering indicator (rotating column)
             const float steeringAngle = useStubData ? 
                 (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
                 ir_SteeringWheelAngle.getFloat();
@@ -480,8 +473,9 @@ class OverlayInputs : public Overlay
                 ir_Gear.getInt();
             
             // Speed text
-            wchar_t speedText[16];
-            swprintf_s( speedText, L"%.0f", speed );
+            wchar_t speedText[32];
+            float clampedSpeed = std::max(-999.0f, std::min(999.0f, speed)); // Clamp to reasonable range
+            swprintf_s( speedText, L"%.0f", clampedSpeed );
             D2D1_RECT_F speedRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 15, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 5 };
             if (!useImageWheel) {
                 m_brush->SetColor( telemetryColor );
@@ -489,13 +483,17 @@ class OverlayInputs : public Overlay
             }
             
             // Gear text
-            wchar_t gearText[8];
+            wchar_t gearText[16];
             if( gear == -1 )
                 wcscpy_s( gearText, L"R" );
             else if( gear == 0 )
                 wcscpy_s( gearText, L"N" );
             else
-                swprintf_s( gearText, L"%d", gear );
+            {
+                // Clamp gear to reasonable range to prevent buffer overflow
+                int clampedGear = std::max(-99, std::min(99, gear));
+                swprintf_s( gearText, L"%d", clampedGear );
+            }
                 
             D2D1_RECT_F gearRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 5, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 25 };
             if (!useImageWheel) {

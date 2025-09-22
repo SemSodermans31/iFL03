@@ -142,6 +142,9 @@ protected:
 
     virtual void onUpdate()
     {
+        if (!StubDataManager::shouldUseStubData() && !ir_hasValidDriver()) {
+            return;
+        }
         struct CarInfo {
             int     carIdx = 0;
             int     classIdx = 0;

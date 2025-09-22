@@ -50,6 +50,9 @@ SOFTWARE.
 #include "OverlayDelta.h"
 #include "OverlayRadar.h"
 #include "OverlayTrack.h"
+#include "OverlayFuel.h"
+#include "OverlayTire.h"
+#include "OverlayPit.h"
 #include "GuiCEF.h"
 #include "AppControl.h"
 #include "preview_mode.h"
@@ -64,7 +67,6 @@ static bool isCefSubprocess()
     {
         for (int i = 0; i < argc; ++i)
         {
-            // Matches "--type=renderer" or "--type" "renderer"
             if (wcsncmp(argv[i], L"--type=", 7) == 0 || wcscmp(argv[i], L"--type") == 0)
             {
                 isSub = true;
@@ -79,7 +81,6 @@ static bool isCefSubprocess()
 // Bring an already running main window to the foreground if we can find it
 static void focusExistingMainWindow()
 {
-    // Window class is defined in GuiCEF as L"iFL03GuiWindow" when CEF is enabled
     HWND hwnd = FindWindowW(L"iFL03GuiWindow", NULL);
     if (hwnd)
     {
@@ -93,6 +94,8 @@ enum class Hotkey
     UiEdit,
     Standings,
     DDU,
+    Fuel,
+    Tire,
     Inputs,
     Relative,
     Cover,
@@ -100,7 +103,8 @@ enum class Hotkey
     Flags,
     Delta, 
     Radar, 
-    Track
+    Track,
+    Pit
 };
 
 static void registerHotkeys()
@@ -108,6 +112,8 @@ static void registerHotkeys()
     UnregisterHotKey( NULL, (int)Hotkey::UiEdit );
     UnregisterHotKey( NULL, (int)Hotkey::Standings );
     UnregisterHotKey( NULL, (int)Hotkey::DDU );
+    UnregisterHotKey( NULL, (int)Hotkey::Fuel );
+    UnregisterHotKey( NULL, (int)Hotkey::Tire );
     UnregisterHotKey( NULL, (int)Hotkey::Inputs );
     UnregisterHotKey( NULL, (int)Hotkey::Relative );
     UnregisterHotKey( NULL, (int)Hotkey::Cover );
@@ -116,6 +122,8 @@ static void registerHotkeys()
     UnregisterHotKey( NULL, (int)Hotkey::Delta );
     UnregisterHotKey( NULL, (int)Hotkey::Radar );
     UnregisterHotKey( NULL, (int)Hotkey::Track );
+    UnregisterHotKey( NULL, (int)Hotkey::Pit );
+    // Custom overlays can add more hotkeys by extending this enum & list
 
     UINT vk, mod;
 
@@ -127,6 +135,12 @@ static void registerHotkeys()
 
     if( parseHotkey( g_cfg.getString("OverlayDDU","toggle_hotkey","ctrl+2"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::DDU, mod, vk );
+
+    if( parseHotkey( g_cfg.getString("OverlayFuel","toggle_hotkey","ctrl+shift+2"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Fuel, mod, vk );
+
+    if( parseHotkey( g_cfg.getString("OverlayTire","toggle_hotkey","ctrl+shift+3"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Tire, mod, vk );
 
     if( parseHotkey( g_cfg.getString("OverlayInputs","toggle_hotkey","ctrl+3"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Inputs, mod, vk );
@@ -151,6 +165,9 @@ static void registerHotkeys()
 
     if( parseHotkey( g_cfg.getString("OverlayTrack","toggle_hotkey","ctrl+0"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Track, mod, vk );
+    if( parseHotkey( g_cfg.getString("OverlayPit","toggle_hotkey","ctrl+shift+0"),&mod,&vk) )
+        RegisterHotKey( NULL, (int)Hotkey::Pit, mod, vk );
+    // Optional: user can bind OverlayTire via config; reuse General/ui to avoid extra enum churn
 }
 
 static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus status )
@@ -250,6 +267,8 @@ int main()
     printf("    Move and resize overlays:     %s\n", g_cfg.getString("General","ui_edit_hotkey","").c_str() );
     printf("    Toggle standings overlay:     %s\n", g_cfg.getString("OverlayStandings","toggle_hotkey","").c_str() );
     printf("    Toggle DDU overlay:           %s\n", g_cfg.getString("OverlayDDU","toggle_hotkey","").c_str() );
+    printf("    Toggle Fuel overlay:          %s\n", g_cfg.getString("OverlayFuel","toggle_hotkey","").c_str() );
+    printf("    Toggle tire overlay:          %s\n", g_cfg.getString("OverlayTire","toggle_hotkey","").c_str() );
     printf("    Toggle inputs overlay:        %s\n", g_cfg.getString("OverlayInputs","toggle_hotkey","").c_str() );
     printf("    Toggle relative overlay:      %s\n", g_cfg.getString("OverlayRelative","toggle_hotkey","").c_str() );
     printf("    Toggle cover overlay:         %s\n", g_cfg.getString("OverlayCover","toggle_hotkey","").c_str() );
@@ -282,6 +301,8 @@ int main()
         overlays.push_back(st);
     }
     overlays.push_back( new OverlayDDU() );
+    overlays.push_back( new OverlayFuel() );
+    overlays.push_back( new OverlayTire() );
     overlays.push_back( new OverlayWeather() );
     overlays.push_back( new OverlayFlags() );
     overlays.push_back( new OverlayDelta() );
@@ -291,6 +312,7 @@ int main()
     overlays.push_back( new OverlayRadar() );
 #endif
     overlays.push_back( new OverlayTrack() );
+    overlays.push_back( new OverlayPit() );
 #ifdef _DEBUG
     overlays.push_back( new OverlayDebug() );
 #endif
@@ -345,7 +367,7 @@ int main()
                 for( Overlay* o : overlays )
                 {
                     if( !o->isEnabled() )
-                        continue; // skip hidden/disabled overlays entirely
+                        continue;
                     o->update();
                 }
             }
@@ -356,7 +378,7 @@ int main()
                 for( Overlay* o : overlays )
                 {
                     if( !o->isEnabled() )
-                        continue; // skip hidden/disabled overlays entirely
+                        continue;
 
                     if( (enabledIdx & 1) == (frameCnt & 1) )
                         o->update();
@@ -397,8 +419,6 @@ int main()
                     for( Overlay* o : overlays )
                         o->enableUiEdit( uiEdit );
 
-                    // When we're exiting edit mode, attempt to make iRacing the foreground window again for best perf
-                    // without the user having to manually click into iRacing.
                     if( !uiEdit )
                         giveFocusToIracing();
                 }
@@ -411,6 +431,12 @@ int main()
                         break;
                     case (int)Hotkey::DDU:
                         g_cfg.setBool( "OverlayDDU", "enabled", !g_cfg.getBool("OverlayDDU","enabled",true) );
+                        break;
+                    case (int)Hotkey::Fuel:
+                        g_cfg.setBool( "OverlayFuel", "enabled", !g_cfg.getBool("OverlayFuel","enabled",true) );
+                        break;
+                    case (int)Hotkey::Tire:
+                        g_cfg.setBool( "OverlayTire", "enabled", !g_cfg.getBool("OverlayTire","enabled",true) );
                         break;
                     case (int)Hotkey::Inputs:
                         g_cfg.setBool( "OverlayInputs", "enabled", !g_cfg.getBool("OverlayInputs","enabled",true) );
@@ -435,6 +461,9 @@ int main()
                         break;
                     case (int)Hotkey::Track:
                         g_cfg.setBool( "OverlayTrack", "enabled", !g_cfg.getBool("OverlayTrack","enabled",true) );
+                        break;
+                    case (int)Hotkey::Pit:
+                        g_cfg.setBool( "OverlayPit", "enabled", !g_cfg.getBool("OverlayPit","enabled",true) );
                         break;
                     }
                     

@@ -246,6 +246,8 @@ extern irsdkCVar ir_RelativeHumidity;    // float[1] Relative Humidity (%)
 extern irsdkCVar ir_FogLevel;    // float[1] Fog level (%)
 extern irsdkCVar ir_TrackWetness;    // int[1] Track wetness level (0=dry, 1=slightly wet, 2=lightly wet, 3=wet, 4=very wet, 5=extremely wet)
 extern irsdkCVar ir_Precipitation;    // float[1] Precipitation intensity (0.0 to 1.0)
+extern irsdkCVar ir_TrackPitEntryPct;    // float[1] Percentage around lap where pit entry speed line is (% of lap)
+extern irsdkCVar ir_TrackPitSpeedLimit;  // float[1] Pit road speed limit (m/s)
 extern irsdkCVar ir_DCLapStatus;    // int[1] Status of driver change lap requirements ()
 extern irsdkCVar ir_DCDriversSoFar;    // int[1] Number of team drivers who have run a stint ()
 extern irsdkCVar ir_OkToReloadTextures;    // bool[1] True if it is ok to reload car textures at this time ()
@@ -420,6 +422,10 @@ ConnectionStatus ir_tick();
 
 // Let the session data tracking know that the config has changed.
 void ir_handleConfigChange();
+
+// True when iRacing is connected and driver index is valid and resolvable.
+// Use this before accessing ir_CarIdx* arrays or ir_session.cars[driver].
+bool ir_hasValidDriver();
 
 // Return whether we're in the process of getting in the car, waiting for others
 // to grid, or doing pace laps before the actual race start.

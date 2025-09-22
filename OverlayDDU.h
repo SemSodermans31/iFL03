@@ -87,8 +87,8 @@ class OverlayDDU : public Overlay
                 // Bold variant (override weight)
                 createGlobalTextFormat(1.0f, (int)DWRITE_FONT_WEIGHT_BLACK, "", m_textFormatBold);
                 createGlobalTextFormat(1.2f, m_textFormatLarge);
-                createGlobalTextFormat(0.7f, m_textFormatSmall);
-                createGlobalTextFormat(0.6f, m_textFormatVerySmall);
+                createGlobalTextFormat(0.8f, m_textFormatSmall);
+                createGlobalTextFormat(0.75f, m_textFormatVerySmall);
                 // Gear uses heavy and oblique and much larger size
                 createGlobalTextFormat(3.0f, (int)DWRITE_FONT_WEIGHT_BLACK, "oblique", m_textFormatGear);
             }
@@ -181,9 +181,11 @@ class OverlayDDU : public Overlay
             m_renderTarget->CreateCompatibleRenderTarget(&bmpTarget);
             bmpTarget->BeginDraw();
             bmpTarget->Clear();
-            
-            // Draw the background
-            m_brush->SetColor( g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,0.5f) ) );
+
+            // Draw the background with current opacity applied
+            float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,1.0f) );
+            bgColor.w *= getGlobalOpacity();
+            m_brush->SetColor( bgColor );
             bmpTarget->FillGeometry( m_backgroundPathGeometry.Get(), m_brush.Get() );
 
             // Draw the boxes and static texts
@@ -215,6 +217,31 @@ class OverlayDDU : public Overlay
         virtual void onSessionChanged()
         {
             m_isValidFuelLap = false;  // avoid confusing the fuel calculator logic with session changes
+            m_lapStartRemainingFuel = ir_FuelLevel.getFloat();
+
+            // Build cache key based on car+track combination
+            std::string newCacheKey = buildFuelCacheKey();
+            m_cacheSavedThisSession = false;
+
+            // Only clear fuel data if car or track changed, otherwise preserve as filler values
+            if (newCacheKey != m_cacheKey && !m_cacheKey.empty())
+            {
+                m_fuelUsedLastLaps.clear();
+            }
+
+            m_cacheKey = newCacheKey;
+
+            // If we don't have fuel data, try to seed from cache
+            if (m_fuelUsedLastLaps.empty() && !m_cacheKey.empty())
+            {
+                const float cachedAvgPerLap = g_cfg.getFloat("FuelCache", m_cacheKey, -1.0f);
+                if (cachedAvgPerLap > 0.0f)
+                {
+                    const int numLapsToAvg = g_cfg.getInt(m_name, "fuel_estimate_avg_green_laps", 4);
+                    for (int i = 0; i < numLapsToAvg; ++i)
+                        m_fuelUsedLastLaps.push_back(cachedAvgPerLap);
+                }
+            }
         }
 
         virtual void onUpdate()
@@ -235,6 +262,9 @@ class OverlayDDU : public Overlay
 
             // Use stub data in preview mode
             const bool useStubData = StubDataManager::shouldUseStubData();
+            if (!useStubData && !ir_hasValidDriver()) {
+                return;
+            }
             if (useStubData) {
                 StubDataManager::populateSessionCars();
             }
@@ -274,11 +304,8 @@ class OverlayDDU : public Overlay
             m_renderTarget->BeginDraw();
             m_brush->SetColor( finalTextCol );
 
-            // Render the cached background
             {
                 m_renderTarget->Clear( float4(0,0,0,0) );
-                float4 bgCol = float4(outlineCol.x, outlineCol.y, outlineCol.z, outlineCol.w * globalOpacity);
-                m_brush->SetColor( bgCol );
                 m_renderTarget->DrawBitmap(m_backgroundBitmap.Get());
                 m_brush->SetColor( finalTextCol );
             }
@@ -553,6 +580,20 @@ class OverlayDDU : public Overlay
                         avgPerLap /= (float)m_fuelUsedLastLaps.size();
 
                     dbg( "valid fuel lap: %d", (int)m_isValidFuelLap );
+                }
+
+                // Persist a fresh average for this car/track combo once we have enough valid laps
+                {
+                    const int numLapsToAvg = g_cfg.getInt(m_name, "fuel_estimate_avg_green_laps", 4);
+                    if (!m_cacheSavedThisSession && (int)m_fuelUsedLastLaps.size() >= numLapsToAvg && avgPerLap > 0.0f)
+                    {
+                        if (m_cacheKey.empty()) m_cacheKey = buildFuelCacheKey();
+                        if (!m_cacheKey.empty())
+                        {
+                            g_cfg.setFloat("FuelCache", m_cacheKey, avgPerLap);
+                            m_cacheSavedThisSession = true;
+                        }
+                    }
                 }
 
                 // Est Laps
@@ -856,6 +897,28 @@ class OverlayDDU : public Overlay
             return r;
         }
 
+        // Build a stable key like: t<trackId>_<sanitizedTrackCfg>_c<carId>
+        std::string buildFuelCacheKey() const
+        {
+            int trackId = ir_session.trackId;
+            std::string cfg = ir_session.trackConfigName;
+            int carId = 0;
+            if (ir_session.driverCarIdx >= 0)
+                carId = ir_session.cars[ir_session.driverCarIdx].carID;
+
+            if (trackId <= 0 || carId <= 0)
+                return std::string();
+
+            for (char& c : cfg)
+            {
+                if (!( (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ))
+                    c = '_';
+            }
+            char buf[256];
+            _snprintf_s(buf, _countof(buf), _TRUNCATE, "t%d_%s_c%d", trackId, cfg.c_str(), carId);
+            return std::string(buf);
+        }
+
     protected:
 
         virtual bool hasCustomBackground()
@@ -904,4 +967,8 @@ class OverlayDDU : public Overlay
         std::deque<float> m_fuelUsedLastLaps;
         bool m_isValidFuelLap = false;
         float m_fontSpacing = getGlobalFontSpacing();
+
+        // Simple per-car+track fuel average cache
+        std::string m_cacheKey;
+        bool m_cacheSavedThisSession = false;
 };
