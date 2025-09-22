@@ -102,6 +102,9 @@ class OverlayRelative : public Overlay
 
         virtual void onUpdate()
         {
+            if (!StubDataManager::shouldUseStubData() && !ir_hasValidDriver()) {
+                return;
+            }
             struct CarInfo {
                 int     carIdx = 0;
                 float   delta = 0;

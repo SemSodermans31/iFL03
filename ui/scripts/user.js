@@ -2,6 +2,7 @@
 let currentState = {};
 
 // Initialize the page
+let saveAsMode = 'duplicate'; // 'duplicate' | 'create'
 document.addEventListener('DOMContentLoaded', function() {
 	console.log('User page loaded');
 	
@@ -16,6 +17,8 @@ function setupEventListeners() {
 	// Config management actions
 	const dupBtn = document.getElementById('btn-duplicate-config');
 	if (dupBtn) dupBtn.addEventListener('click', showSaveAsModal);
+	const createBtn = document.getElementById('btn-create-config');
+	if (createBtn) createBtn.addEventListener('click', showCreateModal);
 	const delBtn = document.getElementById('deleteConfig');
 	if (delBtn) delBtn.addEventListener('click', deleteSelectedConfig);
 	const setActiveBtn = document.getElementById('btn-set-active');
@@ -313,9 +316,27 @@ function deleteSelectedConfig() {
 function showSaveAsModal() {
 	const modal = document.getElementById('saveAsModal');
 	const input = document.getElementById('saveAsCarName');
+	const title = document.getElementById('saveAsTitle');
 	
 	if (modal && input) {
+		saveAsMode = 'duplicate';
+		if (title) title.textContent = 'Duplicate Configuration';
 		input.value = selectedConfigName ? (selectedConfigName + ' copy') : '';
+		modal.classList.remove('hidden');
+		input.focus();
+	}
+}
+
+function showCreateModal() {
+	const modal = document.getElementById('saveAsModal');
+	const input = document.getElementById('saveAsCarName');
+	const title = document.getElementById('saveAsTitle');
+	if (modal && input) {
+		saveAsMode = 'create';
+		if (title) title.textContent = 'Create Configuration';
+		const canPrefill = currentState && !currentState.previewMode && currentState.connectionStatus === 'DRIVING';
+		const prefill = canPrefill ? (currentState.currentCar || '') : '';
+		input.value = prefill;
 		modal.classList.remove('hidden');
 		input.focus();
 	}
@@ -336,10 +357,17 @@ function confirmSaveAs() {
 		return;
 	}
 	const newName = input.value.trim();
-	const fromCar = selectedConfigName || '';
 
-	sendCommand({ cmd: 'copyCarConfig', fromCar: fromCar, toCar: newName }, 
-		'Configuration saved successfully', 'Configuration save failed');
+	if (saveAsMode === 'create') {
+		// Save current settings as a new car config
+		sendCommand({ cmd: 'saveCarConfig', carName: newName }, 
+			'Configuration created successfully', 'Configuration create failed');
+	} else {
+		// Duplicate from selected config
+		const fromCar = selectedConfigName || '';
+		sendCommand({ cmd: 'copyCarConfig', fromCar: fromCar, toCar: newName }, 
+			'Configuration saved successfully', 'Configuration save failed');
+	}
 
 	hideSaveAsModal();
 }

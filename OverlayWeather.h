@@ -230,14 +230,14 @@ class OverlayWeather : public Overlay
                 std::string wetnessText;
                 if (useStubData)
                 {
-                    const float stubWet = StubDataManager::getStubTrackWetness(); // 0..1
+                    const float stubWet = StubDataManager::getStubTrackWetness();
                     trackWetnessBar = std::max(0.0f, std::min(1.0f, stubWet));
                     const int wetEnumForText = (int)std::round(trackWetnessBar * 7.0f);
                     wetnessText = getTrackWetnessText((float)wetEnumForText);
                 }
                 else
                 {
-                    const int wetEnum = ir_TrackWetness.getInt(); // 0..7 per IRSDK
+                    const int wetEnum = ir_TrackWetness.getInt();
                     trackWetnessBar = std::max(0.0f, std::min(1.0f, (float)wetEnum / 7.0f));
                     wetnessText = getTrackWetnessText((float)wetEnum);
                 }
@@ -297,7 +297,7 @@ class OverlayWeather : public Overlay
                 // Title is cached in static bitmap (both labels)
 
                 const float valueY = m_precipitationBox.y0 + m_precipitationBox.h * 0.65f;
-                const float iconX = m_precipitationBox.x0 + titlePadding; // Align with title
+                const float iconX = m_precipitationBox.x0 + titlePadding; 
 
                 if (showPrecip) {
                     // Show precipitation data
@@ -309,7 +309,7 @@ class OverlayWeather : public Overlay
                     // Percentage value - larger, to the right of the icon
                     m_brush->SetColor( precipCol );
                     swprintf( s, _countof(s), L"%.0f%%", precipitation * 100.0f );
-                    const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
+                    const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor);
                     m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(),
                                   m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 } else {
@@ -326,7 +326,7 @@ class OverlayWeather : public Overlay
                     m_brush->SetColor( precipCol );
                     const wchar_t degree = L'\x00B0';
                     swprintf( s, _countof(s), L"%.1f%lc%c", airTemp, degree, imperial ? 'F' : 'C' );
-                    const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor); // Icon width plus some spacing
+                    const float textOffset = titlePadding + iconSize + (15 * m_scaleFactor);
                     m_text.render( m_renderTarget.Get(), s, m_textFormatLarge.Get(),
                                   m_precipitationBox.x0 + textOffset, m_precipitationBox.x1 - valuePadding, valueY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 }
@@ -536,7 +536,6 @@ class OverlayWeather : public Overlay
                         } else {
                             dw = h * aspect;
                         }
-                        // Center adjusted size inside given box
                         float offsetX = (w - dw) * 0.5f;
                         float offsetY = (h - dh) * 0.5f;
                         dest = { x + offsetX, y + offsetY, x + offsetX + dw, y + offsetY + dh };
@@ -553,7 +552,7 @@ class OverlayWeather : public Overlay
 
         void drawWindCompass(float windDirection, float centerX, float centerY, float radius, float cardinalRotation)
         {
-            const float carSize = radius * 0.7f; // Scale car size relative to compass radius
+            const float carSize = radius * 0.7f;
 
             // Draw compass circle
             D2D1_ELLIPSE compassCircle = { {centerX, centerY}, radius, radius };
@@ -624,7 +623,7 @@ class OverlayWeather : public Overlay
             drawIcon(m_carIcon.Get(), carX, carY, carSize, carSize, true);
 
             const float arrowStartRadius = radius;
-            const float arrowEndRadius = radius * 0.25f; // Shorter, but still starts at edge
+            const float arrowEndRadius = radius * 0.25f;
 
             const float startX = centerX + arrowStartRadius * (float)sin(windDirection);
             const float startY = centerY - arrowStartRadius * (float)cos(windDirection);
@@ -686,7 +685,7 @@ class OverlayWeather : public Overlay
                 return g_cfg.getInt("OverlayWeather", "preview_weather_type", 1) == 1;
             }
             // Show precipitation if we detect rain intensity or meaningful wetness
-            return ir_Precipitation.getFloat() > 0.01f || ir_TrackWetness.getInt() >= 3; // >= VeryLightlyWet
+            return ir_Precipitation.getFloat() > 0.01f || ir_TrackWetness.getInt() >= 3;
         }
 
         virtual bool hasCustomBackground()

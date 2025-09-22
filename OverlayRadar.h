@@ -75,6 +75,9 @@ class OverlayRadar : public Overlay
             blips.reserve(8);
 
             const bool useStubData = StubDataManager::shouldUseStubData();
+            if (!useStubData && !ir_hasValidDriver()) {
+                return;
+            }
 
             const int selfIdx = useStubData ? 0 : ir_session.driverCarIdx;
             const float selfSpeed = std::max( 5.0f, ir_Speed.getFloat() ); // m/s
@@ -82,16 +85,16 @@ class OverlayRadar : public Overlay
             // Raw, instantaneous measures this frame
             float minAheadNow = 1e9f, minBehindNow = 1e9f;
             bool hasLeft = false, hasRight = false;
-            float minLeftDist = 1e9f, minRightDist = 1e9f;  // Track closest side distances
-            float leftCarPos = 0.0f, rightCarPos = 0.0f;   // Track lateral position (-1 to 1, where 0 is alongside driver)
+            float minLeftDist = 1e9f, minRightDist = 1e9f; 
+            float leftCarPos = 0.0f, rightCarPos = 0.0f;   
 
             if (useStubData)
             {
                 // Enhanced demo: cars positioned to demonstrate lateral animation
-                blips.push_back({ -1.5f,  1.0f }); // close front-left (will show red block on left)
-                blips.push_back({  2.0f,  3.0f }); // front-right (will show yellow zone)
-                blips.push_back({ -1.2f, -1.5f }); // close rear-left (will show red block on left)
-                blips.push_back({  1.8f, -4.0f }); // rear-right (will show yellow zone)
+                blips.push_back({ -1.5f,  1.0f });
+                blips.push_back({  2.0f,  3.0f });
+                blips.push_back({ -1.2f, -1.5f });
+                blips.push_back({  1.8f, -4.0f }); 
 
                 for (const Blip& b : blips)
                 {
@@ -100,13 +103,11 @@ class OverlayRadar : public Overlay
                     if (b.dx < -0.5f && fabsf(b.dy) <= 2.0f) {
                         hasLeft = true;
                         minLeftDist = std::min(minLeftDist, -b.dx);
-                        // Calculate lateral position relative to driver (-1 = far left, 0 = alongside, 1 = far right)
                         leftCarPos = std::max(leftCarPos, std::min(1.0f, (b.dx + 2.0f) / 4.0f)); // Scale to -1 to 1 range
                     }
                     if (b.dx >  0.5f && fabsf(b.dy) <= 2.0f) {
                         hasRight = true;
                         minRightDist = std::min(minRightDist, b.dx);
-                        // Calculate lateral position relative to driver (-1 = far left, 0 = alongside, 1 = far right)
                         rightCarPos = std::min(rightCarPos, std::max(-1.0f, (b.dx - 2.0f) / 4.0f)); // Scale to -1 to 1 range
                     }
                 }
@@ -166,28 +167,28 @@ class OverlayRadar : public Overlay
 
                 // Estimate lateral positions and distances based on iRacing side detection
                 if (hasLeft) {
-                    minLeftDist = 1.5f;   // Estimate close distance
+                    minLeftDist = 1.5f;   
                     // Estimate lateral position - cars detected on left are typically alongside or slightly ahead/behind
-                    leftCarPos = 0.0f;    // Assume cars are alongside (0 = direct lateral position)
+                    leftCarPos = 0.0f;    
                     // For 2 cars on left, spread them out a bit
                     if (clr == irsdk_LR2CarsLeft) {
-                        leftCarPos = -0.3f; // Slightly offset for multiple cars
+                        leftCarPos = -0.3f; 
                     }
                 }
                 if (hasRight) {
-                    minRightDist = 1.5f;  // Estimate close distance
+                    minRightDist = 1.5f;  
                     // Estimate lateral position - cars detected on right are typically alongside or slightly ahead/behind
-                    rightCarPos = 0.0f;   // Assume cars are alongside (0 = direct lateral position)
+                    rightCarPos = 0.0f;   
                     // For 2 cars on right, spread them out a bit
                     if (clr == irsdk_LR2CarsRight) {
-                        rightCarPos = 0.3f; // Slightly offset for multiple cars
+                        rightCarPos = 0.3f; 
                     }
                 }
             }
 
             // Smoothing and sticky timers
             const float now = ir_SessionTime.getFloat();
-            // Reset smoothing/timers if session time jumps backwards (session transition)
+            
             if (m_lastSessionTime >= 0.0f && now + 0.001f < m_lastSessionTime)
             {
                 m_frontDistSm = 1e9f;
@@ -228,17 +229,16 @@ class OverlayRadar : public Overlay
                 m_renderTarget->FillEllipse(&e, m_brush.Get());
             }
 
-            // Decide which zones to light up - Racelab style
-            // Only show colors if opponents are within configured ranges
+            
             const bool hasOpponentsInRange = (m_frontDistSm <= m_yellowRangeM || m_rearDistSm <= m_yellowRangeM);
             
-            // Front/back zones
+            
             bool frontYellowInst = hasOpponentsInRange && (m_frontDistSm <= m_yellowRangeM && m_frontDistSm > m_redRangeM);
             bool frontRedInst    = hasOpponentsInRange && (m_frontDistSm <= m_redRangeM);
             bool rearYellowInst  = hasOpponentsInRange && (m_rearDistSm  <= m_yellowRangeM && m_rearDistSm  > m_redRangeM);
             bool rearRedInst     = hasOpponentsInRange && (m_rearDistSm  <= m_redRangeM);
 
-            // Sticky timers
+            
             const float stickRed = 0.20f;   // seconds
             const float stickYellow = 0.15f;
             if (frontRedInst)   m_frontRedUntil   = std::max(m_frontRedUntil,   now + stickRed);
@@ -251,11 +251,11 @@ class OverlayRadar : public Overlay
             const bool frontYellow= now <= m_frontYellowUntil|| frontYellowInst;
             const bool rearYellow = now <= m_rearYellowUntil || rearYellowInst;
 
-            // Side zones: rely directly on iRacing side detection (no yellow for sides)
+
             const bool leftRed     = hasLeft;
             const bool rightRed    = hasRight;
-            const bool leftYellow  = false;  // No yellow for sides in Racelab style
-            const bool rightYellow = false; // No yellow for sides in Racelab style
+            const bool leftYellow  = false;  
+            const bool rightYellow = false; 
 
             // Draw guide lines and proximity zones
             const float pxPerM = radius / std::max(1.0f, m_maxRangeM);
@@ -271,19 +271,19 @@ class OverlayRadar : public Overlay
             };
 
             // Draw guide lines with fading opacity
-            const float4 guideLineCol = float4(1.0f, 1.0f, 1.0f, 0.5f * globalOpacity); // 50% opacity white
+            const float4 guideLineCol = float4(1.0f, 1.0f, 1.0f, 0.5f * globalOpacity);
             
             // Vertical line: guide at yellow range
             const float frontLineY = cy - halfL - (m_yellowRangeM * pxPerM);
             const float rearLineY = cy + halfL + (m_yellowRangeM * pxPerM);
-            drawLine(cx, cy - halfL, cx, frontLineY, guideLineCol, 1.5f);  // Front line
-            drawLine(cx, cy + halfL, cx, rearLineY, guideLineCol, 1.5f);   // Rear line
+            drawLine(cx, cy - halfL, cx, frontLineY, guideLineCol, 1.5f); 
+            drawLine(cx, cy + halfL, cx, rearLineY, guideLineCol, 1.5f);  
             
             // Horizontal lines: guide at red range left and right at car front/back
             const float leftLineX = cx - (m_redRangeM * pxPerM);
             const float rightLineX = cx + (m_redRangeM * pxPerM);
-            drawLine(leftLineX, cy - halfL, rightLineX, cy - halfL, guideLineCol, 1.5f);  // Front horizontal
-            drawLine(leftLineX, cy + halfL, rightLineX, cy + halfL, guideLineCol, 1.5f);  // Rear horizontal
+            drawLine(leftLineX, cy - halfL, rightLineX, cy - halfL, guideLineCol, 1.5f); 
+            drawLine(leftLineX, cy + halfL, rightLineX, cy + halfL, guideLineCol, 1.5f); 
 
             // Helpers for radial gradient wedges fading to the outside of the circle
             auto makeRadialBrush = [&](float innerR, float outerR, const float4& baseCol, Microsoft::WRL::ComPtr<ID2D1RadialGradientBrush>& outBrush)

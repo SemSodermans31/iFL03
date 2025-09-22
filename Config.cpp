@@ -46,7 +46,7 @@ static void configWatcher( std::atomic<bool>* m_hasChanged )
     {        
         if( ReadDirectoryChangesW( dir, buf.data(), (DWORD)buf.size()/sizeof(DWORD), TRUE, FILE_NOTIFY_CHANGE_LAST_WRITE, &bytesReturned, NULL, NULL ) )
         {
-            Sleep( 100 );  // wait a bit to make sure changes are actually picked up when we reload
+            Sleep( 100 ); 
             *m_hasChanged = true;
         }
     }
@@ -57,7 +57,6 @@ bool Config::load()
     std::string json;
     if( !loadFile(m_filename, json) )
     {
-        //printf("Could not load config file\n");
         return false;
     }
 
@@ -189,7 +188,7 @@ std::vector<std::string> Config::getStringVec( const std::string& component, con
 
 void Config::setStringVec( const std::string& component, const std::string& key, const std::vector<std::string>& v )
 {
-    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    picojson::object& pjcomp = getOrInsertComponent( component );
     picojson::array arr;
     arr.reserve(v.size());
     for (const std::string& s : v) {
@@ -202,26 +201,26 @@ void Config::setStringVec( const std::string& component, const std::string& key,
 
 void Config::setInt( const std::string& component, const std::string& key, int v )
 {
-    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    picojson::object& pjcomp = getOrInsertComponent( component );
     double d = double(v);
     pjcomp[key].set<double>( d );
 }
 
 void Config::setBool( const std::string& component, const std::string& key, bool v )
 {
-    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    picojson::object& pjcomp = getOrInsertComponent( component );
     pjcomp[key].set<bool>( v );
 }
 
 void Config::setString( const std::string& component, const std::string& key, const std::string& v )
 {
-    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    picojson::object& pjcomp = getOrInsertComponent( component );
     pjcomp[key].set<std::string>( v );
 }
 
 void Config::setFloat( const std::string& component, const std::string& key, float v )
 {
-    picojson::object& pjcomp = m_pj[component].get<picojson::object>();
+    picojson::object& pjcomp = getOrInsertComponent( component );
     pjcomp[key].set<double>( static_cast<double>(v) );
 }
 
@@ -367,8 +366,8 @@ std::vector<std::string> Config::getAvailableCarConfigs()
                 if (filename.starts_with("config_") && filename.ends_with(".json"))
                 {
                     // Extract car name from filename
-                    std::string carName = filename.substr(7); // Remove "config_"
-                    carName = carName.substr(0, carName.length() - 5); // Remove ".json"
+                    std::string carName = filename.substr(7);
+                    carName = carName.substr(0, carName.length() - 5);
                     
                     // Restore spaces (reverse sanitization - basic version)
                     std::replace(carName.begin(), carName.end(), '_', ' ');
@@ -388,7 +387,7 @@ std::vector<std::string> Config::getAvailableCarConfigs()
 bool Config::deleteCarConfig( const std::string& carName )
 {
     if( carName.empty() )
-        return false; // Don't delete default config
+        return false;
         
     std::string carFilename = getCarConfigFilename(carName);
     return DeleteFileA(carFilename.c_str()) != 0;

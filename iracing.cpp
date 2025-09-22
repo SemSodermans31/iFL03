@@ -157,6 +157,8 @@ irsdkCVar ir_RelativeHumidity("RelativeHumidity");    // float[1] Relative Humid
 irsdkCVar ir_FogLevel("FogLevel");    // float[1] Fog level (%)
 irsdkCVar ir_TrackWetness("TrackWetness");    // int[1] Track wetness level (0=dry, 1=slightly wet, 2=lightly wet, 3=wet, 4=very wet, 5=extremely wet)
 irsdkCVar ir_Precipitation("Precipitation");    // float[1] Precipitation intensity (0.0 to 1.0)
+irsdkCVar ir_TrackPitEntryPct("TrackPitEntryPct");    // float[1] Pit entry (% of lap)
+irsdkCVar ir_TrackPitSpeedLimit("TrackPitSpeedLimit");  // float[1] Pit speed limit (m/s)
 irsdkCVar ir_DCLapStatus("DCLapStatus");    // int[1] Status of driver change lap requirements ()
 irsdkCVar ir_DCDriversSoFar("DCDriversSoFar");    // int[1] Number of team drivers who have run a stint ()
 irsdkCVar ir_OkToReloadTextures("OkToReloadTextures");    // bool[1] True if it is ok to reload car textures at this time ()
@@ -664,6 +666,14 @@ ConnectionStatus ir_tick()
     // (for just a short time) even when we're not in the car in a practice session. Checking both does seem
     // to address that.
     return (ir_IsOnTrack.getBool() && ir_IsOnTrackCar.getBool()) ? ConnectionStatus::DRIVING : ConnectionStatus::CONNECTED;
+}
+
+bool ir_hasValidDriver()
+{
+    // Connected and driver index in range
+    if (!irsdkClient::instance().isConnected()) return false;
+    const int idx = ir_session.driverCarIdx;
+    return idx >= 0 && idx < IR_MAX_CARS;
 }
 
 void ir_handleConfigChange()

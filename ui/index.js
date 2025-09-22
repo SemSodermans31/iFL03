@@ -156,13 +156,39 @@ class IFL03GuiController {
         if (rnBackdrop) rnBackdrop.addEventListener('click', () => this.closeReleaseNotes());
     }
 
-    updateVersionInfo(state) {
+    updateVersionInfo(state = null) {
         try {
             const versionEl = document.getElementById('app-version');
             const updateBtn = document.getElementById('btn-update');
+            const updateTextEl = document.getElementById('update-text');
             const version = (this.installedVersion) || (state && (state.app?.version || state.version || state.appVersion)) || '-';
             if (versionEl) versionEl.textContent = String(version);
-            if (updateBtn) updateBtn.disabled = !(this.latestVersion && this.compareSemver(this.latestVersion, version) > 0);
+
+            const hasUpdate = this.latestVersion && this.compareSemver(this.latestVersion, version) > 0;
+
+            if (updateBtn) {
+                updateBtn.disabled = !hasUpdate;
+                if (hasUpdate) {
+                    // Update available - green button, "Update Available" text
+                    updateBtn.textContent = 'Update Available';
+                    updateBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    updateBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                    // Show update text
+                    if (updateTextEl) {
+                        updateTextEl.textContent = `Version ${this.latestVersion} is available.`;
+                        updateTextEl.classList.remove('hidden');
+                    }
+                } else {
+                    // No update available - red button, "No Update Available" text
+                    updateBtn.textContent = 'No Update Available';
+                    updateBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    updateBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+                    // Hide update text
+                    if (updateTextEl) {
+                        updateTextEl.classList.add('hidden');
+                    }
+                }
+            }
         } catch (e) { console.error('updateVersionInfo failed', e); }
     }
 
@@ -182,7 +208,14 @@ class IFL03GuiController {
     }
 
     async checkLatestRelease() {
+        const loadingEl = document.getElementById('update-loading');
+        const updateBtn = document.getElementById('btn-update');
+
         try {
+            // Show loading indicator
+            if (loadingEl) loadingEl.classList.remove('hidden');
+            if (updateBtn) updateBtn.disabled = true;
+
             const res = await fetch('https://api.github.com/repos/SemSodermans31/iFL03/releases/latest', { headers: { 'Accept': 'application/vnd.github+json' } });
             if (!res.ok) throw new Error('GitHub latest failed');
             const json = await res.json();
@@ -197,14 +230,15 @@ class IFL03GuiController {
             if (!dl && json.html_url) dl = json.html_url;
             this.latestDownloadUrl = dl;
 
-            const updateBtn = document.getElementById('btn-update');
-            if (this.installedVersion && this.latestVersion && this.compareSemver(this.latestVersion, this.installedVersion) > 0) {
-                if (updateBtn) updateBtn.disabled = false;
-            } else {
-                if (updateBtn) updateBtn.disabled = true;
-            }
+            // Update the UI with the new version info
+            this.updateVersionInfo();
         } catch (e) {
-            // Network failure or rate limit; keep button disabled
+            // Network failure or rate limit; show "No Update Available" state
+            console.error('Version check failed:', e);
+            this.updateVersionInfo();
+        } finally {
+            // Hide loading indicator
+            if (loadingEl) loadingEl.classList.add('hidden');
         }
     }
 

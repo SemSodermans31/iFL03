@@ -50,13 +50,92 @@
 
 		<main class="flex-1 flex bg-[#000000]">
 			<!-- Left main content -->
-			<div class="flex-1 m-2 rounded-xl">
+			<div class="flex-1 m-2 rounded-xl space-y-4">
 				<!-- Empty main content area for now -->
 				<section class="rounded-xl bg-[#121212] p-8">
 					<div class="text-center text-slate-100">
 						<h2 class="text-xl font-semibold mb-2">Welcome to iFL03</h2>
 						<p class="text-[#a8a8a8]">Select an option from the sidebar to get started.</p>
 					</div>
+				</section>
+				<section class="rounded-xl bg-[#121212]">
+					<!-- Roadmap -->
+					<section id="roadmap" class="relative bg-[#121212] py-16">
+						<div class="relative mx-auto max-w-7xl px-4">
+							<div class="flex items-center gap-3 mb-8">
+								<div class="h-8 w-1 rounded-full bg-gradient-to-b from-green-600 to-green-700"></div>
+								<h3 class="text-2xl text-white font-semibold tracking-tight">Roadmap</h3>
+							</div>
+							<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+								<!-- Card 1 -->
+								<div class="glass-roadmap-card group">
+									<div class="card-content">
+										<div class="pb-2 text-lg font-bold text-green-600">[01] - Sep 2025</div>
+										<div class="pt-2 font-bold text-sm text-slate-100">Radar overlay update</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+								<!-- Card 2 -->
+								<div class="glass-roadmap-card group">
+									<div class="card-content">
+										<div class="pb-2 text-lg font-bold text-green-600">[02] - Sep 2025</div>
+										<div class="pt-2 font-bold text-sm text-slate-100">Overlay styling update</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+								<!-- Card 3 -->
+								<div class="glass-roadmap-card group">
+									<div class="card-content">
+										<div class="pb-2 text-lg font-bold text-green-600">[03] - Oct 2025</div>
+										<div class="pt-2 font-bold text-sm text-slate-100">Expanded per‑overlay customization</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+								<!-- Card 4 -->
+								<div class="glass-roadmap-card group">
+									<div class="px-8 py-6">
+										<div class="pb-2 text-lg font-bold text-green-600">[04] - Nov 2025</div>
+										<div class="pt-2 font-bold text-sm text-slate-100">All iRacing trackmaps</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+								<!-- Card 5 -->
+								<div class="glass-roadmap-card group">
+									<div class="card-content">
+										<div class="pb-2 text-lg font-bold text-green-600">[05] - Nov 2025</div>
+										<div class="pt-2 font-bold text-sm text-slate-100">Separate hotkeys per overlay config</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+								<!-- Card 6 -->
+								<div class="glass-roadmap-card group">
+									<div class="card-content">
+										<div class="pb-2 text-lg font-bold text-green-600">[06] - tbd</div>
+										<div class="pt-2 font-bold text-sm text-slate-100">VR Support is a long term goal</div>
+										<div class="card-dots">
+											<span></span><span></span>
+											<span></span><span></span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					</section>
 				</section>
 			</div>
 
@@ -70,9 +149,17 @@
 								<div class="text-sm text-slate-100">Version</div>
 								<div class="text-lg font-semibold text--[#a8a8a8]" id="app-version"></div>
 							</div>
-							<button id="btn-update" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-[#121212] disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-								Update Available
-							</button>
+							<div class="flex flex-col items-end">
+								<div class="flex items-center gap-2">
+									<div id="update-loading" class="hidden">
+										<div class="animate-spin rounded-full h-4 w-4 border-2 border-[#a8a8a8] border-t-transparent"></div>
+									</div>
+									<button id="btn-update" class="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-[#121212] disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+										Update Available
+									</button>
+								</div>
+								<div id="update-text" class="text-xs text-[#a8a8a8] mt-1 hidden"></div>
+							</div>
 						</div>
 					</div>
 
@@ -80,25 +167,25 @@
 					<div class="rounded-xl bg-[#1f1f1f] p-4">
 						<div class="text-sm font-medium text-slate-100 mb-3">Links</div>
 						<div class="flex flex-wrap gap-2">
-							<a href="https://instagram.com/sem_sodermans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
-								<!-- Instagram icon -->
-								<i class="fa-brands fa-instagram"></i>
-								<span class="text-[#a8a8a8]">Instagram</span>
-							</a>
-							<a href="https://linkedin.com/in/sem-sodermans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
-								<!-- LinkedIn icon -->
-								<i class="fa-brands fa-linkedin"></i>
-								<span class="text-[#a8a8a8]">LinkedIn</span>
+							<a href="https://semsodermans31.github.io/iFL03/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
+								<!-- PayPal icon -->
+								<i class="fa-solid fa-globe"></i>
+								<span class="text-[#a8a8a8]">Website</span>
 							</a>
 							<a href="https://github.com/SemSodermans31/iFL03/" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
 								<!-- Github icon -->
 								<i class="fa-brands fa-github"></i>
-								<span class="text-[#a8a8a8]">GitHub</span>
+								<span class="text-[#a8a8a8]">Repo</span>
 							</a>
 							<a href="https://paypal.me/sems0drmans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
 								<!-- Paypal icon -->
 								<i class="fa-brands fa-paypal"></i>
-								<span class="text-[#a8a8a8]">PayPal</span>
+								<span class="text-[#a8a8a8]">Donations</span>
+							</a>
+							<a href="https://linkedin.com/in/sem-sodermans" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg bg-[#121212] px-3 py-2 hover:bg-[#3c3c3c]">
+								<!-- LinkedIn icon -->
+								<i class="fa-brands fa-linkedin"></i>
+								<span class="text-[#a8a8a8]">Contact Me</span>
 							</a>
 						</div>
 					</div>
@@ -126,21 +213,7 @@
 					<button id="btn-close-release-notes" class="rounded-md px-2 py-1 text-[#a8a8a8] hover:bg-[#3c3c3c]">✕</button>
 				</div>
 				<div id="release-notes-content" class="p-4 text-sm text-[#a8a8a8] flex-1 overflow-y-auto">
-					Alongside the original overlays, iFL03 adds several new overlays and many quality‑of‑life upgrades:
-
-New overlays
-Delta: Circular delta with trend‑aware coloring and predicted lap time.
-Flags: Clean, high‑contrast flag callouts with two‑band design.
-Weather: Track temp, wetness bar, precipitation/air temp, and a wind compass relative to car.
-Track Map: Scaled track rendering with start/finish markers and cars for most tracks.
-Radar: Proximity radar with 8 m/2 m guides and sticky alerts.
-Enhanced original overlays
-Relative: Optional minimap, license or SR, iRating, pit age, last lap, average of last 5 laps, positions gained, class colors, buddy highlighting, scrollable list, optional iRating prediction in races.
-Standings: Class‑aware grid with fastest‑lap highlighting, car brand icons, deltas/gaps, average of last 5 laps, configurable top/ahead/behind visibility, scroll bar.
-DDU: Fuel calculator refinements, P1 last, delta vs session best, shift light behavior, temperatures, brake bias, incident count, RPM lights, etc.
-Inputs: Dual graph plus vertical bars (clutch/brake/throttle), steering ring or image wheel (Moza KS / RS v2), on‑wheel speed/gear.
-Preview mode: Populate overlays with stub data even when disconnected to place layouts.
-Global opacity: All overlays respect a global opacity for easy blending with broadcasts/streams.
+					loading...
 				</div>
 			</div>
 		</div>

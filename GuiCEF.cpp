@@ -178,7 +178,7 @@ namespace {
 			if (key == VK_F5 || key == VK_F11 || key == VK_F12) return true;
 			if (ctrl && (key == 'R' || key == VK_BROWSER_REFRESH)) return true;
 			if (ctrl && shift && (key == 'I' || key == VK_F12)) return true;
-			if (ctrl && (key == 'L' || key == 'T' || key == 'N' || key == 'W')) return true; // location/new tab/new window/close
+			if (ctrl && (key == 'L' || key == 'T' || key == 'N' || key == 'W')) return true;
 			if (alt && key == VK_LEFT) return true;
 			if (alt && key == VK_RIGHT) return true;
 
@@ -343,7 +343,6 @@ namespace {
 				return true;
 			}
 			if (has("\"cmd\":\"setPreviewWeatherType\"")) {
-				// Extract weather type as integer - look for "value":0 or "value":1 pattern
 				size_t valuePos = req.find("\"value\":");
 				if (valuePos != std::string::npos) {
 					size_t valueStart = valuePos + 8;
@@ -441,7 +440,7 @@ namespace {
 										start = end + 1;
 									} else break;
 								} else {
-									break; // invalid format, bail
+									break;
 								}
 							}
 						}
@@ -673,9 +672,6 @@ void cefCreateMainWindow()
 	CefBrowserSettings browser_settings;
 	browser_settings.chrome_status_bubble = STATE_DISABLED;
 
-	// Try to load UI from the repo root first (..\\..\\ui),
-	// fall back to the copied UI next to the executable (..\\ui),
-	// else fall back to about:blank.
 	std::wstring exeDir = getExecutableDirW_CEF();
 	std::wstring candidateRepo = exeDir + L"\\..\\..\\ui\\index.html";
 	std::wstring candidateLocal = exeDir + L"\\ui\\index.html";
@@ -721,7 +717,7 @@ void cefShutdown()
 
 bool cefInitialize()
 {
-	return false; // Not initialized until CEF is linked
+	return false;
 }
 
 void cefCreateMainWindow()
