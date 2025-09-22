@@ -23,6 +23,9 @@ Acknowledgement: Huge thanks to lespalt for the original work. iFL03’s CEF GUI
   - [Track Map](#track-map)
   - [Radar](#radar)
   - [Cover](#cover)
+  - [Tire](#tire)
+  - [Fuel](#fuel)
+  - [Pitlane](#pitlane)
 - [Editing, Layout and Configuration](#editing-layout-and-configuration)
 - [CEF UI](#cef-ui)
 - [Installing & Running](#installing--running)
@@ -161,7 +164,7 @@ Scaled track rendering with start/finish markers and cars:
 
 ### Radar
 
-Racelab‑style proximity radar with readable distance cues:
+Proximity radar with readable distance cues:
 - Circular background (optional)
 - Guide lines at 8 m front/back and 2 m left/right near the car
 - Yellow zones (8–2 m) and red zones (≤2 m) for front/back with subtle radial fades
@@ -176,14 +179,28 @@ Plain rectangle that can hide distracting in‑car dashes (e.g., next‑gen stoc
 
 Screenshot: (not applicable)
 
+## Tire
+Shows tire data from iRacing SDK, a limitation is that this is only static and gets updated if you drive into your pitbox and out again.
+
+![tire](assets/readmeimg/tire.png)
+
+## Fuel
+Displays live fueldata in a comprehensive view. Able to edit the value for extra fuel that is calculated is possible if you are a good fuel saver and feel like the data is inaccurate.
+
+![fuel](assets/readmeimg/fuel.png)
+
+## Pitlane
+Displays handy information when driving into the pitlane will be updated in the future.
+
+![pitlane](assets/readmeimg/pit.png)
+
 ---
 
-## Editing, Layout and Configuration using the Console
+## Editing, Layout and Configuration using the GUI
 
-- Preview Mode: Press ALT‑J to toggle. Drag overlays to move; drag bottom‑right corner to resize. Press ALT‑J again to exit.
-- Hotkeys: Overlays can be toggled at runtime (see console on startup). Hotkeys are configurable.
-- Live config: Most colors, fonts, sizes and behavior can be tuned in the generated config.json. Edits are applied live when you save.
-- Preview mode: Enable to populate overlays with stub data when disconnected, for layout/design.
+- Preview Mode: In the settings in the GUI toggle the switch on.
+- Hotkeys: Overlays can be toggled at runtime (see overlays menu for hotkey combination). Hotkeys are configurable.
+- Live config: Most colors, fonts, sizes and behavior can be tuned in the generated config.json if you wish to totally customize your experience, this requires a bit of technical knowhow :P. Edits are applied live when you save.
 - Global opacity: Each overlay’s colors are automatically multiplied by a global opacity setting.
 
 ---
@@ -207,8 +224,8 @@ If you prefer, all settings remain available via config.json without opening the
 
 ## Installing & Running
 
-- No installer. Place the executable in any writable folder (so iFL03 can save config.json).
-- Run iFL03 before or after launching iRacing; overlays will appear once you’re in the car.
+- Install via the installer in the releases tab please do this in any writable folder (so iFL03 can save config.json).
+- Run iFL03 before or after launching iRacing; overlays will appear once you’re in the car and standings as you are in the menu.
 - Borderless‑window mode in iRacing is recommended. Other modes may work but are less tested.
 
 ---
