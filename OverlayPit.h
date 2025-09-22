@@ -134,9 +134,9 @@ protected:
 
         if (inPitStall) {
             pitState = PitState::IN_PIT_STALL;
-            // Estimate distance to pit exit (half pit road length from stall)
-            distanceM = pitRoadLengthM * 0.5f;
-            label = L"Pit Exit";
+            // When parked in our stall, distance-to-target should be zero
+            distanceM = 0.0f;
+            label = L"Pit Box";
         }
         else if (onPitRoadNow) {
             pitState = PitState::ON_PIT_ROAD;
@@ -179,15 +179,20 @@ protected:
         const float warn100 = imperial ? 328.0f : 100.0f;
         const float warn50  = imperial ? 164.0f : 50.0f;
 
-        // Only show when approaching pits, on pit road, or in pit stall
+        // Only show in legit pit contexts:
+        // - iRacing "ApproachingPits" track surface (pre-entry heads-up)
+        // - On pit road / in pit stall
+        // - Short grace window after exiting pit road (user feedback)
         bool shouldShow = false;
         if (StubDataManager::shouldUseStubData()) {
             shouldShow = true;
         } else {
             const int surf = ir_PlayerTrackSurface.getInt();
-            shouldShow = (surf == irsdk_AproachingPits) ||
-                        (pitState != PitState::APPROACHING_ENTRY) ||
-                        (displayVal <= (imperial ? 600.0f : 200.0f));
+            const bool approaching = (surf == irsdk_AproachingPits);
+            const bool onPitOrStall = onPitRoadNow || inPitStall;
+            const DWORD nowTs = GetTickCount();
+            const bool justExited = (m_lastEvent == LastEvent::ExitedPitRoad) && ((nowTs - m_stateChangeTick) < 3000);
+            shouldShow = approaching || onPitOrStall || justExited;
         }
         if (!shouldShow) {
             m_renderTarget->EndDraw();
@@ -225,7 +230,7 @@ protected:
             const int engWarn = ir_EngineWarnings.getInt();
             limiterOn = (engWarn & irsdk_pitSpeedLimiter) != 0;
         } else {
-            limiterOn = true; // Static ON state in preview mode
+            limiterOn = true;
         }
         const bool flash = !limiterOn && ((GetTickCount()/350)%2==0);
         const float bannerH = 28.0f;
@@ -366,7 +371,7 @@ protected:
                 progress = std::min(1.0f, distanceM / pitRoadLengthM);
             } else if (pitState == PitState::IN_PIT_STALL) {
                 // For in pit stall: show as mostly filled
-                progress = 0.8f;
+                progress = 1.0f;
             }
 
             if (progress > 0.0f) {

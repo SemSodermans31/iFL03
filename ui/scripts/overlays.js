@@ -272,6 +272,20 @@ function setupEventListeners() {
 	}
 
 
+	// Tire: Show only in pitlane toggle
+	const tirePitlaneToggle = document.getElementById('overlay-tire-pitlane-only');
+	if (tirePitlaneToggle) {
+		tirePitlaneToggle.addEventListener('change', function() {
+			if (selectedOverlay === 'tire') {
+				sendCommand('setConfigBool', {
+					component: 'OverlayTire',
+					key: 'show_only_in_pitlane',
+					value: this.checked
+				});
+			}
+		});
+	}
+
 	// Tire: Temperature thresholds
 	const tireTempCoolInput = document.getElementById('overlay-tire-temp-cool');
 	if (tireTempCoolInput) {
@@ -551,7 +565,7 @@ function renderBooleanToggles(configKey) {
 	if (!cfg) return;
 
 	// Collect boolean keys
-	const exclude = new Set(['enabled', 'show_in_menu', 'show_in_race']);
+	const exclude = new Set(['enabled', 'show_in_menu', 'show_in_race', 'show_only_in_pitlane']);
 	const keys = Object.keys(cfg).filter(k => typeof cfg[k] === 'boolean' && !exclude.has(k));
 	if (keys.length === 0) return;
 
@@ -808,10 +822,12 @@ function updateOverlaySettings(overlayKey) {
 
 		// Update tire settings from config
 		const cfg = currentState.config && currentState.config['OverlayTire'] || {};
+		const pitlaneToggle = document.getElementById('overlay-tire-pitlane-only');
 		const tempCoolInput = document.getElementById('overlay-tire-temp-cool');
 		const tempOptInput = document.getElementById('overlay-tire-temp-opt');
 		const tempHotInput = document.getElementById('overlay-tire-temp-hot');
 
+		if (pitlaneToggle) pitlaneToggle.checked = !!cfg.show_only_in_pitlane;
 		if (tempCoolInput) tempCoolInput.value = (cfg.temp_cool_c !== undefined ? cfg.temp_cool_c : 60);
 		if (tempOptInput) tempOptInput.value = (cfg.temp_opt_c !== undefined ? cfg.temp_opt_c : 85);
 		if (tempHotInput) tempHotInput.value = (cfg.temp_hot_c !== undefined ? cfg.temp_hot_c : 105);

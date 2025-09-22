@@ -86,7 +86,7 @@ class OverlayTire : public Overlay
             m_text.reset(m_dwriteFactory.Get());
             createGlobalTextFormat(0.7f, m_tfSmall);
             createGlobalTextFormat(1.0f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfMediumBold);
-            createGlobalTextFormat(1.4f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfTitle); // Title text format
+            createGlobalTextFormat(1.4f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfTitle);
 
             // Target FPS (moderate, tire data changes slowly)
             setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
@@ -134,6 +134,16 @@ class OverlayTire : public Overlay
 
         virtual void onUpdate()
         {
+            // Check if we should only show in pitlane
+            const bool showOnlyInPitlane = g_cfg.getBool(m_name, "show_only_in_pitlane", false);
+            if (showOnlyInPitlane && !ir_OnPitRoad.getBool()) {
+                // Outside pitlane: clear our layer so previous frame doesn't linger
+                m_renderTarget->BeginDraw();
+                m_renderTarget->Clear(float4(0, 0, 0, 0));
+                m_renderTarget->EndDraw();
+                return;
+            }
+
             const float4 textCol   = g_cfg.getFloat4(m_name, "text_col",   float4(1,1,1,0.9f));
             const float4 goodCol   = g_cfg.getFloat4(m_name, "good_col",   float4(0.0f,0.8f,0.0f,0.85f));
             const float4 warnCol   = g_cfg.getFloat4(m_name, "warn_col",   float4(1.0f,0.7f,0.0f,0.9f));

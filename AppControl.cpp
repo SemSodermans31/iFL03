@@ -206,8 +206,8 @@ std::string app_get_state_json()
 		"\"OverlayFlags\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_flag\":\"%s\"},"
 		"\"OverlayDelta\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"reference_mode\":%d},"
 		"\"OverlayRadar\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_background\":%s},"
-		"\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_other_cars\":%s,\"reverse_direction\":%s,\"track_width\":%.1f},"
-		"\"OverlayTire\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"advanced_mode\":%s,\"pressure_use_psi\":%s,\"temp_cool_c\":%.1f,\"temp_opt_c\":%.1f,\"temp_hot_c\":%.1f},"
+        "\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_other_cars\":%s,\"reverse_direction\":%s,\"track_width\":%.1f},"
+        "\"OverlayTire\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_only_in_pitlane\":%s,\"advanced_mode\":%s,\"pressure_use_psi\":%s,\"temp_cool_c\":%.1f,\"temp_opt_c\":%.1f,\"temp_hot_c\":%.1f},"
 		"\"OverlayPit\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"position\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s}"
 		"}}",
 		(s_uiEdit && *s_uiEdit) ? "true":"false",
@@ -385,6 +385,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayTire","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayTire","show_in_menu",false)),
 		boolStr(g_cfg.getBool("OverlayTire","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayTire","show_only_in_pitlane",false)),
 		boolStr(g_cfg.getBool("OverlayTire","advanced_mode",true)),
 		boolStr(g_cfg.getBool("OverlayTire","pressure_use_psi",true)),
 		g_cfg.getFloat("OverlayTire","temp_cool_c",60.0f),
