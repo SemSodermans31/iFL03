@@ -49,7 +49,7 @@ class OverlayRelative : public Overlay
 
     protected:
 
-        enum class Columns { POSITION, CAR_NUMBER, NAME, DELTA, LICENSE, SAFETY_RATING, IRATING, IR_PRED, PIT, LAST };
+        enum class Columns { POSITION, CAR_NUMBER, NAME, DELTA, LICENSE, SAFETY_RATING, IRATING, IR_PRED, PIT, LAST, TIRE_COMPOUND };
 
         virtual void onEnable()
         {
@@ -91,6 +91,9 @@ class OverlayRelative : public Overlay
                 m_columns.add( (int)Columns::IR_PRED,    computeTextExtent( L"+999", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x * irPredScale, fontSize/8 );
             }
 
+            if( g_cfg.getBool(m_name, "show_tire_compound", false) )
+                m_columns.add( (int)Columns::TIRE_COMPOUND, computeTextExtent( L"Comp 00", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/8 );
+
             // Allow user to scale the LAST column width via config
             const float lastColScale = g_cfg.getFloat( m_name, "last_col_scale", 2.0f );
             if( g_cfg.getBool(m_name, "show_last", true) )
@@ -113,6 +116,7 @@ class OverlayRelative : public Overlay
                 int     lapDelta = 0;
                 int     pitAge = 0;
                 float   last = 0;
+                int     tireCompound = -1;
             };
             std::vector<CarInfo> relatives;
             relatives.reserve( IR_MAX_CARS );
@@ -140,6 +144,7 @@ class OverlayRelative : public Overlay
                     ci.pitAge = rel.pitAge;
                     if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(rel.carIdx)) {
                         ci.last = sc->lastLapTime;
+                        ci.tireCompound = sc->tireCompound;
                     } else {
                         ci.last = 0.0f;
                     }
@@ -208,6 +213,9 @@ class OverlayRelative : public Overlay
                         ci.wrappedSum = wrappedSum;
                         ci.pitAge = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
                         ci.last = ir_CarIdxLastLapTime.getFloat(i);
+                        ci.tireCompound = ir_CarIdxTireCompound.isValid() ? ir_CarIdxTireCompound.getInt(i) : -1;
+                        if (ci.tireCompound < 0 && car.tireCompound >= 0)
+                            ci.tireCompound = car.tireCompound;
                         relatives.push_back( ci );
                     }
                 }
@@ -467,6 +475,21 @@ class OverlayRelative : public Overlay
                     m_brush->SetColor( iratingBgCol );
                     m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
                     m_brush->SetColor( iratingTextCol );
+                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+                }
+
+                if( clm = m_columns.get( (int)Columns::TIRE_COMPOUND ) )
+                {
+                    int compound = ci.tireCompound;
+                    if (compound < 0 && car.tireCompound >= 0)
+                        compound = car.tireCompound;
+                    if (compound < 0 && ir_CarIdxTireCompound.isValid())
+                        compound = ir_CarIdxTireCompound.getInt(ci.carIdx);
+                    if (compound >= 0)
+                        swprintf( s, _countof(s), L"%d", compound );
+                    else
+                        swprintf( s, _countof(s), L"-" );
+                    m_brush->SetColor( col );
                     m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 

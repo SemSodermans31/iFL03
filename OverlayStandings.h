@@ -46,7 +46,7 @@ public:
     const int defaultNumAheadDrivers = 5;
     const int defaultNumBehindDrivers = 5;
 
-    enum class Columns { POSITION, CAR_NUMBER, NAME, GAP, BEST, LAST, LICENSE, IRATING, CAR_BRAND, PIT, DELTA, L5, POSITIONS_GAINED };
+    enum class Columns { POSITION, CAR_NUMBER, NAME, GAP, BEST, LAST, LICENSE, IRATING, CAR_BRAND, PIT, DELTA, L5, POSITIONS_GAINED, TIRE_COMPOUND };
 
     OverlayStandings()
         : Overlay("OverlayStandings")
@@ -124,6 +124,9 @@ protected:
         if (g_cfg.getBool(m_name, "show_positions_gained", true))
             m_columns.add( (int)Columns::POSITIONS_GAINED, computeTextExtent(L"▲99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize / 2);
 
+        if (g_cfg.getBool(m_name, "show_tire_compound", false))
+            m_columns.add( (int)Columns::TIRE_COMPOUND, computeTextExtent( L"Comp 00", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, baseFontSize / 2 );
+
         if (g_cfg.getBool(m_name, "show_gap", true))
             m_columns.add( (int)Columns::GAP,        computeTextExtent(L"999.9", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize / 2 );
 
@@ -160,6 +163,7 @@ protected:
             bool    hasFastestLap = false;
             int     pitAge = 0;
             int     positionsChanged = 0;
+            int     tireCompound = -1;
         };
 
         struct classBestLap {
@@ -204,6 +208,7 @@ protected:
                 ci.pitAge = stubCar.pitAge;
                 ci.hasFastestLap = (stubCar.bestLapTime < 84.4f);
                 ci.positionsChanged = (i % 3) - 1;
+                ci.tireCompound = stubCar.tireCompound;
                 
                 carInfo.push_back(ci);
             }
@@ -227,6 +232,9 @@ protected:
             ci.pitAge       = ir_CarIdxLap.getInt(i) - car.lastLapInPits;
             ci.positionsChanged = ir_getPositionsChanged(i);
             ci.classIdx     = ir_getClassId(ci.carIdx);
+            ci.tireCompound = ir_CarIdxTireCompound.isValid() ? ir_CarIdxTireCompound.getInt(i) : -1;
+            if (ci.tireCompound < 0 && car.tireCompound >= 0)
+                ci.tireCompound = car.tireCompound;
 
             ci.best         = ir_CarIdxBestLapTime.getFloat(i);
             if (ir_session.sessionType == SessionType::RACE && ir_SessionState.getInt() <= irsdk_StateWarmup || ir_session.sessionType == SessionType::QUALIFY && ci.best <= 0) {
@@ -466,6 +474,11 @@ protected:
             m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
         }
 
+        if (clm = m_columns.get((int)Columns::TIRE_COMPOUND)) {
+            swprintf(s, _countof(s), L"Comp");
+            m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+        }
+
         // Content
         
         int carsToDraw = static_cast<int>((ybottom - 2 * yoff) / lineHeight) - 1;
@@ -680,6 +693,22 @@ protected:
                     m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
                 }
                 
+            }
+
+            // Tire compound
+            if (clm = m_columns.get((int)Columns::TIRE_COMPOUND))
+            {
+                int compound = ci.tireCompound;
+                if (compound < 0 && car.tireCompound >= 0)
+                    compound = car.tireCompound;
+                if (compound < 0 && ir_CarIdxTireCompound.isValid())
+                    compound = ir_CarIdxTireCompound.getInt(ci.carIdx);
+                if (compound >= 0)
+                    swprintf(s, _countof(s), L"%d", compound);
+                else
+                    swprintf(s, _countof(s), L"-");
+                m_brush->SetColor(textCol);
+                m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
             }
 
             // Gap

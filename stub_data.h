@@ -50,6 +50,7 @@ public:
         int lapCount;
         int pitAge;
         int classId;
+        int tireCompound;
     };
 
     // Initialize stub data (call once)
@@ -93,6 +94,7 @@ public:
         int pitAge;
         float minimapX;  // X position on track map (0.0 to 1.0)
         float minimapY;  // Y position on track map (0.0 to 1.0)
+        int tireCompound;
     };
     static std::vector<RelativeInfo> getRelativeData();
     

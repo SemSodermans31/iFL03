@@ -461,8 +461,8 @@ void Overlay::onMouseWheel( int /*delta*/, int /*x*/, int /*y*/ ) {}
 
 float Overlay::getGlobalFontSpacing() const
 {
-    // Per-overlay override with fallback to global Overlay setting
-    return g_cfg.getFloat(m_name, "font_spacing", g_cfg.getFloat("Overlay", "font_spacing", 0.0f));
+    // Use per-overlay value with built-in default (no global Overlay fallback)
+    return g_cfg.getFloat(m_name, "font_spacing", 0.30f);
 }
 
 static DWRITE_FONT_STYLE s_toFontStyle(const std::string& style)
@@ -475,11 +475,11 @@ static DWRITE_FONT_STYLE s_toFontStyle(const std::string& style)
 void Overlay::createGlobalTextFormat( float scale,
                                       Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
 {
-    // Prefer per-overlay typography settings; fall back to global Overlay settings
-    const std::string family   = g_cfg.getString(m_name,   "font",        g_cfg.getString("Overlay", "font",        "Poppins"));
-    const float       baseSize = g_cfg.getFloat (m_name,   "font_size",   g_cfg.getFloat ("Overlay", "font_size",   16.0f));
-    const int         weight   = g_cfg.getInt   (m_name,   "font_weight", g_cfg.getInt   ("Overlay", "font_weight", 500));
-    const std::string styleStr = g_cfg.getString(m_name,   "font_style",  g_cfg.getString("Overlay", "font_style",  "normal"));
+    // Use per-overlay typography with built-in defaults (no global Overlay fallback)
+    const std::string family   = g_cfg.getString(m_name,   "font",        "Poppins");
+    const float       baseSize = g_cfg.getFloat (m_name,   "font_size",   16.0f);
+    const int         weight   = g_cfg.getInt   (m_name,   "font_weight", 500);
+    const std::string styleStr = g_cfg.getString(m_name,   "font_style",  "normal");
 
     const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
     const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);
@@ -508,11 +508,11 @@ void Overlay::createGlobalTextFormat( float scale,
                                       const std::string& styleOverride,
                                       Microsoft::WRL::ComPtr<IDWriteTextFormat>& outFormat ) const
 {
-    // Prefer per-overlay typography settings; fall back to global Overlay settings
-    const std::string family   = g_cfg.getString(m_name,   "font",        g_cfg.getString("Overlay", "font",        "Poppins"));
-    const float       baseSize = g_cfg.getFloat (m_name,   "font_size",   g_cfg.getFloat ("Overlay", "font_size",   16.0f));
-    const int         weight   = weightOverride > 0 ? weightOverride : g_cfg.getInt(m_name, "font_weight", g_cfg.getInt("Overlay", "font_weight", 500));
-    const std::string styleStr = styleOverride.empty() ? g_cfg.getString(m_name, "font_style", g_cfg.getString("Overlay", "font_style", "normal")) : styleOverride;
+    // Use per-overlay typography with built-in defaults (no global Overlay fallback)
+    const std::string family   = g_cfg.getString(m_name,   "font",        "Poppins");
+    const float       baseSize = g_cfg.getFloat (m_name,   "font_size",   16.0f);
+    const int         weight   = weightOverride > 0 ? weightOverride : g_cfg.getInt(m_name, "font_weight", 500);
+    const std::string styleStr = styleOverride.empty() ? g_cfg.getString(m_name, "font_style", "normal") : styleOverride;
 
     const float size = std::max(1.0f, baseSize * std::max(0.1f, scale));
     const DWRITE_FONT_STYLE style = s_toFontStyle(styleStr);

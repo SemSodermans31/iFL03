@@ -542,6 +542,9 @@ ConnectionStatus ir_tick()
             _snprintf_s(path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}CarID:", carIdx);
             parseYamlInt(sessionYaml, path, &car.carID);
 
+            _snprintf_s(path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}CarTireCompound:", carIdx);
+            parseYamlInt(sessionYaml, path, &car.tireCompound);
+
             car.qualy.position = 0;
             car.practice.position = 0;
             car.race.position = 0;

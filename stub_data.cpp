@@ -47,23 +47,23 @@ void StubDataManager::initialize()
     s_stubCars = {
         // name,           carNum, lic, iRating, isSelf, isBuddy, isFlagged, pos, bestLap,    lastLap,     lapCount, pitAge, classId
         // Class 0 (Red) - F3 Championship contenders
-        {"You",                "31",   'A', 2850,    true,   false,   false,     3,   108.542f,   108.623f,   15,       8,       0},
-        {"Alex Thompson",      "7",    'A', 3120,    false,  false,   false,     1,   108.456f,   108.512f,   15,       7,       0},
+        {"You",                "31",   'A', 2850,    true,   false,   false,     3,   108.542f,   108.623f,   15,       8,       0,       0},
+        {"Alex Thompson",      "7",    'A', 3120,    false,  false,   false,     1,   108.456f,   108.512f,   15,       7,       0,       0},
         // Class 1 (Green) - Mid-field competitive
-        {"Carlos Martinez",    "12",   'A', 2980,    false,  true,    false,     5,   108.734f,   108.801f,   15,       6,       1},
-        {"Miguel Rodriguez",   "22",   'A', 2765,    false,  false,   true,      8,   109.145f,   109.198f,   14,       5,       1},
+        {"Carlos Martinez",    "12",   'A', 2980,    false,  true,    false,     5,   108.734f,   108.801f,   15,       6,       1,       1},
+        {"Miguel Rodriguez",   "22",   'A', 2765,    false,  false,   true,      8,   109.145f,   109.198f,   14,       5,       1,       2},
         // Class 2 (Magenta) - Points contenders
-        {"Jae-woo Kim",        "9",    'A', 3025,    false,  false,   false,     2,   108.498f,   108.567f,   15,       9,       2},
-        {"Wei Chen",           "15",   'A', 2890,    false,  false,   false,     7,   108.945f,   108.987f,   15,       4,       2},
+        {"Jae-woo Kim",        "9",    'A', 3025,    false,  false,   false,     2,   108.498f,   108.567f,   15,       9,       2,       0},
+        {"Wei Chen",           "15",   'A', 2890,    false,  false,   false,     7,   108.945f,   108.987f,   15,       4,       2,       1},
         // Class 3 (Orange) - Backmarkers with pace
-        {"Arjun Patel",        "18",   'B', 2650,    false,  false,   false,     6,   109.321f,   109.389f,   15,       10,      3},
-        {"Pierre Dubois",      "25",   'B', 2520,    false,  false,   false,     9,   109.623f,   109.691f,   15,       3,       3},
+        {"Arjun Patel",        "18",   'B', 2650,    false,  false,   false,     6,   109.321f,   109.389f,   15,       10,      3,       2},
+        {"Pierre Dubois",      "25",   'B', 2520,    false,  false,   false,     9,   109.623f,   109.691f,   15,       3,       3,       0},
         // Class 4 (Cyan) - Rookie drivers
-        {"Lukas Novak",        "4",    'B', 2380,    false,  false,   false,     4,   108.678f,   108.723f,   15,       2,       4},
-        {"Erik Andersson",     "11",   'C', 2150,    false,  false,   false,    10,   110.102f,   110.201f,   14,       11,      4},
+        {"Lukas Novak",        "4",    'B', 2380,    false,  false,   false,     4,   108.678f,   108.723f,   15,       2,       4,       1},
+        {"Erik Andersson",     "11",   'C', 2150,    false,  false,   false,    10,   110.102f,   110.201f,   14,       11,      4,       2},
         // Class 5 (Yellow) - Strugglers
-        {"Antonio Silva",      "27",   'C', 1980,    false,  false,   false,    11,   110.845f,   110.901f,   15,       12,      5},
-        {"Marek Kowalski",     "30",   'C', 1920,    false,  false,   false,    12,   111.089f,   111.145f,   15,       13,      5}
+        {"Antonio Silva",      "27",   'C', 1980,    false,  false,   false,    11,   110.845f,   110.901f,   15,       12,      5,       3},
+        {"Marek Kowalski",     "30",   'C', 1920,    false,  false,   false,    12,   111.089f,   111.145f,   15,       13,      5,       3}
     };
     
     s_initialized = true;
@@ -123,6 +123,7 @@ void StubDataManager::populateSessionCars()
         car.isFlagged = stubCar.isFlagged ? 1 : 0;
         car.classId = stubCar.classId;
         car.classCol = ClassColors::get(car.classId);
+        car.tireCompound = stubCar.tireCompound;
         
         // Assign car brands for icon display in preview mode (names chosen to match available PNG files)
         const char* carBrands[] = {
@@ -301,6 +302,7 @@ std::vector<StubDataManager::RelativeInfo> StubDataManager::getRelativeData()
         info.delta = deltas[i];
         info.lapDelta = 0;
         info.pitAge = s_stubCars[carIdx].pitAge;
+        info.tireCompound = s_stubCars[carIdx].tireCompound;
         info.minimapX = minimapPositions[i][0];
         info.minimapY = minimapPositions[i][1];
         relatives.push_back(info);

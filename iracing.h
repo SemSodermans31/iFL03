@@ -82,6 +82,7 @@ struct Car
     int             incidentCount = 0;
     float           carClassEstLapTime = 0;
     int             lastLapInPits = 0;
+    int             tireCompound = -1;
     SessionPosTimes practice;
     SessionPosTimes qualy;
     SessionPosTimes race;

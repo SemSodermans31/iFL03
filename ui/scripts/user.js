@@ -38,19 +38,6 @@ function setupEventListeners() {
 	if (buddiesAdd) buddiesAdd.addEventListener('click', () => addListEntry('General', 'buddies', 'buddies-input'));
 	const flaggedAdd = document.getElementById('flagged-add');
 	if (flaggedAdd) flaggedAdd.addEventListener('click', () => addListEntry('General', 'flagged', 'flagged-input'));
-
-	// Overlay font settings
-	const fontSel = document.getElementById('overlay-font');
-	if (fontSel) fontSel.addEventListener('change', () => setConfigString('Overlay', 'font', fontSel.value));
-	const fontSize = document.getElementById('overlay-font-size');
-	if (fontSize) fontSize.addEventListener('blur', () => setConfigInt('Overlay', 'font_size', parseInt(fontSize.value || '16', 10)));
-	const fontSpacing = document.getElementById('overlay-font-spacing');
-	if (fontSpacing) fontSpacing.addEventListener('blur', () => setConfigFloat('Overlay', 'font_spacing', parseFloat(fontSpacing.value || '0.30')));
-	const fontStyle = document.getElementById('overlay-font-style');
-	if (fontStyle) fontStyle.addEventListener('change', () => setConfigString('Overlay', 'font_style', fontStyle.value));
-	const fontWeight = document.getElementById('overlay-font-weight');
-	if (fontWeight) fontWeight.addEventListener('input', () => updateFontWeightPreview());
-	if (fontWeight) fontWeight.addEventListener('change', () => setConfigInt('Overlay', 'font_weight', parseInt(fontWeight.value || '500', 10)));
 }
 
 function requestState() {
@@ -82,9 +69,8 @@ function updateUI() {
 	// Update available configs
 	updateAvailableConfigs();
 
-	// Update general lists and overlay font settings
+	// Update general lists
 	updateGeneralLists();
-	updateOverlayFontSettings();
 }
 
 function updateConnectionStatus(status) {
@@ -190,30 +176,6 @@ function setConfigFloat(component, key, value) {
 
 function setConfigStringVec(component, key, values) {
     sendCommand({ cmd: 'setConfigStringVec', component, key, values }, 'List updated', 'Failed to update list');
-}
-
-function updateOverlayFontSettings() {
-    const overlay = currentState.config && currentState.config.Overlay;
-    if (!overlay) return;
-    const fontSel = document.getElementById('overlay-font');
-    if (fontSel && overlay.font) fontSel.value = overlay.font;
-    const fontSize = document.getElementById('overlay-font-size');
-    if (fontSize && overlay.font_size !== undefined) fontSize.value = overlay.font_size;
-    const fontSpacing = document.getElementById('overlay-font-spacing');
-    if (fontSpacing && overlay.font_spacing !== undefined) fontSpacing.value = overlay.font_spacing;
-    const fontStyle = document.getElementById('overlay-font-style');
-    if (fontStyle && overlay.font_style) fontStyle.value = overlay.font_style;
-    const fontWeight = document.getElementById('overlay-font-weight');
-    if (fontWeight && overlay.font_weight !== undefined) fontWeight.value = overlay.font_weight;
-    updateFontWeightPreview();
-}
-
-function updateFontWeightPreview() {
-    const fontWeight = document.getElementById('overlay-font-weight');
-    const label = document.getElementById('overlay-font-weight-value');
-    if (fontWeight && label) {
-        label.textContent = ` (${fontWeight.value})`;
-    }
 }
 
 function updateCurrentCarInfo() {
@@ -417,8 +379,8 @@ function showStatus(message, type = 'info') {
 	
 	// Remove existing type classes
 	statusDiv.classList.remove('bg-green-100', 'bg-red-100', 'bg-blue-100', 
-							   'border-green-500', 'border-red-500', 'border-blue-500',
-							   'text-green-800', 'text-red-800', 'text-blue-800');
+						   'border-green-500', 'border-red-500', 'border-blue-500',
+						   'text-green-800', 'text-red-800', 'text-blue-800');
 	
 	// Add type-specific classes
 	switch (type) {

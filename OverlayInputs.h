@@ -57,7 +57,13 @@ class OverlayInputs : public Overlay
 
         virtual void onConfigChanged()
         {
-            const int horizontalWidth = (int)(m_width * 0.6f);
+            m_showSteeringWheel = g_cfg.getBool( m_name, "show_steering_wheel", true );
+
+            const float wheelFrac = m_showSteeringWheel ? 0.2f : 0.0f;
+            const float barFrac = m_showSteeringWheel ? 0.2f : 0.3f;
+            const float graphFrac = std::max(0.1f, 1.0f - wheelFrac - barFrac);
+
+            const int horizontalWidth = std::max(1, (int)(m_width * graphFrac));
             m_throttleVtx.resize( horizontalWidth );
             m_brakeVtx.resize( horizontalWidth );
             m_steeringVtx.resize( horizontalWidth );
@@ -80,7 +86,10 @@ class OverlayInputs : public Overlay
             m_textFormatPercent->SetWordWrapping( DWRITE_WORD_WRAPPING_NO_WRAP );
 
             // Load selected steering wheel image if any
-            loadSteeringWheelBitmap();
+            if( m_showSteeringWheel )
+                loadSteeringWheelBitmap();
+            else
+                m_wheelBitmap.Reset();
 
             // Per-overlay FPS (configurable; default 30)
             setTargetFPS(g_cfg.getInt(m_name, "target_fps", 30));
@@ -92,9 +101,14 @@ class OverlayInputs : public Overlay
             const float h = (float)m_height;
 
             // Layout sections
-            const float horizontalWidth = w * 0.6f;  // 60% for horizontal inputs
-            const float barsWidth = w * 0.2f;        // 20% for vertical bars
-            const float wheelWidth = w * 0.2f;       // 20% for steering wheel
+            const bool showWheel = m_showSteeringWheel;
+            const float wheelFrac = showWheel ? 0.2f : 0.0f;
+            const float barFrac = showWheel ? 0.2f : 0.3f;
+            const float graphFrac = 1.0f - wheelFrac - barFrac;
+
+            const float horizontalWidth = w * graphFrac;
+            const float barsWidth = w * barFrac;
+            const float wheelWidth = w * wheelFrac;
 
             const bool leftSide = g_cfg.getBool( m_name, "left_side", false );
 
@@ -155,115 +169,122 @@ class OverlayInputs : public Overlay
                 float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,1.0f) );
                 bgColor.w *= getGlobalOpacity();
 
-                // Keep steering side corners perfectly circular
-                const float arcRadius = h * 0.5f;
+                const float left   = 0.5f;
+                const float top    = 0.5f;
+                const float right  = w - 0.5f;
+                const float bottom = h - 0.5f;
 
-                Microsoft::WRL::ComPtr<ID2D1PathGeometry> geom;
-                Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
-                if (SUCCEEDED(m_d2dFactory->CreatePathGeometry(&geom)) && SUCCEEDED(geom->Open(&sink)))
+                if( !showWheel )
                 {
-                    const float left   = 0.5f;
-                    const float top    = 0.5f;
-                    const float right  = w - 0.5f;
-                    const float bottom = h - 0.5f;
+                    m_brush->SetColor( bgColor );
+                    D2D1_ROUNDED_RECT rr = { D2D1::RectF(left, top, right, bottom), cornerRadius, cornerRadius };
+                    m_renderTarget->FillRoundedRectangle( rr, m_brush.Get() );
+                }
+                else
+                {
+                    const float arcRadius = h * 0.5f;
 
-                    if( !leftSide )
+                    Microsoft::WRL::ComPtr<ID2D1PathGeometry> geom;
+                    Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+                    if (SUCCEEDED(m_d2dFactory->CreatePathGeometry(&geom)) && SUCCEEDED(geom->Open(&sink)))
                     {
-                        // Rounded on right side (default)
-                        sink->BeginFigure( float2(left + cornerRadius, top), D2D1_FIGURE_BEGIN_FILLED );
-                        sink->AddLine( float2(right - arcRadius, top) );
+                        if( !leftSide )
                         {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(right, top + arcRadius);
-                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
+                            // Rounded on right side (default)
+                            sink->BeginFigure( float2(left + cornerRadius, top), D2D1_FIGURE_BEGIN_FILLED );
+                            sink->AddLine( float2(right - arcRadius, top) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(right, top + arcRadius);
+                                arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
+                            sink->AddLine( float2(right, bottom - arcRadius) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(right - arcRadius, bottom);
+                                arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
+                            sink->AddLine( float2(left + cornerRadius, bottom) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(left, bottom - cornerRadius);
+                                arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
+                            sink->AddLine( float2(left, top + cornerRadius) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(left + cornerRadius, top);
+                                arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
                         }
-                        sink->AddLine( float2(right, bottom - arcRadius) );
+                        else
                         {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(right - arcRadius, bottom);
-                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
+                            // Rounded on left side (mirrored)
+                            sink->BeginFigure( float2(left + arcRadius, top), D2D1_FIGURE_BEGIN_FILLED );
+                            sink->AddLine( float2(right - cornerRadius, top) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(right, top + cornerRadius);
+                                arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
+                            sink->AddLine( float2(right, bottom - cornerRadius) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(right - cornerRadius, bottom);
+                                arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
+                            sink->AddLine( float2(left + arcRadius, bottom) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(left, bottom - arcRadius);
+                                arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
+                            sink->AddLine( float2(left, top + arcRadius) );
+                            {
+                                D2D1_ARC_SEGMENT arc = {};
+                                arc.point = float2(left + arcRadius, top);
+                                arc.size = D2D1::SizeF(arcRadius, arcRadius);
+                                arc.rotationAngle = 0.0f;
+                                arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
+                                arc.arcSize = D2D1_ARC_SIZE_SMALL;
+                                sink->AddArc(arc);
+                            }
                         }
-                        sink->AddLine( float2(left + cornerRadius, bottom) );
-                        {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(left, bottom - cornerRadius);
-                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
-                        }
-                        sink->AddLine( float2(left, top + cornerRadius) );
-                        {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(left + cornerRadius, top);
-                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
-                        }
-                    }
-                    else
-                    {
-                        // Rounded on left side (mirrored)
-                        sink->BeginFigure( float2(left + arcRadius, top), D2D1_FIGURE_BEGIN_FILLED );
-                        // Top edge to before small top-right corner
-                        sink->AddLine( float2(right - cornerRadius, top) );
-                        {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(right, top + cornerRadius);
-                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
-                        }
-                        sink->AddLine( float2(right, bottom - cornerRadius) );
-                        {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(right - cornerRadius, bottom);
-                            arc.size = D2D1::SizeF(cornerRadius, cornerRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
-                        }
-                        sink->AddLine( float2(left + arcRadius, bottom) );
-                        {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(left, bottom - arcRadius);
-                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
-                        }
-                        sink->AddLine( float2(left, top + arcRadius) );
-                        {
-                            D2D1_ARC_SEGMENT arc = {};
-                            arc.point = float2(left + arcRadius, top);
-                            arc.size = D2D1::SizeF(arcRadius, arcRadius);
-                            arc.rotationAngle = 0.0f;
-                            arc.sweepDirection = D2D1_SWEEP_DIRECTION_CLOCKWISE;
-                            arc.arcSize = D2D1_ARC_SIZE_SMALL;
-                            sink->AddArc(arc);
-                        }
-                    }
 
-                    sink->EndFigure( D2D1_FIGURE_END_CLOSED );
-                    if (SUCCEEDED(sink->Close()))
-                    {
-                        m_brush->SetColor( bgColor );
-                        m_renderTarget->FillGeometry( geom.Get(), m_brush.Get() );
+                        sink->EndFigure( D2D1_FIGURE_END_CLOSED );
+                        if (SUCCEEDED(sink->Close()))
+                        {
+                            m_brush->SetColor( bgColor );
+                            m_renderTarget->FillGeometry( geom.Get(), m_brush.Get() );
+                        }
                     }
                 }
             }
@@ -394,111 +415,103 @@ class OverlayInputs : public Overlay
                 m_renderTarget->DrawText( percentText, (UINT)wcslen(percentText), m_textFormatPercent.Get(), &percentRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
             }
 
-            // SECTION 3: Steering Wheel with Speed/Gear or Image
-            const float wheelCenterX = wheelStartX + wheelWidth * 0.5f;
-            const float wheelCenterY = h * 0.5f;
-            const float wheelRadius = std::min(wheelWidth, h) * (0.45f * 0.85f); // Matches calcWheelRadius above
-            const float innerRadius = wheelRadius * 0.8f;
-            
-            // Check selected wheel mode
-            const std::string wheelMode = g_cfg.getString(m_name, "steering_wheel", "builtin");
-            const bool useImageWheel = (wheelMode != "builtin");
-            
-            // Draw a single thick circular ring (inner circle outward) for builtin mode only
-            const float steeringAngle = useStubData ? 
-                (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
-                ir_SteeringWheelAngle.getFloat();
-            
-            // Center column (vertical)
-            const float columnWidth = wheelRadius * 0.15f;
-            const float columnHeight = (wheelRadius - innerRadius) * 0.95f;
-            
-            // Colors
-            const float4 ringColor      = g_cfg.getFloat4( m_name, "steering_ring_col",   float4(0.3f, 0.3f, 0.3f, 1.0f) );
-            const float4 columnColor    = g_cfg.getFloat4( m_name, "steering_column_col", float4(0.93f, 0.03f, 0.13f, 1.0f) );
-            const float4 telemetryColor = g_cfg.getFloat4( m_name, "steering_text_col",   float4(1.0f, 1.0f, 1.0f, 1.0f) );
-
-            // Ring stroke so that inner edge aligns with innerRadius and outer edge with wheelRadius
-            if (!useImageWheel) {
-                const float ringStroke = std::max(1.0f, wheelRadius - innerRadius);
-                const float ringRadius = innerRadius + ringStroke * 0.5f;
-                m_brush->SetColor( ringColor );
-                D2D1_ELLIPSE ring = { {wheelCenterX, wheelCenterY}, ringRadius, ringRadius };
-                m_renderTarget->DrawEllipse( ring, m_brush.Get(), ringStroke );
-            }
-            D2D1_RECT_F columnRect = { 
-                wheelCenterX - columnWidth*0.7f,
-                wheelCenterY - wheelRadius,
-                wheelCenterX + columnWidth*0.7f,
-                wheelCenterY - wheelRadius + columnHeight
-            };
-            
-            // Create rotation matrix around wheel center (negate angle to fix inversion)
-            D2D1::Matrix3x2F rotation = D2D1::Matrix3x2F::Rotation(
-                -steeringAngle * (180.0f / 3.14159f),
-                D2D1::Point2F(wheelCenterX, wheelCenterY)
-            );
-            
-            // Apply rotation transform and draw the column or wheel image
-            D2D1_MATRIX_3X2_F previousTransform;
-            m_renderTarget->GetTransform(&previousTransform);
-            m_renderTarget->SetTransform(rotation);
-            if (useImageWheel && m_wheelBitmap) {
-                D2D1_SIZE_F bmpSize = m_wheelBitmap->GetSize();
-                float scale = 1.0f;
-                if (bmpSize.width > 0 && bmpSize.height > 0) {
-                    const float maxDim = wheelRadius * 2.0f;
-                    const float sx = maxDim / bmpSize.width;
-                    const float sy = maxDim / bmpSize.height;
-                    scale = std::min(sx, sy);
-                }
-                const float drawW = bmpSize.width * scale;
-                const float drawH = bmpSize.height * scale;
-                const float left = wheelCenterX - drawW * 0.5f;
-                const float top  = wheelCenterY - drawH * 0.5f;
-                D2D1_RECT_F dest = { left, top, left + drawW, top + drawH };
-                m_renderTarget->DrawBitmap(m_wheelBitmap.Get(), dest);
-            } else {
-                m_brush->SetColor( columnColor );
-                m_renderTarget->FillRectangle( columnRect, m_brush.Get() );
-            }
-            m_renderTarget->SetTransform(previousTransform);
-            
-            // Draw speed and gear inside wheel
-            const float speed = useStubData ? 
-                StubDataManager::getStubSpeed() :
-                ir_Speed.getFloat() * 3.6f;
-            const int gear = useStubData ? 
-                StubDataManager::getStubGear() : 
-                ir_Gear.getInt();
-            
-            // Speed text
-            wchar_t speedText[32];
-            float clampedSpeed = std::max(-999.0f, std::min(999.0f, speed)); // Clamp to reasonable range
-            swprintf_s( speedText, L"%.0f", clampedSpeed );
-            D2D1_RECT_F speedRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 15, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 5 };
-            if (!useImageWheel) {
-                m_brush->SetColor( telemetryColor );
-                m_renderTarget->DrawText( speedText, (UINT)wcslen(speedText), m_textFormatBold.Get(), &speedRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
-            }
-            
-            // Gear text
-            wchar_t gearText[16];
-            if( gear == -1 )
-                wcscpy_s( gearText, L"R" );
-            else if( gear == 0 )
-                wcscpy_s( gearText, L"N" );
-            else
+            if( showWheel )
             {
-                // Clamp gear to reasonable range to prevent buffer overflow
-                int clampedGear = std::max(-99, std::min(99, gear));
-                swprintf_s( gearText, L"%d", clampedGear );
-            }
-                
-            D2D1_RECT_F gearRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 5, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 25 };
-            if (!useImageWheel) {
-                m_brush->SetColor( telemetryColor );
-                m_renderTarget->DrawText( gearText, (UINT)wcslen(gearText), m_textFormatBold.Get(), &gearRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                // SECTION 3: Steering Wheel with Speed/Gear or Image
+                const float wheelCenterX = wheelStartX + wheelWidth * 0.5f;
+                const float wheelCenterY = h * 0.5f;
+                const float wheelRadius = std::min(wheelWidth, h) * (0.45f * 0.85f);
+                const float innerRadius = wheelRadius * 0.8f;
+
+                const std::string wheelMode = g_cfg.getString(m_name, "steering_wheel", "builtin");
+                const bool useImageWheel = (wheelMode != "builtin");
+
+                const float steeringAngle = useStubData ?
+                    (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
+                    ir_SteeringWheelAngle.getFloat();
+
+                const float columnWidth = wheelRadius * 0.15f;
+                const float columnHeight = (wheelRadius - innerRadius) * 0.95f;
+
+                const float4 ringColor      = g_cfg.getFloat4( m_name, "steering_ring_col",   float4(0.3f, 0.3f, 0.3f, 1.0f) );
+                const float4 columnColor    = g_cfg.getFloat4( m_name, "steering_column_col", float4(0.93f, 0.03f, 0.13f, 1.0f) );
+                const float4 telemetryColor = g_cfg.getFloat4( m_name, "steering_text_col",   float4(1.0f, 1.0f, 1.0f, 1.0f) );
+
+                if (!useImageWheel) {
+                    const float ringStroke = std::max(1.0f, wheelRadius - innerRadius);
+                    const float ringRadius = innerRadius + ringStroke * 0.5f;
+                    m_brush->SetColor( ringColor );
+                    D2D1_ELLIPSE ring = { {wheelCenterX, wheelCenterY}, ringRadius, ringRadius };
+                    m_renderTarget->DrawEllipse( ring, m_brush.Get(), ringStroke );
+                }
+                D2D1_RECT_F columnRect = {
+                    wheelCenterX - columnWidth*0.7f,
+                    wheelCenterY - wheelRadius,
+                    wheelCenterX + columnWidth*0.7f,
+                    wheelCenterY - wheelRadius + columnHeight
+                };
+
+                D2D1::Matrix3x2F rotation = D2D1::Matrix3x2F::Rotation(
+                    -steeringAngle * (180.0f / 3.14159f),
+                    D2D1::Point2F(wheelCenterX, wheelCenterY)
+                );
+
+                D2D1_MATRIX_3X2_F previousTransform;
+                m_renderTarget->GetTransform(&previousTransform);
+                m_renderTarget->SetTransform(rotation);
+                if (useImageWheel && m_wheelBitmap) {
+                    D2D1_SIZE_F bmpSize = m_wheelBitmap->GetSize();
+                    float scale = 1.0f;
+                    if (bmpSize.width > 0 && bmpSize.height > 0) {
+                        const float maxDim = wheelRadius * 2.0f;
+                        const float sx = maxDim / bmpSize.width;
+                        const float sy = maxDim / bmpSize.height;
+                        scale = std::min(sx, sy);
+                    }
+                    const float drawW = bmpSize.width * scale;
+                    const float drawH = bmpSize.height * scale;
+                    const float left = wheelCenterX - drawW * 0.5f;
+                    const float top  = wheelCenterY - drawH * 0.5f;
+                    D2D1_RECT_F dest = { left, top, left + drawW, top + drawH };
+                    m_renderTarget->DrawBitmap(m_wheelBitmap.Get(), dest);
+                } else {
+                    m_brush->SetColor( columnColor );
+                    m_renderTarget->FillRectangle( columnRect, m_brush.Get() );
+                }
+                m_renderTarget->SetTransform(previousTransform);
+
+                const float speed = useStubData ?
+                    StubDataManager::getStubSpeed() :
+                    ir_Speed.getFloat() * 3.6f;
+                const int gear = useStubData ?
+                    StubDataManager::getStubGear() :
+                    ir_Gear.getInt();
+
+                wchar_t speedText[32];
+                float clampedSpeed = std::max(-999.0f, std::min(999.0f, speed));
+                swprintf_s( speedText, L"%.0f", clampedSpeed );
+                D2D1_RECT_F speedRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 15, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 5 };
+                if (!useImageWheel) {
+                    m_brush->SetColor( telemetryColor );
+                    m_renderTarget->DrawText( speedText, (UINT)wcslen(speedText), m_textFormatBold.Get(), &speedRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                }
+
+                wchar_t gearText[16];
+                if( gear == -1 )
+                    wcscpy_s( gearText, L"R" );
+                else if( gear == 0 )
+                    wcscpy_s( gearText, L"N" );
+                else
+                {
+                    int clampedGear = std::max(-99, std::min(99, gear));
+                    swprintf_s( gearText, L"%d", clampedGear );
+                }
+
+                D2D1_RECT_F gearRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 5, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 25 };
+                if (!useImageWheel) {
+                    m_brush->SetColor( telemetryColor );
+                    m_renderTarget->DrawText( gearText, (UINT)wcslen(gearText), m_textFormatBold.Get(), &gearRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                }
             }
 
             m_renderTarget->EndDraw();
@@ -512,6 +525,7 @@ class OverlayInputs : public Overlay
         Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatBold;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatPercent;
         Microsoft::WRL::ComPtr<ID2D1Bitmap> m_wheelBitmap;
+        bool m_showSteeringWheel = true;
 
         void loadSteeringWheelBitmap()
         {
