@@ -27,6 +27,7 @@ SOFTWARE.
 #include <windowsx.h>
 #include "Overlay.h"
 #include "Config.h"
+#include "Logger.h"
 #include <string>
 
 using namespace Microsoft::WRL;
@@ -377,7 +378,10 @@ void Overlay::saveWindowPosAndSize()
     // When user manually moves overlay, switch to custom position
     g_cfg.setString( m_name, "position", "custom" );
 
-    g_cfg.save();
+    if (!g_cfg.save())
+    {
+        Logger::instance().logError("Failed to save config.json while saving window position for " + m_name);
+    }
 }
 
 bool Overlay::canEnableWhileNotDriving() const

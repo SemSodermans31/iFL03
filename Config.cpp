@@ -27,6 +27,7 @@ SOFTWARE.
 #include <filesystem>
 #include <algorithm>
 #include "Config.h"
+#include "Logger.h"
 
 Config              g_cfg;
 
@@ -57,6 +58,7 @@ bool Config::load()
     std::string json;
     if( !loadFile(m_filename, json) )
     {
+        Logger::instance().logError("Failed to load config file " + m_filename + " (loadFile returned false)");
         return false;
     }
 
@@ -64,6 +66,7 @@ bool Config::load()
     std::string parseError = picojson::parse( pjval, json );
     if( !parseError.empty() )
     {
+        Logger::instance().logError("Config file parse error: " + parseError);
         printf("Config file is not valid JSON!\n%s\n", parseError.c_str() );
         return false;
     }
@@ -82,6 +85,8 @@ bool Config::save()
         char s[1024];
         GetCurrentDirectory( sizeof(s), s );
         printf("Could not save config file! Please make sure iFL03 is started from a directory for which it has write permissions. The current directory is: %s.\n", s);
+        std::string msg = "Could not save config file (" + m_filename + ") from directory " + s;
+        Logger::instance().logError(msg);
     }
     return ok;
 }
@@ -274,6 +279,7 @@ bool Config::loadCarConfig( const std::string& carName )
         // If car config doesn't exist, try to load default config as base
         if( !loadFile("config.json", json) )
         {
+            Logger::instance().logError("Failed to load car config " + carFilename + " and fallback config.json");
             return false;
         }
     }
@@ -282,6 +288,7 @@ bool Config::loadCarConfig( const std::string& carName )
     std::string parseError = picojson::parse( pjval, json );
     if( !parseError.empty() )
     {
+        Logger::instance().logError("Car config parse error: " + parseError);
         printf("Car config file is not valid JSON!\n%s\n", parseError.c_str() );
         return false;
     }
@@ -335,6 +342,7 @@ bool Config::copyConfigToCar( const std::string& fromCar, const std::string& toC
     
     if( !loadOk )
     {
+        Logger::instance().logError("Failed to load source config when copying from " + fromCar + " to " + toCar);
         // Restore previous state
         m_pj = currentPj;
         m_filename = currentFilename;
@@ -390,5 +398,12 @@ bool Config::deleteCarConfig( const std::string& carName )
         return false;
         
     std::string carFilename = getCarConfigFilename(carName);
+    std::ifstream ifs(carFilename);
+    if (!ifs)
+    {
+        Logger::instance().logError("Failed to open car config file " + carFilename + " for delete check");
+        return false;
+    }
+    ifs.close();
     return DeleteFileA(carFilename.c_str()) != 0;
 }

@@ -76,6 +76,18 @@ public:
         m_carBrandIconsLoaded = loaded;
     }
 
+    std::string tireCompoundToString(int compound) const
+    {
+        switch (compound)
+        {
+        case 1: return "Primary";
+        case 2: return "Alternate";
+        case 3: return "Wet";
+        case 0: return "Dry";
+        default: return "-";
+        }
+    }
+
 protected:
 
     virtual void onEnable()
@@ -703,12 +715,9 @@ protected:
                     compound = car.tireCompound;
                 if (compound < 0 && ir_CarIdxTireCompound.isValid())
                     compound = ir_CarIdxTireCompound.getInt(ci.carIdx);
-                if (compound >= 0)
-                    swprintf(s, _countof(s), L"%d", compound);
-                else
-                    swprintf(s, _countof(s), L"-");
+                const std::string compoundText = tireCompoundToString(compound);
                 m_brush->SetColor(textCol);
-                m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                m_text.render(m_renderTarget.Get(), toWide(compoundText).c_str(), m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
             }
 
             // Gap

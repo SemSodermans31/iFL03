@@ -102,7 +102,14 @@ protected:
 
         // Pre-compute colors with opacity applied
         const float4 bgCol = float4(0.05f, 0.05f, 0.05f, 0.65f * globalOpacity);
-        const float4 trackCol = float4(0.8f, 0.8f, 0.8f, 0.9f * globalOpacity);
+        const bool useDarkMode = g_cfg.getBool(m_name, "dark_mode", false);
+
+        const float4 trackCol = useDarkMode
+            ? float4(0.070588f, 0.070588f, 0.070588f, 0.9f * globalOpacity)
+            : float4(0.8f, 0.8f, 0.8f, 0.9f * globalOpacity);
+        const float4 trackBorderCol = useDarkMode
+            ? float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity)
+            : float4(0.0f, 0.0f, 0.0f, 0.8f * globalOpacity);
         const float4 markerCol = ClassColors::self();
         const float4 outlineCol = float4(0.2f, 0.8f, 0.2f, 0.9f * globalOpacity);
 
@@ -221,7 +228,7 @@ protected:
             if (m_cachedPathGeometry) {
                 const float trackWidth = m_cachedTrackWidth;
                 const float outlineWidth = trackWidth * 2.0f;
-                m_brush->SetColor(D2D1::ColorF(D2D1::ColorF::Black, 0.8f * globalOpacity));
+                m_brush->SetColor(trackBorderCol);
                 m_renderTarget->DrawGeometry(m_cachedPathGeometry.Get(), m_brush.Get(), outlineWidth);
                 m_brush->SetColor(trackCol);
                 m_renderTarget->DrawGeometry(m_cachedPathGeometry.Get(), m_brush.Get(), trackWidth);

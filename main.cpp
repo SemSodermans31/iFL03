@@ -37,8 +37,13 @@ SOFTWARE.
 #include <stdlib.h>
 #include <stdio.h>
 #include <windows.h>
+#include <atomic>
+#include <thread>
+#include <chrono>
+#include <exception>
 #include "iracing.h"
 #include "Config.h"
+#include "Logger.h"
 #include "OverlayCover.h"
 #include "OverlayRelative.h"
 #include "OverlayInputs.h"
@@ -222,8 +227,37 @@ static void setWorkingDirectoryToExe()
     }
 }
 
+static std::string formatLastErrorMessage(DWORD err)
+{
+    if (err == 0)
+        return {};
+
+    char buffer[256] = {};
+    DWORD len = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                               nullptr, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                               buffer, sizeof(buffer), nullptr);
+    if (len == 0)
+        return std::to_string(err);
+
+    return std::to_string(err) + ": " + std::string(buffer, len);
+}
+
+static void logIfLastError(const char* context)
+{
+    DWORD err = GetLastError();
+    if (err)
+        Logger::instance().logError(std::string(context) + " failed: " + formatLastErrorMessage(err));
+}
+
+static std::atomic<DWORD> g_lastHeartbeatTick{0};
+static std::atomic<bool> g_watchdogRunning{false};
+static std::atomic<bool> g_watchdogStalled{false};
+static DWORD g_lastConfigReloadLogTick = 0;
+
 int main()
 {
+    Logger::instance().logInfo("iFL03 starting");
+
     // Single-instance guard for the main/browser process only (skip CEF sub-processes)
     HANDLE singleInstanceMutex = NULL;
     if (!isCefSubprocess())
@@ -233,8 +267,11 @@ int main()
         {
             focusExistingMainWindow();
             MessageBoxW(NULL, L"iFL03 is already running. Please first close the existing instance and try again.", L"iFL03", MB_OK | MB_ICONINFORMATION);
+            Logger::instance().logWarning("Second instance detected; exiting");
             return 0;
         }
+        if (!singleInstanceMutex)
+            logIfLastError("CreateMutexW");
     }
 
     // Bump priority up so we get time from the sim
@@ -243,14 +280,88 @@ int main()
     // Ensure config.json is read/written next to the executable
     setWorkingDirectoryToExe();
 
+    {
+        wchar_t logPath[MAX_PATH] = {};
+        if (GetModuleFileNameW(NULL, logPath, MAX_PATH))
+        {
+            for (int i = (int)wcslen(logPath) - 1; i >= 0; --i)
+            {
+                if (logPath[i] == L'\\' || logPath[i] == L'/')
+                {
+                    logPath[i + 1] = 0;
+                    break;
+                }
+            }
+            wcscat_s(logPath, L"logs.txt");
+            Logger::instance().init(logPath);
+        }
+    }
+
+    std::set_terminate([]
+    {
+        Logger::instance().logError("std::terminate invoked");
+        Logger::instance().flush();
+        std::abort();
+    });
+
+    SetUnhandledExceptionFilter([](EXCEPTION_POINTERS* info) -> LONG
+    {
+        DWORD code = info && info->ExceptionRecord ? info->ExceptionRecord->ExceptionCode : 0;
+        char buf[9];
+        sprintf_s(buf, "%08X", code);
+        Logger::instance().logError(std::string("Unhandled exception code 0x") + buf);
+        Logger::instance().flush();
+        return EXCEPTION_EXECUTE_HANDLER;
+    });
+
+    SetConsoleCtrlHandler([](DWORD signal) -> BOOL
+    {
+        Logger::instance().logWarning("Console control signal " + std::to_string(signal));
+        Logger::instance().flush();
+        return FALSE;
+    }, TRUE);
+
+    g_lastHeartbeatTick = GetTickCount();
+    g_watchdogRunning = true;
+    std::thread([]
+    {
+        while (g_watchdogRunning.load())
+        {
+            DWORD now = GetTickCount();
+            DWORD last = g_lastHeartbeatTick.load();
+            bool stalled = (now - last) > 5000;
+            bool wasStalled = g_watchdogStalled.load();
+            if (stalled && !wasStalled)
+            {
+                g_watchdogStalled = true;
+                Logger::instance().logWarning("Main loop heartbeat stalled for " + std::to_string(now - last) + " ms");
+                Logger::instance().flush();
+            }
+            else if (!stalled && wasStalled)
+            {
+                g_watchdogStalled = false;
+                Logger::instance().logInfo("Main loop heartbeat recovered");
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+        }
+    }).detach();
+
 #ifdef IFL03_USE_CEF
     const bool cefOk = cefInitialize();
     if( cefOk )
+    {
+        Logger::instance().logInfo("CEF initialized successfully");
         cefCreateMainWindow();
+    }
+    else
+    {
+        Logger::instance().logError("cefInitialize failed");
+    }
 #endif
 
     // Load the config and watch it for changes
-    g_cfg.load();
+    if (!g_cfg.load())
+        Logger::instance().logWarning("Initial config load failed");
     g_cfg.watchForChanges();
 
     // Initialize preview mode
@@ -334,6 +445,7 @@ int main()
         status = ir_tick();
         if( status != prevStatus )
         {
+            Logger::instance().logInfo(std::string("Connection status changed to ") + ConnectionStatusStr[(int)status]);
             if( status == ConnectionStatus::DISCONNECTED )
                 printf("Waiting for iRacing connection...\n");
             else
@@ -356,8 +468,6 @@ int main()
             for( Overlay* o : overlays )
                 o->sessionChanged();
         }
-
-        dbg( "connection status: %s, session type: %s, session state: %d, pace mode: %d, on track: %d, flags: 0x%X", ConnectionStatusStr[(int)status], SessionTypeStr[(int)ir_session.sessionType], ir_SessionState.getInt(), ir_PaceMode.getInt(), (int)ir_IsOnTrackCar.getBool(), ir_SessionFlags.getInt() );
 
         // Update/render overlays
         {
@@ -391,8 +501,20 @@ int main()
         // Watch for config change signal
         if( g_cfg.hasChanged() )
         {
-            g_cfg.load();
-            handleConfigChange( overlays, status );
+            if (!g_cfg.load())
+            {
+                Logger::instance().logError("Config reload failed");
+            }
+            else
+            {
+                DWORD nowTick = GetTickCount();
+                if (nowTick - g_lastConfigReloadLogTick > 2000)
+                {
+                    Logger::instance().logInfo("Config reloaded from disk");
+                    g_lastConfigReloadLogTick = nowTick;
+                }
+                handleConfigChange( overlays, status );
+            }
 #ifdef IFL03_USE_CEF
             if (cefOk) {
                 std::string js = std::string("window.onIFL03State && window.onIFL03State(") + app_get_state_json() + ");";
@@ -407,6 +529,7 @@ int main()
         {
             if( msg.message == WM_QUIT )
             {
+                Logger::instance().logInfo("WM_QUIT received");
                 quitRequested = true;
                 break;
             }
@@ -467,7 +590,8 @@ int main()
                         break;
                     }
                     
-                    g_cfg.save();
+                    if (!g_cfg.save())
+                        Logger::instance().logError("Failed to save config after hotkey toggle");
                     handleConfigChange( overlays, status );
                 }
             }
@@ -475,6 +599,8 @@ int main()
             TranslateMessage(&msg);
             DispatchMessage(&msg);            
         }
+
+        g_lastHeartbeatTick = GetTickCount();
 
         if( quitRequested )
             break;
@@ -487,15 +613,23 @@ int main()
         frameCnt++;
     }
 
+    Logger::instance().logInfo("iFL03 shutting down");
+    g_watchdogRunning = false;
+    Logger::instance().flush();
+
     for( Overlay* o : overlays )
         delete o;
 
 #ifdef IFL03_USE_CEF
     cefShutdown();
+    Logger::instance().logInfo("CEF shutdown complete");
 #endif
 
     if (singleInstanceMutex)
         CloseHandle(singleInstanceMutex);
+
+    Logger::instance().logInfo("iFL03 shutting down cleanly");
+    Logger::instance().flush();
 
     return 0;
 }
