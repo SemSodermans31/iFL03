@@ -30,6 +30,7 @@ SOFTWARE.
 #include <string>
 #include <map>
 #include <algorithm>
+#include <wincodec.h>
 #include "Overlay.h"
 #include "Config.h"
 #include "Units.h"
@@ -104,6 +105,9 @@ protected:
             pair.second->Release();
         }
         m_carIdToIconMap.clear();
+
+        m_positionsUpIcon.Reset();
+        m_positionsDownIcon.Reset();
     }
 
     virtual void onConfigChanged()
@@ -134,7 +138,11 @@ protected:
             m_columns.add( (int)Columns::CAR_BRAND,  30, baseFontSize / 2);
 
         if (g_cfg.getBool(m_name, "show_positions_gained", true))
-            m_columns.add( (int)Columns::POSITIONS_GAINED, computeTextExtent(L"▲99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x, baseFontSize / 2);
+        {
+            const float iconWidth = baseFontSize * 0.9f;
+            const float textWidth = computeTextExtent( L" 99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x;
+            m_columns.add( (int)Columns::POSITIONS_GAINED, iconWidth + textWidth + baseFontSize * 0.6f, baseFontSize / 2);
+        }
 
         if (g_cfg.getBool(m_name, "show_tire_compound", false))
             m_columns.add( (int)Columns::TIRE_COMPOUND, computeTextExtent( L"Comp 00", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing ).x, baseFontSize / 2 );
@@ -421,6 +429,7 @@ protected:
         D2D1_ROUNDED_RECT rr = {};
 
         m_renderTarget->BeginDraw();
+        ensurePositionIcons();
         m_brush->SetColor( headerCol );
 
         // Headers
@@ -683,28 +692,62 @@ protected:
 
             // Positions gained
             if (clm = m_columns.get((int)Columns::POSITIONS_GAINED)) {
-                if (ci.positionsChanged == 0) {
-                    m_brush->SetColor(textCol);
+                const float colLeft = xoff + clm->textL;
+                const float colRight = xoff + clm->textR;
+                const float rectPadding = lineHeight * 0.12f;
+                const float rectLeft = colLeft + rectPadding;
+                const float rectRight = colRight - rectPadding;
+                const float rectTop = y - (lineHeight / 2) + rectPadding;
+                const float rectBottom = y + (lineHeight / 2) - rectPadding;
+                const float rectRadius = std::max(2.0f, lineHeight * 0.25f);
+
+                D2D1_ROUNDED_RECT bgRect = {};
+                bgRect.rect = { rectLeft, rectTop, rectRight, rectBottom };
+                bgRect.radiusX = rectRadius;
+                bgRect.radiusY = rectRadius;
+
+                m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, globalOpacity));
+                m_renderTarget->FillRoundedRectangle(&bgRect, m_brush.Get());
+
+                const int positionsDelta = ci.positionsChanged;
+                const bool positiveDelta = positionsDelta > 0;
+                const bool negativeDelta = positionsDelta < 0;
+
+                ID2D1Bitmap* icon = nullptr;
+                if (positiveDelta)
+                    icon = m_positionsUpIcon.Get();
+                else if (negativeDelta)
+                    icon = m_positionsDownIcon.Get();
+
+                const float iconSize = lineHeight * 0.6f;
+                const float contentLeft = rectLeft + lineHeight * 0.2f;
+                const float contentCenterY = y;
+                float textStart = rectLeft;
+
+                if (icon) {
+                    D2D1_RECT_F iconRect = {
+                        contentLeft,
+                        contentCenterY - iconSize * 0.5f,
+                        contentLeft + iconSize,
+                        contentCenterY + iconSize * 0.5f
+                    };
+                    m_renderTarget->DrawBitmap(icon, &iconRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
+                    textStart = iconRect.right + lineHeight * 0.1f;
+                } else {
+                    textStart = contentLeft + lineHeight * 0.15f;
+                }
+
+                if (positionsDelta == 0)
+                {
                     swprintf(s, _countof(s), L"-");
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
                 }
-                else {
-                    if (ci.positionsChanged > 0) {
-                        swprintf(s, _countof(s), L"+");
-                        m_brush->SetColor(deltaPosCol);
-                    }
-                    else {
-                        swprintf(s, _countof(s), L"-");
-                        m_brush->SetColor(deltaNegCol);
-                    }
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING);
-
-                    m_brush->SetColor(textCol);
-                    swprintf(s, _countof(s), L"%d", abs(ci.positionsChanged));
-
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                else
+                {
+                    swprintf(s, _countof(s), L"%d", std::abs(positionsDelta));
                 }
-                
+
+                m_brush->SetColor(float4(0.0f, 0.0f, 0.0f, 1.0f));
+                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textStart, rectRight - lineHeight * 0.2f, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
 
             // Tire compound
@@ -907,10 +950,55 @@ protected:
     std::map<std::string, IWICFormatConverter*> m_carBrandIconsMap;
     std::map<int, ID2D1Bitmap*> m_carIdToIconMap;
     std::set<std::string> notFoundBrands;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_positionsUpIcon;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_positionsDownIcon;
 
     ColumnLayout m_columns;
     TextCache m_text;
     int m_scrollRow = 0;
     int m_maxScrollRow = 0;
     float m_fontSpacing = getGlobalFontSpacing();
+
+    void ensurePositionIcons();
 };
+
+inline void OverlayStandings::ensurePositionIcons()
+{
+    if ((m_positionsUpIcon && m_positionsDownIcon) || !m_renderTarget)
+        return;
+
+    Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
+    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic))))
+        return;
+
+    auto loadIcon = [&](const wchar_t* relativePath, Microsoft::WRL::ComPtr<ID2D1Bitmap>& outBitmap)
+    {
+        if (outBitmap)
+            return;
+
+        std::wstring absolutePath = resolveAssetPathW(relativePath);
+        Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
+        if (FAILED(wic->CreateDecoderFromFilename(absolutePath.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder)))
+            return;
+
+        Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+        if (FAILED(decoder->GetFrame(0, &frame)))
+            return;
+
+        Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
+        if (FAILED(wic->CreateFormatConverter(&converter)))
+            return;
+
+        if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut)))
+            return;
+
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+        if (FAILED(m_renderTarget->CreateBitmapFromWicBitmap(converter.Get(), nullptr, bitmap.GetAddressOf())))
+            return;
+
+        outBitmap = bitmap;
+    };
+
+    loadIcon(L"assets\\icons\\up.png", m_positionsUpIcon);
+    loadIcon(L"assets\\icons\\down.png", m_positionsDownIcon);
+}
