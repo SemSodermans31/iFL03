@@ -55,8 +55,8 @@ class OverlayRelative : public Overlay
         {
             switch (compound)
             {
-            case 1: return "Primary";
-            case 2: return "Alternate";
+            case 1: return "Pri";
+            case 2: return "Alt";
             case 3: return "Wet";
             case 0: return "Dry";
             default: return "-";
