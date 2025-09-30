@@ -40,14 +40,14 @@ class OverlayInputs : public Overlay
 
         virtual void onEnable()
         {
-            onConfigChanged();  // trigger font load
+            onConfigChanged();
         }
 
     protected:
 
         virtual bool hasCustomBackground()
         {
-            return true; // We'll draw the full background ourselves
+            return true;
         }
 
         virtual float2 getDefaultSize()
@@ -60,7 +60,7 @@ class OverlayInputs : public Overlay
             m_showSteeringWheel = g_cfg.getBool( m_name, "show_steering_wheel", true );
 
             const float wheelFrac = m_showSteeringWheel ? 0.2f : 0.0f;
-            const float barFrac = m_showSteeringWheel ? 0.2f : 0.3f;
+            const float barFrac = m_showSteeringWheel ? 0.16f : 0.26f;
             const float graphFrac = std::max(0.1f, 1.0f - wheelFrac - barFrac);
 
             const int horizontalWidth = std::max(1, (int)(m_width * graphFrac));
@@ -91,8 +91,8 @@ class OverlayInputs : public Overlay
             else
                 m_wheelBitmap.Reset();
 
-            // Per-overlay FPS (configurable; default 30)
-            setTargetFPS(g_cfg.getInt(m_name, "target_fps", 30));
+            // Per-overlay FPS (configurable; default 60)
+            setTargetFPS(g_cfg.getInt(m_name, "target_fps", 60));
         }
 
         virtual void onUpdate()
@@ -103,7 +103,7 @@ class OverlayInputs : public Overlay
             // Layout sections
             const bool showWheel = m_showSteeringWheel;
             const float wheelFrac = showWheel ? 0.2f : 0.0f;
-            const float barFrac = showWheel ? 0.2f : 0.3f;
+            const float barFrac = showWheel ? 0.15f : 0.3f;
             const float graphFrac = 1.0f - wheelFrac - barFrac;
 
             const float horizontalWidth = w * graphFrac;
@@ -143,8 +143,7 @@ class OverlayInputs : public Overlay
                     m_brakeVtx[i].y = m_brakeVtx[i+1].y;
                 m_brakeVtx[(int)m_brakeVtx.size()-1].y = currentBrake;
 
-                // Steering line history (normalize angle to [0..1] with 0.5 at straight)
-                float s = currentSteeringAngle / (3.14159f * 0.5f); // scale by 90 deg default
+                float s = currentSteeringAngle / (3.14159f * 0.5f); 
                 if( s < -1.0f ) s = -1.0f;
                 if( s > 1.0f ) s = 1.0f;
                 const float steeringNorm = 0.5f - s * 0.5f;
@@ -158,7 +157,7 @@ class OverlayInputs : public Overlay
             // Transform function for horizontal graphs
             auto vtx2coord = [&]( const float2& v )->float2 {
                 float scaledX = (v.x / (float)m_throttleVtx.size()) * horizontalWidth;
-                return float2( horizontalStartX + scaledX + 0.5f, h - 0.5f*thickness - v.y*(h*0.6f-thickness) - h*0.2f );
+                return float2( horizontalStartX + scaledX + 0.5f, h - 0.5f*thickness - v.y*(h*0.8f-thickness) - h*0.1f );
             };
 
             m_renderTarget->BeginDraw();
@@ -166,7 +165,7 @@ class OverlayInputs : public Overlay
             m_renderTarget->Clear( float4(0,0,0,0) );
             {
                 const float cornerRadius = g_cfg.getFloat( m_name, "corner_radius", 2.0f );
-                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0.0705882f,0.0705882f,0.0705882f,1.0f) );
+                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0.1215686f, 0.1215686f, 0.1215686f, 0.5f) );
                 bgColor.w *= getGlobalOpacity();
 
                 const float left   = 0.5f;
@@ -294,12 +293,12 @@ class OverlayInputs : public Overlay
             {
                 // Telemetry background with subtle grid lines and black border (#1f1f1f bg, #121212 lines)
                 {
-                    const float graphTop = h * 0.2f;
-                    const float graphBottom = h * 0.8f;
+                    const float graphTop = h * 0.1f;
+                    const float graphBottom = h * 0.9f;
                     D2D1_RECT_F teleRect = { horizontalStartX, graphTop, horizontalEndX, graphBottom };
 
-                    // Background fill #1f1f1f
-                    float4 teleBg = float4(0.1215686f, 0.1215686f, 0.1215686f, 1.0f);
+                    // Background fill #1f1f1f with slight transparency
+                    float4 teleBg = float4(0.1215686f, 0.1215686f, 0.1215686f, 0.5f);
                     teleBg.w *= getGlobalOpacity();
                     m_brush->SetColor( teleBg );
                     m_renderTarget->FillRectangle( teleRect, m_brush.Get() );
@@ -322,10 +321,10 @@ class OverlayInputs : public Overlay
                 Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleFillSink;
                 m_d2dFactory->CreatePathGeometry( &throttleFillPath );
                 throttleFillPath->Open( &throttleFillSink );
-                throttleFillSink->BeginFigure( float2(horizontalStartX, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
+                throttleFillSink->BeginFigure( float2(horizontalStartX, h*0.9f), D2D1_FIGURE_BEGIN_FILLED );
                 for( int i=0; i<(int)m_throttleVtx.size(); ++i )
                     throttleFillSink->AddLine( vtx2coord(m_throttleVtx[i]) );
-                throttleFillSink->AddLine( float2(horizontalEndX, h*0.8f) );
+                throttleFillSink->AddLine( float2(horizontalEndX, h*0.9f) );
                 throttleFillSink->EndFigure( D2D1_FIGURE_END_CLOSED );
                 throttleFillSink->Close();
 
@@ -334,10 +333,10 @@ class OverlayInputs : public Overlay
                 Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeFillSink;
                 m_d2dFactory->CreatePathGeometry( &brakeFillPath );
                 brakeFillPath->Open( &brakeFillSink );
-                brakeFillSink->BeginFigure( float2(horizontalStartX, h*0.8f), D2D1_FIGURE_BEGIN_FILLED );
+                brakeFillSink->BeginFigure( float2(horizontalStartX, h*0.9f), D2D1_FIGURE_BEGIN_FILLED );
                 for( int i=0; i<(int)m_brakeVtx.size(); ++i )
                     brakeFillSink->AddLine( vtx2coord(m_brakeVtx[i]) );
-                brakeFillSink->AddLine( float2(horizontalEndX, h*0.8f) );
+                brakeFillSink->AddLine( float2(horizontalEndX, h*0.9f) );
                 brakeFillSink->EndFigure( D2D1_FIGURE_END_CLOSED );
                 brakeFillSink->Close();
 
@@ -394,8 +393,8 @@ class OverlayInputs : public Overlay
             }
 
             // SECTION 2: Vertical Percentage Bars
-            const float barWidth = barsWidth / 3.5f;
-            const float barHeight = h * 0.55f;
+            const float barWidth = barsWidth / 3.0f;
+            const float barHeight = h * 0.65f;
             const float barY = h * 0.25f;
             
             const float clutchValue = useStubData ? StubDataManager::getStubClutch() : (1.0f - ir_Clutch.getFloat());
@@ -420,18 +419,21 @@ class OverlayInputs : public Overlay
                 const BarInfo& bar = bars[i];
                 
                 // Draw bar background
+                const float borderPx = 1.0f;
                 m_brush->SetColor( float4(0.2f, 0.2f, 0.2f, 0.8f) );
                 D2D1_RECT_F bgRect = { bar.x - barWidth*0.3f, barY, bar.x + barWidth*0.3f, barY + barHeight };
                 m_renderTarget->FillRectangle( bgRect, m_brush.Get() );
-                // Black border #000000 around the bar background
+                
+                // Draw bar fill first (slightly inset), then border on top so fill never appears wider
+                float fillHeight = barHeight * bar.value;
+                D2D1_RECT_F innerRect = { bgRect.left + borderPx, bgRect.top + borderPx, bgRect.right - borderPx, bgRect.bottom - borderPx };
+                D2D1_RECT_F fillRect = { innerRect.left, std::max(innerRect.top, innerRect.bottom - fillHeight), innerRect.right, innerRect.bottom };
+                m_brush->SetColor( bar.color );
+                m_renderTarget->FillRectangle( fillRect, m_brush.Get() );
+
+                // Black border #000000 around the bar background (drawn last)
                 m_brush->SetColor( float4(0.0f, 0.0f, 0.0f, 1.0f) );
                 m_renderTarget->DrawRectangle( bgRect, m_brush.Get(), 1.0f );
-                
-                // Draw bar fill
-                m_brush->SetColor( bar.color );
-                float fillHeight = barHeight * bar.value;
-                D2D1_RECT_F fillRect = { bar.x - barWidth*0.3f, barY + barHeight - fillHeight, bar.x + barWidth*0.3f, barY + barHeight };
-                m_renderTarget->FillRectangle( fillRect, m_brush.Get() );
                 
                 // Draw percentage text
                 wchar_t percentText[32];
@@ -448,7 +450,7 @@ class OverlayInputs : public Overlay
                 // SECTION 3: Steering Wheel with Speed/Gear or Image
                 const float wheelCenterX = wheelStartX + wheelWidth * 0.5f;
                 const float wheelCenterY = h * 0.5f;
-                const float wheelRadius = std::min(wheelWidth, h) * (0.45f * 0.85f);
+                const float wheelRadius = std::min(wheelWidth, h * 0.5f) * 0.9f;
                 const float innerRadius = wheelRadius * 0.8f;
 
                 const std::string wheelMode = g_cfg.getString(m_name, "steering_wheel", "builtin");
@@ -515,41 +517,41 @@ class OverlayInputs : public Overlay
                     StubDataManager::getStubGear() :
                     ir_Gear.getInt();
 
-                wchar_t speedText[32];
-                float clampedSpeed = std::max(-999.0f, std::min(999.0f, speed));
-                swprintf_s( speedText, L"%.0f", clampedSpeed );
-                D2D1_RECT_F speedRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 15, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 5 };
-                if (!useImageWheel) {
-                    m_brush->SetColor( telemetryColor );
-                    m_renderTarget->DrawText( speedText, (UINT)wcslen(speedText), m_textFormatBold.Get(), &speedRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
-                }
-
-                wchar_t gearText[16];
-                if( gear == -1 )
-                    wcscpy_s( gearText, L"R" );
-                else if( gear == 0 )
-                    wcscpy_s( gearText, L"N" );
-                else
-                {
-                    int clampedGear = std::max(-99, std::min(99, gear));
-                    swprintf_s( gearText, L"%d", clampedGear );
-                }
-
-                D2D1_RECT_F gearRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 5, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 25 };
-                if (!useImageWheel) {
-                    m_brush->SetColor( telemetryColor );
-                    m_renderTarget->DrawText( gearText, (UINT)wcslen(gearText), m_textFormatBold.Get(), &gearRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
-                }
-
                 // Optional steering angle in degrees for builtin wheel (center 0°, left negative, right positive)
-                if (g_cfg.getBool(m_name, "show_steering_degrees", true) && !useImageWheel) {
-                    const float degrees = -steeringAngle * (180.0f / 3.14159f);
-                    const float clampedDegrees = std::max(-999.0f, std::min(999.0f, degrees));
-                    wchar_t degText[32];
-                    swprintf_s(degText, L"%.0f°", clampedDegrees);
+                const float degrees = -steeringAngle * (180.0f / 3.14159f);
+                const float clampedDegrees = std::max(-999.0f, std::min(999.0f, degrees));
+
+                if (!useImageWheel) {
                     m_brush->SetColor( telemetryColor );
-                    D2D1_RECT_F degRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 28, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 48 };
-                    m_renderTarget->DrawText( degText, (UINT)wcslen(degText), m_textFormatPercent.Get(), &degRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+
+                    // Speed text 
+                    wchar_t speedText[32];
+                    float clampedSpeed = std::max(-999.0f, std::min(999.0f, speed));
+                    swprintf_s( speedText, L"%.0f", clampedSpeed );
+                    D2D1_RECT_F speedRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 25, wheelCenterX + wheelRadius*0.5f, wheelCenterY - 10 };
+                    m_renderTarget->DrawText( speedText, (UINT)wcslen(speedText), m_textFormatBold.Get(), &speedRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+
+                    // Gear text
+                    wchar_t gearText[16];
+                    if( gear == -1 )
+                        wcscpy_s( gearText, L"R" );
+                    else if( gear == 0 )
+                        wcscpy_s( gearText, L"N" );
+                    else
+                    {
+                        int clampedGear = std::max(-99, std::min(99, gear));
+                        swprintf_s( gearText, L"%d", clampedGear );
+                    }
+                    D2D1_RECT_F gearRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY - 12, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 10 };
+                    m_renderTarget->DrawText( gearText, (UINT)wcslen(gearText), m_textFormatBold.Get(), &gearRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                    
+                    // Steering degrees text
+                    if (g_cfg.getBool(m_name, "show_steering_degrees", true)) {
+                        wchar_t degText[32];
+                        swprintf_s(degText, L"%.0f\u00B0", clampedDegrees);
+                        D2D1_RECT_F degRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 15, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 25 };
+                        m_renderTarget->DrawText( degText, (UINT)wcslen(degText), m_textFormatPercent.Get(), &degRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                    }
                 }
             }
 
