@@ -437,6 +437,24 @@ ConnectionStatus ir_tick()
         _snprintf_s(path, _countof(path), _TRUNCATE, "WeekendInfo:WeekendOptions:NumCarClasses:");
         parseYamlInt(sessionYaml, path, &ir_session.numCarClasses);
 
+        // Incident limit (can be an integer or the string "unlimited")
+        {
+            _snprintf_s(path, _countof(path), _TRUNCATE, "WeekendInfo:WeekendOptions:IncidentLimit:");
+            // Try int first
+            int incLim = 0;
+            if (!parseYamlInt(sessionYaml, path, &incLim))
+            {
+                std::string incStr;
+                if (parseYamlStr(sessionYaml, path, incStr))
+                {
+                    for (char &c : incStr) c = (char)tolower((unsigned char)c);
+                    if (incStr == "unlimited")
+                        incLim = -1; // use -1 to represent unlimited
+                }
+            }
+            ir_session.incidentLimit = incLim;
+        }
+
         // Current session type
         std::string sessionNameStr;
         _snprintf_s( path, _countof(path), _TRUNCATE, "SessionInfo:Sessions:SessionNum:{%d}SessionName:", ir_SessionNum.getInt() );

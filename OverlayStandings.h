@@ -94,6 +94,7 @@ protected:
     virtual void onEnable()
     {
         onConfigChanged();  // trigger font load
+        loadPositionIcons();
     }
 
     virtual void onDisable()
@@ -106,8 +107,8 @@ protected:
         }
         m_carIdToIconMap.clear();
 
-        m_positionsUpIcon.Reset();
-        m_positionsDownIcon.Reset();
+        // Release positions gained icons/factory
+        releasePositionIcons();
     }
 
     virtual void onConfigChanged()
@@ -139,9 +140,9 @@ protected:
 
         if (g_cfg.getBool(m_name, "show_positions_gained", true))
         {
-            const float iconWidth = baseFontSize * 0.9f;
-            const float textWidth = computeTextExtent( L" 99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x;
-            m_columns.add( (int)Columns::POSITIONS_GAINED, iconWidth + textWidth + baseFontSize * 0.6f, baseFontSize / 2);
+            const float posTextW = computeTextExtent( L"99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x;
+            // Add extra width for icon space
+            m_columns.add( (int)Columns::POSITIONS_GAINED, posTextW + baseFontSize, baseFontSize / 2);
         }
 
         if (g_cfg.getBool(m_name, "show_tire_compound", false))
@@ -429,7 +430,6 @@ protected:
         D2D1_ROUNDED_RECT rr = {};
 
         m_renderTarget->BeginDraw();
-        ensurePositionIcons();
         m_brush->SetColor( headerCol );
 
         // Headers
@@ -692,62 +692,34 @@ protected:
 
             // Positions gained
             if (clm = m_columns.get((int)Columns::POSITIONS_GAINED)) {
-                const float colLeft = xoff + clm->textL;
-                const float colRight = xoff + clm->textR;
-                const float rectPadding = lineHeight * 0.12f;
-                const float rectLeft = colLeft + rectPadding;
-                const float rectRight = colRight - rectPadding;
-                const float rectTop = y - (lineHeight / 2) + rectPadding;
-                const float rectBottom = y + (lineHeight / 2) - rectPadding;
-                const float rectRadius = std::max(2.0f, lineHeight * 0.25f);
+                // Backdrop: full-opacity white rounded rectangle
+                r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                rr.radiusX = 3;
+                rr.radiusY = 3;
+                m_brush->SetColor(float4(1, 1, 1, 1));
+                m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
 
-                D2D1_ROUNDED_RECT bgRect = {};
-                bgRect.rect = { rectLeft, rectTop, rectRight, rectBottom };
-                bgRect.radiusX = rectRadius;
-                bgRect.radiusY = rectRadius;
-
-                m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, globalOpacity));
-                m_renderTarget->FillRoundedRectangle(&bgRect, m_brush.Get());
-
-                const int positionsDelta = ci.positionsChanged;
-                const bool positiveDelta = positionsDelta > 0;
-                const bool negativeDelta = positionsDelta < 0;
-
+                // Choose icon per delta
+                const int delta = ci.positionsChanged;
                 ID2D1Bitmap* icon = nullptr;
-                if (positiveDelta)
-                    icon = m_positionsUpIcon.Get();
-                else if (negativeDelta)
-                    icon = m_positionsDownIcon.Get();
+                if (delta > 0)      icon = m_posUpIcon.Get();
+                else if (delta < 0) icon = m_posDownIcon.Get();
+                else                icon = m_posEqualIcon.Get();
 
-                const float iconSize = lineHeight * 0.6f;
-                const float contentLeft = rectLeft + lineHeight * 0.2f;
-                const float contentCenterY = y;
-                float textStart = rectLeft;
-
+                // Icon at left
+                const float iconPad  = 4.0f;
+                const float iconSize = std::max(0.0f, lineHeight - 6.0f);
                 if (icon) {
-                    D2D1_RECT_F iconRect = {
-                        contentLeft,
-                        contentCenterY - iconSize * 0.5f,
-                        contentLeft + iconSize,
-                        contentCenterY + iconSize * 0.5f
-                    };
-                    m_renderTarget->DrawBitmap(icon, &iconRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_LINEAR);
-                    textStart = iconRect.right + lineHeight * 0.1f;
-                } else {
-                    textStart = contentLeft + lineHeight * 0.15f;
+                    D2D1_RECT_F ir = { r.left + iconPad, y - iconSize * 0.5f, r.left + iconPad + iconSize, y + iconSize * 0.5f };
+                    m_renderTarget->DrawBitmap(icon, &ir);
                 }
 
-                if (positionsDelta == 0)
-                {
-                    swprintf(s, _countof(s), L"-");
-                }
-                else
-                {
-                    swprintf(s, _countof(s), L"%d", std::abs(positionsDelta));
-                }
-
-                m_brush->SetColor(float4(0.0f, 0.0f, 0.0f, 1.0f));
-                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textStart, rectRight - lineHeight * 0.2f, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                // Number in black, right aligned
+                m_brush->SetColor(float4(0, 0, 0, 1));
+                swprintf(s, _countof(s), L"%d", abs(delta));
+                const float textL = r.left + iconPad + (icon ? iconSize + 4.0f : 0.0f);
+                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
 
             // Tire compound
@@ -943,6 +915,46 @@ protected:
 
 protected:
 
+    // Loads position change icons (up/down/equal) once
+    void loadPositionIcons()
+    {
+        if (!m_renderTarget.Get()) return;
+        if (m_posUpIcon || m_posDownIcon || m_posEqualIcon) return;
+
+        (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (!m_wicFactory.Get()) {
+            (void)CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory));
+        }
+        if (!m_wicFactory.Get()) return;
+
+        auto loadPng = [&](const std::wstring& rel) -> Microsoft::WRL::ComPtr<ID2D1Bitmap>
+        {
+            Microsoft::WRL::ComPtr<ID2D1Bitmap> bmp;
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> dec;
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            Microsoft::WRL::ComPtr<IWICFormatConverter> conv;
+            const std::wstring path = resolveAssetPathW(rel);
+            if (FAILED(m_wicFactory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &dec))) return bmp;
+            if (FAILED(dec->GetFrame(0, &frame))) return bmp;
+            if (FAILED(m_wicFactory->CreateFormatConverter(&conv))) return bmp;
+            if (FAILED(conv->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return bmp;
+            (void)m_renderTarget->CreateBitmapFromWicBitmap(conv.Get(), nullptr, &bmp);
+            return bmp;
+        };
+
+        m_posUpIcon    = loadPng(L"assets\\icons\\up.png");
+        m_posDownIcon  = loadPng(L"assets\\icons\\down.png");
+        m_posEqualIcon = loadPng(L"assets\\icons\\equal.png");
+    }
+
+    void releasePositionIcons()
+    {
+        m_posUpIcon.Reset();
+        m_posDownIcon.Reset();
+        m_posEqualIcon.Reset();
+        m_wicFactory.Reset();
+    }
+
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatSmall;
     std::vector<std::vector<float>> m_avgL5Times;
@@ -950,55 +962,16 @@ protected:
     std::map<std::string, IWICFormatConverter*> m_carBrandIconsMap;
     std::map<int, ID2D1Bitmap*> m_carIdToIconMap;
     std::set<std::string> notFoundBrands;
-    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_positionsUpIcon;
-    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_positionsDownIcon;
+
+    // Position change icons
+    Microsoft::WRL::ComPtr<IWICImagingFactory> m_wicFactory;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posUpIcon;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posDownIcon;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posEqualIcon;
 
     ColumnLayout m_columns;
     TextCache m_text;
     int m_scrollRow = 0;
     int m_maxScrollRow = 0;
     float m_fontSpacing = getGlobalFontSpacing();
-
-    void ensurePositionIcons();
 };
-
-inline void OverlayStandings::ensurePositionIcons()
-{
-    if ((m_positionsUpIcon && m_positionsDownIcon) || !m_renderTarget)
-        return;
-
-    Microsoft::WRL::ComPtr<IWICImagingFactory> wic;
-    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&wic))))
-        return;
-
-    auto loadIcon = [&](const wchar_t* relativePath, Microsoft::WRL::ComPtr<ID2D1Bitmap>& outBitmap)
-    {
-        if (outBitmap)
-            return;
-
-        std::wstring absolutePath = resolveAssetPathW(relativePath);
-        Microsoft::WRL::ComPtr<IWICBitmapDecoder> decoder;
-        if (FAILED(wic->CreateDecoderFromFilename(absolutePath.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &decoder)))
-            return;
-
-        Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
-        if (FAILED(decoder->GetFrame(0, &frame)))
-            return;
-
-        Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
-        if (FAILED(wic->CreateFormatConverter(&converter)))
-            return;
-
-        if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut)))
-            return;
-
-        Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
-        if (FAILED(m_renderTarget->CreateBitmapFromWicBitmap(converter.Get(), nullptr, bitmap.GetAddressOf())))
-            return;
-
-        outBitmap = bitmap;
-    };
-
-    loadIcon(L"assets\\icons\\up.png", m_positionsUpIcon);
-    loadIcon(L"assets\\icons\\down.png", m_positionsDownIcon);
-}

@@ -166,7 +166,7 @@ class OverlayInputs : public Overlay
             m_renderTarget->Clear( float4(0,0,0,0) );
             {
                 const float cornerRadius = g_cfg.getFloat( m_name, "corner_radius", 2.0f );
-                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0,0,0,1.0f) );
+                float4 bgColor = g_cfg.getFloat4( m_name, "background_col", float4(0.0705882f,0.0705882f,0.0705882f,1.0f) );
                 bgColor.w *= getGlobalOpacity();
 
                 const float left   = 0.5f;
@@ -292,6 +292,31 @@ class OverlayInputs : public Overlay
             // SECTION 1: Horizontal Throttle/Brake Graphs
             if( !m_throttleVtx.empty() && !m_brakeVtx.empty() )
             {
+                // Telemetry background with subtle grid lines and black border (#1f1f1f bg, #121212 lines)
+                {
+                    const float graphTop = h * 0.2f;
+                    const float graphBottom = h * 0.8f;
+                    D2D1_RECT_F teleRect = { horizontalStartX, graphTop, horizontalEndX, graphBottom };
+
+                    // Background fill #1f1f1f
+                    float4 teleBg = float4(0.1215686f, 0.1215686f, 0.1215686f, 1.0f);
+                    teleBg.w *= getGlobalOpacity();
+                    m_brush->SetColor( teleBg );
+                    m_renderTarget->FillRectangle( teleRect, m_brush.Get() );
+
+                    // Horizontal lines at 25/50/75% in #121212
+                    m_brush->SetColor( float4(0.0705882f, 0.0705882f, 0.0705882f, 1.0f) );
+                    for( int i = 1; i <= 3; ++i )
+                    {
+                        float y = graphTop + (graphBottom - graphTop) * (float)i / 4.0f;
+                        m_renderTarget->DrawLine( float2(horizontalStartX, y), float2(horizontalEndX, y), m_brush.Get(), 1.0f );
+                    }
+
+                    // Black border #000000
+                    m_brush->SetColor( float4(0.0f, 0.0f, 0.0f, 1.0f) );
+                    m_renderTarget->DrawRectangle( teleRect, m_brush.Get(), 1.0f );
+                }
+
                 // Throttle (fill)
                 Microsoft::WRL::ComPtr<ID2D1PathGeometry1> throttleFillPath;
                 Microsoft::WRL::ComPtr<ID2D1GeometrySink>  throttleFillSink;
@@ -398,6 +423,9 @@ class OverlayInputs : public Overlay
                 m_brush->SetColor( float4(0.2f, 0.2f, 0.2f, 0.8f) );
                 D2D1_RECT_F bgRect = { bar.x - barWidth*0.3f, barY, bar.x + barWidth*0.3f, barY + barHeight };
                 m_renderTarget->FillRectangle( bgRect, m_brush.Get() );
+                // Black border #000000 around the bar background
+                m_brush->SetColor( float4(0.0f, 0.0f, 0.0f, 1.0f) );
+                m_renderTarget->DrawRectangle( bgRect, m_brush.Get(), 1.0f );
                 
                 // Draw bar fill
                 m_brush->SetColor( bar.color );
@@ -511,6 +539,17 @@ class OverlayInputs : public Overlay
                 if (!useImageWheel) {
                     m_brush->SetColor( telemetryColor );
                     m_renderTarget->DrawText( gearText, (UINT)wcslen(gearText), m_textFormatBold.Get(), &gearRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
+                }
+
+                // Optional steering angle in degrees for builtin wheel (center 0°, left negative, right positive)
+                if (g_cfg.getBool(m_name, "show_steering_degrees", true) && !useImageWheel) {
+                    const float degrees = -steeringAngle * (180.0f / 3.14159f);
+                    const float clampedDegrees = std::max(-999.0f, std::min(999.0f, degrees));
+                    wchar_t degText[32];
+                    swprintf_s(degText, L"%.0f°", clampedDegrees);
+                    m_brush->SetColor( telemetryColor );
+                    D2D1_RECT_F degRect = { wheelCenterX - wheelRadius*0.5f, wheelCenterY + 28, wheelCenterX + wheelRadius*0.5f, wheelCenterY + 48 };
+                    m_renderTarget->DrawText( degText, (UINT)wcslen(degText), m_textFormatPercent.Get(), &degRect, m_brush.Get(), D2D1_DRAW_TEXT_OPTIONS_CLIP );
                 }
             }
 

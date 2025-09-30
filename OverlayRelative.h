@@ -567,6 +567,17 @@ class OverlayRelative : public Overlay
                 std::string footer;
                 bool addSpaces = false;
 
+                if (g_cfg.getBool(m_name, "show_incidents", true)) {
+                    const int inc = ir_PlayerCarTeamIncidentCount.getInt();
+                    const int lim = ir_session.incidentLimit;
+                    if (addSpaces) footer += "       ";
+                    if (lim > 0)
+                        footer += std::format("Inc: {}/{}", inc, lim);
+                    else
+                        footer += std::format("Inc: {}/--", inc);
+                    addSpaces = true;
+                }
+
                 if (g_cfg.getBool(m_name, "show_SoF", true)) {
                     int sof = ir_session.sof; if (sof < 0) sof = 0;
                     footer += std::format("SoF: {}", sof);

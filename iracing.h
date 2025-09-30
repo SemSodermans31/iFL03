@@ -98,6 +98,7 @@ struct Session
     int             sof = 0;
     int             subsessionId = 0;
     int             isFixedSetup = 0;
+    int             incidentLimit = 0;
     int             isUnlimitedTime = 0;
     int             isUnlimitedLaps = 0;
     float           fuelMaxLtr = 0;

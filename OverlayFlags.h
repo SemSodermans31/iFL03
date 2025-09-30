@@ -69,7 +69,6 @@ protected:
 		m_text.reset( m_dwriteFactory.Get() );
 		
 		const float baseScale = std::max(0.5f, std::min(6.0f, m_scaleFactor));
-		createGlobalTextFormat(baseScale * 3.6f, 900, "oblique", m_textFormatBold);
 		createGlobalTextFormat(baseScale * 3.2f, 900, "oblique", m_textFormatLarge);
 		// Per-overlay FPS (configurable; default 10)
 		setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
@@ -125,7 +124,7 @@ protected:
 			topTextCol.w = globalOpacity;
 			m_brush->SetColor( topTextCol );
 			const float yTop = padding + topH * 0.52f;
-			m_text.render( m_renderTarget.Get(), sTop, m_textFormatBold.Get(), r.left + padding, r.right - padding, yTop, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+			m_text.render( m_renderTarget.Get(), sTop, m_textFormatLarge.Get(), r.left + padding, r.right - padding, yTop, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 		}
 
 		// BOTTOM BAND: background = flag color, text = black or white for contrast
@@ -244,7 +243,6 @@ protected:
 	float m_scaleFactorY = 1.0f;
 	float m_scaleFactor = 1.0f;
 
-	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatBold;
 	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatLarge;
 	TextCache m_text;
 	float m_fontSpacing = getGlobalFontSpacing();

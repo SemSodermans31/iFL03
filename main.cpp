@@ -141,36 +141,37 @@ static void registerHotkeys()
     if( parseHotkey( g_cfg.getString("OverlayDDU","toggle_hotkey","ctrl+2"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::DDU, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayFuel","toggle_hotkey","ctrl+shift+2"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayFuel","toggle_hotkey","ctrl+2"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Fuel, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayTire","toggle_hotkey","ctrl+shift+3"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayTire","toggle_hotkey","ctrl+3"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Tire, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayInputs","toggle_hotkey","ctrl+3"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayInputs","toggle_hotkey","ctrl+4"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Inputs, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayRelative","toggle_hotkey","ctrl+4"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayRelative","toggle_hotkey","ctrl+5"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Relative, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayCover","toggle_hotkey","ctrl+5"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayCover","toggle_hotkey","ctrl+6"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Cover, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl+6"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayWeather","toggle_hotkey","ctrl+7"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Weather, mod, vk );
     
-    if( parseHotkey( g_cfg.getString("OverlayFlags","toggle_hotkey","ctrl+7"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayFlags","toggle_hotkey","ctrl+8"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Flags, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayDelta","toggle_hotkey","ctrl+8"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayDelta","toggle_hotkey","ctrl+9"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Delta, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayRadar","toggle_hotkey","ctrl+9"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayRadar","toggle_hotkey","ctrl+0"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Radar, mod, vk );
 
-    if( parseHotkey( g_cfg.getString("OverlayTrack","toggle_hotkey","ctrl+0"),&mod,&vk) )
+    if( parseHotkey( g_cfg.getString("OverlayTrack","toggle_hotkey","ctrl+shift+1"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Track, mod, vk );
-    if( parseHotkey( g_cfg.getString("OverlayPit","toggle_hotkey","ctrl+shift+0"),&mod,&vk) )
+
+    if( parseHotkey( g_cfg.getString("OverlayPit","toggle_hotkey","ctrl+shift+2"),&mod,&vk) )
         RegisterHotKey( NULL, (int)Hotkey::Pit, mod, vk );
     // Optional: user can bind OverlayTire via config; reuse General/ui to avoid extra enum churn
 }
@@ -387,6 +388,8 @@ int main()
     printf("    Toggle flags overlay:         %s\n", g_cfg.getString("OverlayFlags","toggle_hotkey","").c_str() );
     printf("    Toggle delta overlay:         %s\n", g_cfg.getString("OverlayDelta","toggle_hotkey","").c_str() );
     printf("    Toggle radar overlay:         %s\n", g_cfg.getString("OverlayRadar","toggle_hotkey","").c_str() );
+    printf("    Toggle track overlay:         %s\n", g_cfg.getString("OverlayTrack","toggle_hotkey","").c_str() );
+    printf("    Toggle pit overlay:           %s\n", g_cfg.getString("OverlayPit","toggle_hotkey","").c_str() );
     printf("\niFL03 will generate a file called \'config.json\' in its current directory. This file\n"\
            "stores your settings. You can edit the file at any time, even while iFL03 is running,\n"\
            "to customize your overlays and hotkeys.\n\n");
