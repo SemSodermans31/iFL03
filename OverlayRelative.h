@@ -421,7 +421,15 @@ class OverlayRelative : public Overlay
                 // Name
                 {
                     clm = m_columns.get( (int)Columns::NAME );
-                    swprintf( s, _countof(s), L"%S", car.userName.c_str() );
+                    std::string displayName = car.userName;
+                    if (!g_cfg.getBool(m_name, "show_full_name", true)) {
+                        // Show only first name
+                        size_t spacePos = displayName.find(' ');
+                        if (spacePos != std::string::npos) {
+                            displayName = displayName.substr(0, spacePos);
+                        }
+                    }
+                    swprintf( s, _countof(s), L"%S", displayName.c_str() );
                     m_brush->SetColor( col );
                     m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
                 }
