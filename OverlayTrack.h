@@ -27,6 +27,7 @@ SOFTWARE.
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <limits>
 #include <d2d1.h>
 #include "picojson.h"
 #include "Overlay.h"
@@ -55,6 +56,7 @@ protected:
         m_autoOffset = 0.0f;
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
+        resetSectorTiming();
     }
 
     virtual void onDisable()
@@ -64,6 +66,7 @@ protected:
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
         m_text.reset();
+        resetSectorTiming();
     }
 
     virtual void onSessionChanged()
@@ -72,6 +75,7 @@ protected:
         m_autoOffset = 0.0f;
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
+        resetSectorTiming();
     }
 
     virtual void onConfigChanged()
@@ -240,13 +244,11 @@ protected:
             m_pathOffset = float2(offsetX, offsetY);
         }
 
-        // Draw start/finish lines
+        // Draw start/finish lines and optional sector lines
         if (m_trackPath.size() >= 2) {
-            const float4 lineCol = float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity);
-            m_brush->SetColor(lineCol);
-            
-            auto drawLineAt = [&](float linePos)
+            auto drawColoredLineAt = [&](float linePos, const float4& col, float thickness)
             {
+                m_brush->SetColor(col);
                 float2 pos = computeMarkerPosition(linePos);
                 
                 // Apply same scaling as track path
@@ -292,17 +294,49 @@ protected:
                 const float x2 = centerX - dir.x * halfLen;
                 const float y2 = centerY - dir.y * halfLen;
                 
-                m_renderTarget->DrawLine(float2(x1, y1), float2(x2, y2), m_brush.Get(), 2.0f);
+                m_renderTarget->DrawLine(float2(x1, y1), float2(x2, y2), m_brush.Get(), thickness);
             };
+
+            // Always draw start/finish line in white
+            const float4 lineCol = float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity);
+            drawColoredLineAt(0.0f, lineCol, 2.0f);
 
             if (!m_extendedLines.empty())
             {
-                for (float linePos : m_extendedLines) drawLineAt(linePos);
+                for (float linePos : m_extendedLines) drawColoredLineAt(linePos, lineCol, 2.0f);
             }
-            else
+
+            // Optional: sector split lines with status coloring
+            if (g_cfg.getBool(m_name, "show_sectors", false))
             {
-                // Default: draw start/finish at beginning of path
-                drawLineAt(0.0f);
+                // Build adjusted and sorted sector starts according to offsets and reverse
+                buildAdjustedSectorStarts();
+                const float thickness = 3.0f;
+                const float4 purple = float4(0.78f, 0.35f, 1.0f, 0.95f * globalOpacity);
+                const float4 green  = float4(0.2f, 0.9f, 0.2f, 0.95f * globalOpacity);
+                const float4 yellow = float4(1.0f, 0.9f, 0.2f, 0.95f * globalOpacity);
+                const float4 neutral = float4(1.0f, 1.0f, 1.0f, 0.6f * globalOpacity);
+
+                // Update sector timing using current car pcts before drawing, so colors are fresh
+                updateSectorTimingForAllCars();
+
+                for (int s = 1; s < (int)m_sectorStartsAdjusted.size(); ++s)
+                {
+                    int secIdx = s - 1; // sector ending at this boundary
+                    float pos = m_sectorStartsAdjusted[s];
+                    float4 col = neutral;
+                    if (secIdx >= 0 && secIdx < kMaxSectors)
+                    {
+                        switch (m_selfSectorStatus[secIdx])
+                        {
+                        case SectorStatus::SESSION_BEST: col = purple; break;
+                        case SectorStatus::PERSONAL_BEST: col = green; break;
+                        case SectorStatus::SLOWER_THAN_PREV: col = yellow; break;
+                        default: col = neutral; break;
+                        }
+                    }
+                    drawColoredLineAt(pos, col, thickness);
+                }
             }
         }
 
@@ -662,4 +696,187 @@ private:
         return float2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
     }
 
+    // ---- Sector timing and rendering support ----
+    // Members
+    static constexpr int kMaxSectors = 10;
+    enum class SectorStatus { NONE=0, SESSION_BEST, PERSONAL_BEST, SLOWER_THAN_PREV };
+    std::vector<float> m_sectorStartsAdjusted; // 0..1 sorted with offset/reverse applied, includes 0 and 1
+    float m_prevPctByCar[IR_MAX_CARS] = {0};
+    int   m_currSectorIdxByCar[IR_MAX_CARS] = {0};
+    double m_sectorStartTimeByCar[IR_MAX_CARS] = {0};
+    float m_sessionBest[kMaxSectors] = {0};
+    float m_selfPrev[kMaxSectors] = {0};
+    float m_selfBest[kMaxSectors] = {0};
+    float m_selfLast[kMaxSectors] = {0};
+    SectorStatus m_selfSectorStatus[kMaxSectors] = {};
+    bool  m_sectorsInitialized = false;
+
+    void resetSectorTiming()
+    {
+        m_sectorStartsAdjusted.clear();
+        m_sectorsInitialized = false;
+        for (int i = 0; i < IR_MAX_CARS; ++i) {
+            m_prevPctByCar[i] = -1.0f;
+            m_currSectorIdxByCar[i] = 0;
+            m_sectorStartTimeByCar[i] = 0.0;
+        }
+        for (int s = 0; s < kMaxSectors; ++s) {
+            m_sessionBest[s] = std::numeric_limits<float>::infinity();
+            m_selfPrev[s] = 0.0f;
+            m_selfBest[s] = std::numeric_limits<float>::infinity();
+            m_selfLast[s] = 0.0f;
+            m_selfSectorStatus[s] = SectorStatus::NONE;
+        }
+    }
+
+    void buildAdjustedSectorStarts()
+    {
+        // Refresh from ir_session if needed
+        std::vector<float> base = ir_session.sectorStartPct;
+        if (base.empty()) return;
+
+        // Apply config offset/reverse exactly like for car pcts
+        float startOffset = g_cfg.getFloat(m_name, "start_offset_pct", 0.0f);
+        if (m_hasAutoOffset) startOffset += m_autoOffset;
+        const bool rev = g_cfg.getBool(m_name, "reverse_direction", false);
+
+        m_sectorStartsAdjusted.clear();
+        for (float p : base)
+        {
+            float q = rev ? (1.0f - p) : p;
+            q += startOffset;
+            while (q >= 1.0f) q -= 1.0f;
+            while (q < 0.0f) q += 1.0f;
+            m_sectorStartsAdjusted.push_back(q);
+        }
+        std::sort(m_sectorStartsAdjusted.begin(), m_sectorStartsAdjusted.end());
+
+        // Ensure 0 and 1 are present
+        if (m_sectorStartsAdjusted.empty() || m_sectorStartsAdjusted.front() > 0.0001f)
+            m_sectorStartsAdjusted.insert(m_sectorStartsAdjusted.begin(), 0.0f);
+        if (m_sectorStartsAdjusted.back() < 0.9999f)
+            m_sectorStartsAdjusted.push_back(1.0f);
+        m_sectorsInitialized = true;
+    }
+
+    static inline bool boundaryCrossed(float prev, float cur, float boundary)
+    {
+        if (prev < 0.0f) return false;
+        if (cur >= prev)
+            return boundary >= prev && boundary < cur;
+        // wrap case: prev -> 1.0, then 0.0 -> cur
+        return (boundary >= prev && boundary < 1.0f) || (boundary >= 0.0f && boundary < cur);
+    }
+
+    void updateSectorTimingForAllCars()
+    {
+        if (!g_cfg.getBool(m_name, "show_sectors", false)) return;
+        if (!m_sectorsInitialized) buildAdjustedSectorStarts();
+        if (m_sectorStartsAdjusted.size() < 2) return;
+
+        const bool useStub = StubDataManager::shouldUseStubData();
+        const double now = useStub ? (double)StubDataManager::getAnimationTime() : (double)ir_SessionTime.getDouble();
+        const int selfIdx = ir_session.driverCarIdx;
+
+        auto getCarPctProcessed = [&](int i)->float {
+            float carPct = 0.0f;
+            if (useStub) {
+                if (i >= 0 && i < 64) {
+                    static float s_baseOffset[64] = {0};
+                    static float s_speed[64] = {0};
+                    static bool s_init = false;
+                    if (!s_init) {
+                        for (int j = 0; j < 64; ++j) {
+                            s_baseOffset[j] = (float)j * 0.12f;
+                            while (s_baseOffset[j] >= 1.0f) s_baseOffset[j] -= 1.0f;
+                            s_speed[j] = 0.0004f + (float)(j % 5) * 0.0001f;
+                        }
+                        s_init = true;
+                    }
+                    s_baseOffset[i] += s_speed[i];
+                    while (s_baseOffset[i] >= 1.0f) s_baseOffset[i] -= 1.0f;
+                    carPct = s_baseOffset[i];
+                }
+            } else {
+                carPct = ir_CarIdxLapDistPct.getFloat(i);
+            }
+
+            if (g_cfg.getBool(m_name, "reverse_direction", false))
+                carPct = 1.0f - carPct;
+            float startOffset = g_cfg.getFloat(m_name, "start_offset_pct", 0.0f);
+            if (m_hasAutoOffset) startOffset += m_autoOffset;
+            carPct = carPct + startOffset;
+            while (carPct >= 1.0f) carPct -= 1.0f;
+            while (carPct < 0.0f) carPct += 1.0f;
+            return std::clamp(carPct, 0.0f, 0.9999f);
+        };
+
+        const int maxCars = IR_MAX_CARS;
+        for (int i = 0; i < maxCars; ++i)
+        {
+            // Only consider valid cars
+            if (useStub) {
+                if (!StubDataManager::getStubCar(i)) continue;
+            } else {
+                if (ir_session.cars[i].userName.empty()) continue;
+            }
+
+            float curPct = getCarPctProcessed(i);
+            float prevPct = m_prevPctByCar[i];
+
+            if (prevPct < 0.0f) {
+                // Initialize current sector and timer
+                int secIdx = 0;
+                for (int s = 1; s < (int)m_sectorStartsAdjusted.size(); ++s) {
+                    if (curPct >= m_sectorStartsAdjusted[s]) secIdx = s - 1; else break;
+                }
+                m_currSectorIdxByCar[i] = secIdx;
+                m_sectorStartTimeByCar[i] = now;
+                m_prevPctByCar[i] = curPct;
+                continue;
+            }
+
+            // Check crossings for each boundary > prev up to cur
+            for (int s = 1; s < (int)m_sectorStartsAdjusted.size(); ++s)
+            {
+                float boundary = m_sectorStartsAdjusted[s];
+                if (boundaryCrossed(prevPct, curPct, boundary))
+                {
+                    int endedSec = s - 1;
+                    float secTime = (float)std::max(0.0, now - m_sectorStartTimeByCar[i]);
+                    m_sectorStartTimeByCar[i] = now;
+                    m_currSectorIdxByCar[i] = s % std::max(1, (int)m_sectorStartsAdjusted.size()-1);
+
+                    // Update session best with any car's time
+                    if (endedSec >= 0 && endedSec < kMaxSectors && secTime > 0.01f && secTime < 300.0f)
+                    {
+                        if (secTime < m_sessionBest[endedSec])
+                            m_sessionBest[endedSec] = secTime;
+                    }
+
+                    // For self, also compute status
+                    if (i == selfIdx && endedSec >= 0 && endedSec < kMaxSectors)
+                    {
+                        float prev = m_selfLast[endedSec];
+                        float best = m_selfBest[endedSec];
+                        m_selfLast[endedSec] = secTime;
+                        if (secTime < best) m_selfBest[endedSec] = secTime;
+                        SectorStatus st = SectorStatus::NONE;
+                        const float eps = 1e-3f;
+                        if (secTime + eps < m_sessionBest[endedSec])
+                            st = SectorStatus::SESSION_BEST;
+                        else if (secTime + eps < best)
+                            st = SectorStatus::PERSONAL_BEST;
+                        else if (prev > 0.0f && secTime > prev + eps)
+                            st = SectorStatus::SLOWER_THAN_PREV;
+                        else
+                            st = SectorStatus::NONE;
+                        m_selfSectorStatus[endedSec] = st;
+                    }
+                }
+            }
+
+            m_prevPctByCar[i] = curPct;
+        }
+    }
 };

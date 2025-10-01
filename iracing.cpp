@@ -24,6 +24,7 @@ SOFTWARE.
 
 #include "iracing.h"
 #include "Config.h"
+#include <algorithm>
 
 irsdkCVar ir_SessionTime("SessionTime");    // double[1] Seconds since session start (s)
 irsdkCVar ir_SessionTick("SessionTick");    // int[1] Current update number ()
@@ -429,6 +430,58 @@ ConnectionStatus ir_tick()
         if (!ir_session.trackName.empty()) {
             for (char& c : ir_session.trackName) c = (char)tolower((unsigned char)c);
             for (char& c : ir_session.trackName) if (c==' ' || c=='_') c='-';
+        }
+
+        // Parse sector split info when present
+        {
+            ir_session.sectorStartPct.clear();
+            // Always start at 0.0
+            ir_session.sectorStartPct.push_back(0.0f);
+
+            int numSectors = 0;
+            if (parseYamlInt(sessionYaml, "SessionInfo:SplitTimeInfo:NumSectors:", &numSectors) && numSectors > 1 && numSectors <= 10)
+            {
+                // iRacing reports NumSectors, with implicit 0.0 start and 1.0 end.
+                // The session string holds entries per sector with a start percentage for sectors 2..N (end of sector k) in many builds.
+                for (int s = 1; s < numSectors; ++s)
+                {
+                    char p1[256];
+                    // Common key name used in session string
+                    _snprintf_s(p1, _countof(p1), _TRUNCATE, "SessionInfo:SplitTimeInfo:Sectors:SectorNum:{%d}SectorStartPct:", s);
+                    float sp = -1.0f;
+                    if (!parseYamlFloat(sessionYaml, p1, &sp))
+                    {
+                        // Some builds have StartPct or SectorPct; try alternatives for robustness
+                        _snprintf_s(p1, _countof(p1), _TRUNCATE, "SessionInfo:SplitTimeInfo:Sectors:SectorNum:{%d}StartPct:", s);
+                        if (!parseYamlFloat(sessionYaml, p1, &sp))
+                        {
+                            _snprintf_s(p1, _countof(p1), _TRUNCATE, "SessionInfo:SplitTimeInfo:Sectors:SectorNum:{%d}SectorPct:", s);
+                            parseYamlFloat(sessionYaml, p1, &sp);
+                        }
+                    }
+                    if (sp > 0.0f && sp < 1.0f)
+                    {
+                        ir_session.sectorStartPct.push_back(sp);
+                    }
+                }
+                // Ensure unique and sorted, clamp to [0,1]
+                std::sort(ir_session.sectorStartPct.begin(), ir_session.sectorStartPct.end());
+                ir_session.sectorStartPct.erase(std::unique(ir_session.sectorStartPct.begin(), ir_session.sectorStartPct.end()), ir_session.sectorStartPct.end());
+            }
+
+            // Always end at 1.0 and ensure we have at least 3 sectors if splits missing
+            if (ir_session.sectorStartPct.size() <= 1)
+            {
+                // Fallback to 3 equal sectors: 0.0, 1/3, 2/3, 1.0
+                ir_session.sectorStartPct = {0.0f, 1.0f/3.0f, 2.0f/3.0f, 1.0f};
+            }
+            else
+            {
+                if (ir_session.sectorStartPct.front() > 0.0001f)
+                    ir_session.sectorStartPct.insert(ir_session.sectorStartPct.begin(), 0.0f);
+                if (ir_session.sectorStartPct.back() < 0.9999f)
+                    ir_session.sectorStartPct.push_back(1.0f);
+            }
         }
 
         _snprintf_s( path, _countof(path), _TRUNCATE, "WeekendInfo:WeekendOptions:IsFixedSetup:" );

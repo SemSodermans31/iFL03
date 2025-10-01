@@ -28,6 +28,7 @@ SOFTWARE.
 #include "irsdk/irsdk_client.h"
 #include "irsdk/yaml_parser.h"
 #include <string>
+#include <vector>
 #include "util.h"
 
 #define IR_MAX_CARS 64
@@ -114,6 +115,9 @@ struct Session
     std::string     trackConfigName;      
     int             trackId = 0;
     float           trackLengthMeters = 0.0f; 
+    // Sector starts as lap distance percentage [0..1). The first element should be 0.0.
+    // Parsed from SessionInfo:SplitTimeInfo when available.
+    std::vector<float> sectorStartPct;
 };
 
 extern irsdkCVar ir_SessionTime;    // double[1] Seconds since session start (s)
