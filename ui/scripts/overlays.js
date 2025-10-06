@@ -162,19 +162,6 @@ function setupEventListeners() {
 		});
 	}
 
-	// Position select
-	const overlayPosition = document.getElementById('overlay-position');
-	if (overlayPosition) {
-		overlayPosition.addEventListener('change', function() {
-			if (selectedOverlay) {
-				const configKey = overlayConfig[selectedOverlay].configKey;
-				sendCommand('setOverlayPosition', { 
-					component: configKey,
-					position: this.value 
-				});
-			}
-		});
-	}
 
 	// Opacity slider
 	const overlayOpacity = document.getElementById('overlay-opacity');
@@ -220,6 +207,71 @@ function setupEventListeners() {
 	if (saveButton) {
 		saveButton.addEventListener('click', function() {
 			saveOverlaySettings();
+		});
+	}
+
+	// D-pad movement controls
+	const dpadUp = document.getElementById('dpad-up');
+	if (dpadUp) {
+		dpadUp.addEventListener('click', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('moveOverlay', {
+					component: configKey,
+					direction: 'up'
+				});
+			}
+		});
+	}
+
+	const dpadDown = document.getElementById('dpad-down');
+	if (dpadDown) {
+		dpadDown.addEventListener('click', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('moveOverlay', {
+					component: configKey,
+					direction: 'down'
+				});
+			}
+		});
+	}
+
+	const dpadLeft = document.getElementById('dpad-left');
+	if (dpadLeft) {
+		dpadLeft.addEventListener('click', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('moveOverlay', {
+					component: configKey,
+					direction: 'left'
+				});
+			}
+		});
+	}
+
+	const dpadRight = document.getElementById('dpad-right');
+	if (dpadRight) {
+		dpadRight.addEventListener('click', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('moveOverlay', {
+					component: configKey,
+					direction: 'right'
+				});
+			}
+		});
+	}
+
+	const dpadCenter = document.getElementById('dpad-center');
+	if (dpadCenter) {
+		dpadCenter.addEventListener('click', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('centerOverlay', {
+					component: configKey
+				});
+			}
 		});
 	}
 
@@ -306,6 +358,25 @@ function setupEventListeners() {
 				sendCommand('setConfigFloat', {
 					component: 'OverlayTire',
 					key: 'temp_hot_c',
+					value: parseFloat(this.value)
+				});
+			}
+		});
+	}
+
+	// Track: Track Width slider
+	const trackWidthSlider = document.getElementById('track-width-slider');
+	if (trackWidthSlider) {
+		trackWidthSlider.addEventListener('input', function() {
+			const value = parseFloat(this.value);
+			document.getElementById('track-width-value').textContent = value.toFixed(1);
+		});
+
+		trackWidthSlider.addEventListener('change', function() {
+			if (selectedOverlay === 'track') {
+				sendCommand('setConfigFloat', {
+					component: 'OverlayTrack',
+					key: 'track_width',
 					value: parseFloat(this.value)
 				});
 			}
@@ -476,11 +547,6 @@ function updateOverlaySettings(overlayKey) {
 		overlayHotkey.value = currentState.config[config.configKey].toggle_hotkey || '';
 	}
 	
-	// Update position
-	const overlayPosition = document.getElementById('overlay-position');
-	if (overlayPosition && currentState.config && currentState.config[config.configKey]) {
-		overlayPosition.value = currentState.config[config.configKey].position || 'top-left';
-	}
 	
 	// Update opacity
 	const overlayOpacity = document.getElementById('overlay-opacity');

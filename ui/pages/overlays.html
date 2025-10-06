@@ -229,21 +229,6 @@
 						<input type="text" id="overlay-hotkey" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200 placeholder-[#a8a8a8] focus:border-green-500 focus:outline-none" />
 					</div>
 
-					<!-- Position Setting -->
-					<div class="space-y-2">
-						<label class="block text-sm font-medium text-slate-200">Position</label>
-						<select id="overlay-position" class="w-full rounded-lg bg-[#1f1f1f] px-3 py-2 text-slate-200">
-							<option value="top-left">Top Left</option>
-							<option value="top-center">Top Center</option>
-							<option value="top-right">Top Right</option>
-							<option value="center-left">Center Left</option>
-							<option value="center">Center</option>
-							<option value="center-right">Center Right</option>
-							<option value="bottom-left">Bottom Left</option>
-							<option value="bottom-center">Bottom Center</option>
-							<option value="bottom-right">Bottom Right</option>
-						</select>
-					</div>
 
 					<!-- Opacity Setting -->
 					<div class="space-y-2">
@@ -260,6 +245,53 @@
 						<input type="range" id="overlay-target-fps" min="5" max="60" value="10" class="w-full" />
 						<div class="text-xs text-[#a8a8a8] text-center">
 							<span id="target-fps-value">10</span> Hz
+						</div>
+					</div>
+
+					<!-- Overlay Position Control (D-pad) -->
+					<div class="space-y-3">
+						<div class="text-sm font-medium text-slate-200 mb-2">Position Control</div>
+						<div class="flex flex-col items-center space-y-2">
+							<!-- Up Button -->
+							<button id="dpad-up" class="w-12 h-12 bg-[#1f1f1f] hover:bg-[#2a2a2a] rounded-lg flex items-center justify-center border border-[#3c3c3c] transition-colors">
+								<svg class="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+								</svg>
+							</button>
+
+							<!-- Left, Center, Right Row -->
+							<div class="flex items-center space-x-2">
+								<!-- Left Button -->
+								<button id="dpad-left" class="w-12 h-12 bg-[#1f1f1f] hover:bg-[#2a2a2a] rounded-lg flex items-center justify-center border border-[#3c3c3c] transition-colors">
+									<svg class="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+									</svg>
+								</button>
+
+								<!-- Center Button -->
+								<button id="dpad-center" class="w-12 h-12 bg-green-600 hover:bg-green-700 rounded-lg flex items-center justify-center border border-green-500 transition-colors">
+									<svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+									</svg>
+								</button>
+
+								<!-- Right Button -->
+								<button id="dpad-right" class="w-12 h-12 bg-[#1f1f1f] hover:bg-[#2a2a2a] rounded-lg flex items-center justify-center border border-[#3c3c3c] transition-colors">
+									<svg class="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+									</svg>
+								</button>
+							</div>
+
+							<!-- Down Button -->
+							<button id="dpad-down" class="w-12 h-12 bg-[#1f1f1f] hover:bg-[#2a2a2a] rounded-lg flex items-center justify-center border border-[#3c3c3c] transition-colors">
+								<svg class="w-6 h-6 text-slate-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+								</svg>
+							</button>
+						</div>
+						<div class="text-xs text-[#a8a8a8] text-center">
+							Use D-pad to move overlay position (10px steps). Center button centers the overlay.
 						</div>
 					</div>
 

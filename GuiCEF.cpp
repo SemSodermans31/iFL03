@@ -306,15 +306,6 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
-			if (has("\"cmd\":\"setOverlayPosition\"")) {
-				std::string component, position;
-				if (extractStringField(req, "component", component) && 
-					extractStringField(req, "position", position)) {
-					app_set_config_string(component.c_str(), "position", position.c_str());
-				}
-				callback->Success(app_get_state_json());
-				return true;
-			}
 			if (has("\"cmd\":\"setOverlayOpacity\"")) {
 				std::string component;
 				if (extractStringField(req, "component", component)) {
@@ -330,6 +321,31 @@ namespace {
 							app_set_config_int(component.c_str(), "opacity", opacity);
 						}
 					}
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"moveOverlay\"")) {
+				std::string component, direction;
+				if (extractStringField(req, "component", component) &&
+					extractStringField(req, "direction", direction)) {
+					int deltaX = 0, deltaY = 0;
+					if (direction == "up") deltaY = -10;
+					else if (direction == "down") deltaY = 10;
+					else if (direction == "left") deltaX = -10;
+					else if (direction == "right") deltaX = 10;
+
+					if (deltaX != 0 || deltaY != 0) {
+						app_move_overlay(component.c_str(), deltaX, deltaY);
+					}
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"centerOverlay\"")) {
+				std::string component;
+				if (extractStringField(req, "component", component)) {
+					app_center_overlay(component.c_str());
 				}
 				callback->Success(app_get_state_json());
 				return true;
