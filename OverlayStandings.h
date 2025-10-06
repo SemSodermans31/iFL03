@@ -81,10 +81,17 @@ public:
     {
         switch (compound)
         {
-        case 1: return "Pri";
+        case 0: return "Dry";
+        case 1: {
+            // In some series, 1 maps to Wet (wet/dry only). In others, 1 is Primary.
+            // Disambiguate using current weather conditions.
+            const int trackWetness = ir_TrackWetness.getInt();
+            const float precip = ir_Precipitation.getFloat();
+            if (trackWetness > irsdk_TrackWetness_Dry || precip > 0.01f) return "Wet";
+            return "Pri";
+        }
         case 2: return "Alt";
         case 3: return "Wet";
-        case 0: return "Dry";
         default: return "-";
         }
     }
@@ -95,6 +102,7 @@ protected:
     {
         onConfigChanged();  // trigger font load
         loadPositionIcons();
+        loadFooterIcons();
     }
 
     virtual void onDisable()
@@ -109,6 +117,7 @@ protected:
 
         // Release positions gained icons/factory
         releasePositionIcons();
+        releaseFooterIcons();
     }
 
     virtual void onConfigChanged()
@@ -142,7 +151,7 @@ protected:
         {
             const float posTextW = computeTextExtent( L"99", m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing ).x;
             // Add extra width for icon space
-            m_columns.add( (int)Columns::POSITIONS_GAINED, posTextW + baseFontSize, baseFontSize / 2);
+            m_columns.add( (int)Columns::POSITIONS_GAINED, posTextW + baseFontSize * 1.8f, baseFontSize / 2);
         }
 
         if (g_cfg.getBool(m_name, "show_tire_compound", false))
@@ -430,6 +439,67 @@ protected:
         D2D1_ROUNDED_RECT rr = {};
 
         m_renderTarget->BeginDraw();
+
+        // Header row above column labels: SoF (left) and Incidents (right) with divider
+        {
+            const float xMargin = 10.0f;
+            const float yTop = 6.0f;
+            const float fontSizeH = g_cfg.getFloat("Overlay", "font_size", 16.0f);
+            const float iconSizeH = std::max(20.0f, fontSizeH * 1.2f);
+            const float iconPadH = std::max(3.0f,  fontSizeH * 0.25f);
+            const float itemH = iconSizeH + 2.0f;
+            const float yCenter = yTop + itemH * 0.5f;
+
+            // Divider under header (like footer divider)
+            const float headerDividerY = yTop + itemH + 6.0f;
+            m_brush->SetColor(float4(1,1,1,0.4f));
+            m_renderTarget->DrawLine(float2(0, headerDividerY), float2((float)m_width, headerDividerY), m_brush.Get());
+
+            // Left: SoF
+            if (g_cfg.getBool(m_name, "show_SoF", true)) {
+                int sof = ir_session.sof; if (sof < 0) sof = 0;
+                std::wstring sofText = toWide(std::format("{}", sof));
+                const float textW = computeTextExtent(sofText.c_str(), m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
+                const float itemW = (m_iconSoF ? iconSizeH + iconPadH : 0.0f) + textW + 6.0f;
+                float x = xMargin;
+                D2D1_RECT_F bg = { x - 4.0f, yCenter - itemH * 0.5f, x + itemW - 4.0f, yCenter + itemH * 0.5f };
+                D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                m_brush->SetColor(float4(1,1,1,1));
+                m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                if (m_iconSoF) {
+                    D2D1_RECT_F ir = { x, yCenter - iconSizeH * 0.5f, x + iconSizeH, yCenter + iconSizeH * 0.5f };
+                    m_renderTarget->DrawBitmap(m_iconSoF.Get(), &ir);
+                    x += iconSizeH + iconPadH;
+                }
+                m_brush->SetColor(float4(0,0,0,1));
+                m_text.render(m_renderTarget.Get(), sofText.c_str(), m_textFormatSmall.Get(), x, x + textW + 32.0f, yCenter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+            }
+
+            // Right: Incidents
+            if (g_cfg.getBool(m_name, "show_incidents", true)) {
+                const int inc = ir_PlayerCarTeamIncidentCount.getInt();
+                const int lim = ir_session.incidentLimit;
+                std::wstring incText = toWide(lim > 0 ? std::format("{}/{}", inc, lim) : std::format("{}/--", inc));
+                const float textW = computeTextExtent(incText.c_str(), m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
+                const float itemW = (m_iconIncidents ? iconSizeH + iconPadH : 0.0f) + textW + 6.0f;
+                float x = (float)m_width - xMargin - itemW;
+                D2D1_RECT_F bg = { x - 4.0f, yCenter - itemH * 0.5f, x + itemW - 4.0f, yCenter + itemH * 0.5f };
+                D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                m_brush->SetColor(float4(1,1,1,1));
+                m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                if (m_iconIncidents) {
+                    D2D1_RECT_F ir = { x, yCenter - iconSizeH * 0.5f, x + iconSizeH, yCenter + iconSizeH * 0.5f };
+                    m_renderTarget->DrawBitmap(m_iconIncidents.Get(), &ir);
+                    x += iconSizeH + iconPadH;
+                }
+                m_brush->SetColor(float4(0,0,0,1));
+                m_text.render(m_renderTarget.Get(), incText.c_str(), m_textFormatSmall.Get(), x, x + textW + 32.0f, yCenter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+            }
+
+            // Move y below header divider for column labels with extra top margin
+            y = headerDividerY + 12.0f;
+        }
+
         m_brush->SetColor( headerCol );
 
         // Headers
@@ -502,7 +572,9 @@ protected:
 
         // Content
         
-        int carsToDraw = static_cast<int>((ybottom - 2 * yoff) / lineHeight) - 1;
+        // Calculate available space for rows below the column labels
+        const float contentStartY = y + lineHeight + 6.0f;
+        int carsToDraw = static_cast<int>((ybottom - contentStartY) / lineHeight) - 1;
         int carsToSkip;
         if (carsToDraw >= carsInClass) {
             numTopDrivers = carsToDraw;
@@ -540,7 +612,7 @@ protected:
         {
             if (drawnCars > carsToDraw) break;
 
-            y = 2*yoff + lineHeight/2 + (drawnCars+1)*lineHeight;
+            y = contentStartY + lineHeight/2 + drawnCars*lineHeight;
             
             if (!showAllClasses && carInfo[i].classIdx != ownClass) {
                 continue;
@@ -726,8 +798,8 @@ protected:
                 // Number in black, right aligned
                 m_brush->SetColor(float4(0, 0, 0, 1));
                 swprintf(s, _countof(s), L"%d", abs(delta));
-                const float textL = r.left + iconPad + (icon ? iconSize + 4.0f : 0.0f);
-                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                const float textL = r.left + iconPad + (icon ? iconSize + 2.0f : 0.0f);
+                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right - 15.0f, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
             }
 
             // Tire compound
@@ -837,7 +909,7 @@ protected:
             m_renderTarget->FillRectangle( &thumb, m_brush.Get() );
         }
         
-        // Footer
+        // Footer: left (session time), right (track temp + laps)
         {
             float trackTemp = ir_TrackTempCrew.getFloat();
             char  tempUnit  = 'C';
@@ -848,58 +920,87 @@ protected:
             }
 
             int hours, mins, secs;
-
             ir_getSessionTimeRemaining(hours, mins, secs);
             const int laps = std::max(ir_CarIdxLap.getInt(ir_session.driverCarIdx), ir_CarIdxLapCompleted.getInt(ir_session.driverCarIdx));
             const int remainingLaps = ir_getLapsRemaining();
             const int irTotalLaps = ir_SessionLapsTotal.getInt();
-            int totalLaps = remainingLaps;
-            
-            if (irTotalLaps == 32767)
-                totalLaps = laps + remainingLaps;
-            else
-                totalLaps = irTotalLaps;
+            const int totalLaps = (irTotalLaps == 32767) ? (laps + remainingLaps) : irTotalLaps;
 
+            // Divider line
             m_brush->SetColor(float4(1,1,1,0.4f));
             m_renderTarget->DrawLine( float2(0,ybottom),float2((float)m_width,ybottom),m_brush.Get() );
 
-            str.clear();
-            bool addSpaces = false;
+            struct FooterItem { ID2D1Bitmap* icon; std::wstring text; float width; };
+            std::vector<FooterItem> leftItems;
+            std::vector<FooterItem> rightItems;
 
-            if (g_cfg.getBool(m_name, "show_SoF", true)) {
-                int sof = ir_session.sof;
-                if (sof < 0) sof = 0;
-                str += std::format("SoF: {}", sof);
-                addSpaces = true;
-            }
-
-            if (g_cfg.getBool(m_name, "show_track_temp", true)) {
-                if (addSpaces) {
-                    str += "       ";
-                }
-                str += std::format("Track Temp: {:.1f}\u00B0{:c}", trackTemp, tempUnit);
-                addSpaces = true;
-            }
+            auto measure = [&](const std::wstring& w)->float {
+                return computeTextExtent(w.c_str(), m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing).x;
+            };
 
             if (g_cfg.getBool(m_name, "show_session_end", true)) {
-                if (addSpaces) {
-                    str += "       ";
-                }
-                str += std::vformat("Session end: {}:{:0>2}:{:0>2}", std::make_format_args(hours, mins, secs));
-                addSpaces = true;
+                leftItems.push_back({ m_iconSessionTime.Get(), toWide(std::vformat("{}:{:0>2}:{:0>2}", std::make_format_args(hours, mins, secs))), 0.0f });
             }
-
+            if (g_cfg.getBool(m_name, "show_track_temp", true)) {
+                wchar_t buf[64];
+                swprintf(buf, _countof(buf), L"%.1f\x00B0%c", trackTemp, tempUnit);
+                rightItems.push_back({ m_iconTrackTemp.Get(), std::wstring(buf), 0.0f });
+            }
             if (g_cfg.getBool(m_name, "show_laps", true)) {
-                if (addSpaces) {
-                    str += "       ";
-                }
-                str += std::format("Laps: {}/{}{}", laps, (irTotalLaps == 32767 ? "~" : ""), totalLaps);
-                addSpaces = true;
+                rightItems.push_back({ m_iconLaps.Get(), toWide(std::format("{}/{}{}", laps, (irTotalLaps == 32767 ? "~" : ""), totalLaps)), 0.0f });
             }
 
-            y = m_height - (m_height-ybottom)/2;
-            m_brush->SetColor( headerCol );
-            m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff, (float)m_width-2*xoff, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+            const float fontSize = g_cfg.getFloat("Overlay", "font_size", 16.0f);
+            const float iconSize = std::max(20.0f, fontSize * 1.2f);
+            const float iconPad = std::max(3.0f, fontSize * 0.25f);
+            const float yText = m_height - (m_height - ybottom) / 2;
+
+            // Left side
+            if (!leftItems.empty()) {
+                float xL = 10.0f;
+                for (auto& it : leftItems) {
+                    it.width = (it.icon ? iconSize + iconPad : 0.0f) + measure(it.text);
+                    const float itemW = it.width + 6.0f;
+                    const float itemH = iconSize + 2.0f;
+                    D2D1_RECT_F bg = { xL - 4.0f, yText - itemH * 0.5f, xL + itemW - 4.0f, yText + itemH * 0.5f };
+                    D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                    m_brush->SetColor(float4(1,1,1,1));
+                    m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                    if (it.icon) {
+                        D2D1_RECT_F ir = { xL, yText - iconSize * 0.5f, xL + iconSize, yText + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(it.icon, &ir);
+                        xL += iconSize + iconPad;
+                    }
+                    m_brush->SetColor(float4(0,0,0,1));
+                    m_text.render(m_renderTarget.Get(), it.text.c_str(), m_textFormatSmall.Get(), xL, xL + it.width + 64.0f, yText, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                    xL += measure(it.text) + 12.0f;
+                }
+            }
+
+            // Right side
+            if (!rightItems.empty()) {
+                float xR = (float)m_width - 10.0f;
+                for (int i = (int)rightItems.size() - 1; i >= 0; --i) {
+                    auto& it = rightItems[i];
+                    it.width = (it.icon ? iconSize + iconPad : 0.0f) + measure(it.text);
+                    const float itemW = it.width + 6.0f;
+                    const float itemH = iconSize + 2.0f;
+                    xR -= itemW;
+                    D2D1_RECT_F bg = { xR - 4.0f, yText - itemH * 0.5f, xR + itemW - 4.0f, yText + itemH * 0.5f };
+                    D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                    m_brush->SetColor(float4(1,1,1,1));
+                    m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                    float itemX = xR;
+                    if (it.icon) {
+                        D2D1_RECT_F ir = { itemX, yText - iconSize * 0.5f, itemX + iconSize, yText + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(it.icon, &ir);
+                        itemX += iconSize + iconPad;
+                    }
+                    m_brush->SetColor(float4(0,0,0,1));
+                    m_text.render(m_renderTarget.Get(), it.text.c_str(), m_textFormatSmall.Get(), itemX, itemX + measure(it.text) + 32.0f, yText, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                    xR -= 12.0f;
+                }
+            }
         }
 
         m_renderTarget->EndDraw();
@@ -963,6 +1064,45 @@ protected:
         m_wicFactory.Reset();
     }
 
+    // Footer icons
+    void loadFooterIcons()
+    {
+        if (!m_renderTarget.Get()) return;
+        (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        if (!m_wicFactory.Get()) {
+            (void)CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory));
+        }
+        if (!m_wicFactory.Get()) return;
+        auto loadPng = [&](const std::wstring& rel) -> Microsoft::WRL::ComPtr<ID2D1Bitmap>
+        {
+            Microsoft::WRL::ComPtr<ID2D1Bitmap> bmp;
+            Microsoft::WRL::ComPtr<IWICBitmapDecoder> dec;
+            Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+            Microsoft::WRL::ComPtr<IWICFormatConverter> conv;
+            const std::wstring path = resolveAssetPathW(rel);
+            if (FAILED(m_wicFactory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &dec))) return bmp;
+            if (FAILED(dec->GetFrame(0, &frame))) return bmp;
+            if (FAILED(m_wicFactory->CreateFormatConverter(&conv))) return bmp;
+            if (FAILED(conv->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return bmp;
+            (void)m_renderTarget->CreateBitmapFromWicBitmap(conv.Get(), nullptr, &bmp);
+            return bmp;
+        };
+        m_iconIncidents   = loadPng(L"assets\\icons\\incidents.png");
+        m_iconSoF         = loadPng(L"assets\\icons\\SoF.png");
+        m_iconTrackTemp   = loadPng(L"assets\\icons\\temp_dark.png");
+        m_iconSessionTime = loadPng(L"assets\\icons\\session_time.png");
+        m_iconLaps        = loadPng(L"assets\\icons\\laps.png");
+    }
+
+    void releaseFooterIcons()
+    {
+        m_iconIncidents.Reset();
+        m_iconSoF.Reset();
+        m_iconTrackTemp.Reset();
+        m_iconSessionTime.Reset();
+        m_iconLaps.Reset();
+    }
+
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormat;
     Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatSmall;
     std::vector<std::vector<float>> m_avgL5Times;
@@ -976,6 +1116,13 @@ protected:
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posUpIcon;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posDownIcon;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posEqualIcon;
+
+    // Footer icons bitmaps
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconIncidents;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconSoF;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconTrackTemp;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconSessionTime;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconLaps;
 
     ColumnLayout m_columns;
     TextCache m_text;

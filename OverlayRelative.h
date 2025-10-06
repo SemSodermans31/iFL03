@@ -34,6 +34,7 @@ SOFTWARE.
 #include "Config.h"
 #include "Units.h"
 #include "stub_data.h"
+#include <wincodec.h>
 
 class OverlayRelative : public Overlay
 {
@@ -49,28 +50,39 @@ class OverlayRelative : public Overlay
 
     protected:
 
-        enum class Columns { POSITION, CAR_NUMBER, NAME, DELTA, LICENSE, SAFETY_RATING, IRATING, IR_PRED, PIT, LAST, TIRE_COMPOUND };
+        enum class Columns { POSITION, CAR_NUMBER, NAME, POSITIONS_GAINED, DELTA, LICENSE, SAFETY_RATING, IRATING, IR_PRED, PIT, LAST, TIRE_COMPOUND };
 
         std::string tireCompoundToString(int compound) const
         {
             switch (compound)
             {
-            case 1: return "Pri";
+            case 0: return "Dry";
+            case 1: {
+                // In two-compound series (Dry/Wet), 1 represents Wet.
+                // Use weather to disambiguate when series provide Primary/Alternate instead.
+                const int trackWetness = ir_TrackWetness.getInt();
+                const float precip = ir_Precipitation.getFloat();
+                if (trackWetness > irsdk_TrackWetness_Dry || precip > 0.01f) return "Wet";
+                return "Pri";
+            }
             case 2: return "Alt";
             case 3: return "Wet";
-            case 0: return "Dry";
             default: return "-";
             }
         }
 
         virtual void onEnable()
         {
-            onConfigChanged();  // trigger font load
+            onConfigChanged();
+            loadPositionIcons();
+            loadFooterIcons();
         }
 
         virtual void onDisable()
         {
             m_text.reset();
+            releasePositionIcons();
+            releaseFooterIcons();
         }
 
         virtual void onConfigChanged()
@@ -88,6 +100,11 @@ class OverlayRelative : public Overlay
             m_columns.add( (int)Columns::POSITION,   computeTextExtent( L"P99", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
             m_columns.add( (int)Columns::CAR_NUMBER, computeTextExtent( L"#999", m_dwriteFactory.Get(), m_textFormat.Get() ).x, fontSize/2 );
             m_columns.add( (int)Columns::NAME,       0, fontSize/2 );
+            if( g_cfg.getBool(m_name, "show_positions_gained", true) )
+            {
+                const float posTextW = computeTextExtent( L"99", m_dwriteFactory.Get(), m_textFormat.Get() ).x;
+                m_columns.add( (int)Columns::POSITIONS_GAINED, posTextW + fontSize * 1.8f, fontSize / 2 );
+            }
             if( g_cfg.getBool(m_name,"show_pit_age",true) )
                 m_columns.add( (int)Columns::PIT,           computeTextExtent( L"999", m_dwriteFactory.Get(), m_textFormatSmall.Get() ).x, fontSize/4 );
             if( g_cfg.getBool(m_name,"show_license",true) && !g_cfg.getBool(m_name,"show_sr",false) )
@@ -129,6 +146,7 @@ class OverlayRelative : public Overlay
                 int     pitAge = 0;
                 float   last = 0;
                 int     tireCompound = -1;
+                int     positionsChanged = 0;
             };
             std::vector<CarInfo> relatives;
             relatives.reserve( IR_MAX_CARS );
@@ -157,6 +175,7 @@ class OverlayRelative : public Overlay
                     if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(rel.carIdx)) {
                         ci.last = sc->lastLapTime;
                         ci.tireCompound = sc->tireCompound;
+                        ci.positionsChanged = (rel.carIdx % 3) - 1;
                     } else {
                         ci.last = 0.0f;
                     }
@@ -207,11 +226,6 @@ class OverlayRelative : public Overlay
                         {
                             delta = CarEstLapTime - SelfEstLapTime;
                         }
-
-                        // Assume no lap delta when not in a race, because we don't want to show drivers as lapped/lapping there.
-                        // Also reset it during initial pacing, since iRacing for some reason starts counting
-                        // during the pace lap but then resets the counter a couple seconds in, confusing the logic.
-                        // And consider the pace car in the same lap as us, too.
                         if( ir_session.sessionType!=SessionType::RACE || ir_isPreStart() || car.isPaceCar )
                         {
                             lapDelta = 0;
@@ -228,6 +242,7 @@ class OverlayRelative : public Overlay
                         ci.tireCompound = ir_CarIdxTireCompound.isValid() ? ir_CarIdxTireCompound.getInt(i) : -1;
                         if (ci.tireCompound < 0 && car.tireCompound >= 0)
                             ci.tireCompound = car.tireCompound;
+                        ci.positionsChanged = ir_getPositionsChanged(i);
                         relatives.push_back( ci );
                     }
                 }
@@ -498,6 +513,35 @@ class OverlayRelative : public Overlay
                     m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
                 }
 
+                // Positions gained/lost
+                if( clm = m_columns.get( (int)Columns::POSITIONS_GAINED ) )
+                {
+                    r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    m_brush->SetColor(float4(1, 1, 1, 1));
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+
+                    const int deltaPos = ci.positionsChanged;
+                    ID2D1Bitmap* icon = nullptr;
+                    if (deltaPos > 0)      icon = m_posUpIcon.Get();
+                    else if (deltaPos < 0) icon = m_posDownIcon.Get();
+                    else                   icon = m_posEqualIcon.Get();
+
+                    const float iconPad  = 4.0f;
+                    const float iconSize = std::max(0.0f, lineHeight - 6.0f);
+                    if (icon) {
+                        D2D1_RECT_F ir = { r.left + iconPad, y - iconSize * 0.5f, r.left + iconPad + iconSize, y + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(icon, &ir);
+                    }
+
+                    m_brush->SetColor(float4(0, 0, 0, 1));
+                    swprintf(s, _countof(s), L"%d", abs(deltaPos));
+                    const float textL = r.left + iconPad + (icon ? iconSize + 2.0f : 0.0f);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right - 15.0f, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                }
+
                 if( clm = m_columns.get( (int)Columns::TIRE_COMPOUND ) )
                 {
                     int compound = ci.tireCompound;
@@ -530,8 +574,8 @@ class OverlayRelative : public Overlay
                 }
 
                 // Last
+                if( clm = m_columns.get((int)Columns::LAST) )
                 {
-                    clm = m_columns.get((int)Columns::LAST);
                     str.clear();
                     if (ci.last > 0)
                         str = formatLaptime(ci.last);
@@ -548,7 +592,7 @@ class OverlayRelative : public Overlay
                 }
             }
 
-            // Footer (matches OverlayStandings)
+            // Footer: left (session time), right (track temp + laps)
             {
                 const bool imperial = isImperialUnits();
                 float trackTemp = ir_TrackTempCrew.getFloat();
@@ -561,67 +605,148 @@ class OverlayRelative : public Overlay
                 const int laps = std::max(ir_CarIdxLap.getInt(ir_session.driverCarIdx), ir_CarIdxLapCompleted.getInt(ir_session.driverCarIdx));
                 const int remainingLaps = ir_getLapsRemaining();
                 const int irTotalLaps = ir_SessionLapsTotal.getInt();
-                int totalLaps = remainingLaps;
-                if (irTotalLaps == 32767)
-                    totalLaps = laps + remainingLaps;
-                else
-                    totalLaps = irTotalLaps;
+                int totalLaps = (irTotalLaps == 32767) ? (laps + remainingLaps) : irTotalLaps;
 
                 const float ybottom = ybottomFooter;
 
+                // Divider line
                 m_brush->SetColor(float4(1,1,1,0.4f));
                 m_renderTarget->DrawLine(float2(0,ybottom), float2((float)m_width,ybottom), m_brush.Get());
 
-                std::string footer;
-                bool addSpaces = false;
+                struct FooterItem { ID2D1Bitmap* icon; std::wstring text; float width; };
+                std::vector<FooterItem> leftItems;
+                std::vector<FooterItem> rightItems;
+
+                auto measure = [&](const std::wstring& w)->float {
+                    return computeTextExtent(w.c_str(), m_dwriteFactory.Get(), m_textFormat.Get(), m_fontSpacing).x;
+                };
+
+                if (g_cfg.getBool(m_name, "show_session_end", true)) {
+                    leftItems.push_back({ m_iconSessionTime.Get(), toWide(std::vformat("{}:{:0>2}:{:0>2}", std::make_format_args(hours, mins, secs))), 0.0f });
+                }
+                if (g_cfg.getBool(m_name, "show_track_temp", true)) {
+                    wchar_t buf[64];
+                    swprintf(buf, _countof(buf), L"%.1f\x00B0%c", trackTemp, tempUnit);
+                    rightItems.push_back({ m_iconTrackTemp.Get(), std::wstring(buf), 0.0f });
+                }
+                if (g_cfg.getBool(m_name, "show_laps", true)) {
+                    rightItems.push_back({ m_iconLaps.Get(), toWide(std::format("{}/{}{}", laps, (irTotalLaps == 32767 ? "~" : ""), totalLaps)), 0.0f });
+                }
+
+                const float fontSize = g_cfg.getFloat("Overlay", "font_size", 16.0f);
+                const float iconSize = std::max(20.0f, fontSize * 1.2f);
+                const float iconPad = std::max(3.0f, fontSize * 0.25f);
+                const float yText = m_height - (m_height - ybottom) / 2;
+
+                // Left side
+                if (!leftItems.empty()) {
+                    float xL = 10.0f;
+                    for (auto& it : leftItems) {
+                        it.width = (it.icon ? iconSize + iconPad : 0.0f) + measure(it.text);
+                        const float itemW = it.width + 6.0f;
+                        const float itemH = iconSize + 2.0f;
+                        D2D1_RECT_F bg = { xL - 4.0f, yText - itemH * 0.5f, xL + itemW - 4.0f, yText + itemH * 0.5f };
+                        D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                        m_brush->SetColor(float4(1,1,1,1));
+                        m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                        if (it.icon) {
+                            D2D1_RECT_F ir = { xL, yText - iconSize * 0.5f, xL + iconSize, yText + iconSize * 0.5f };
+                            m_renderTarget->DrawBitmap(it.icon, &ir);
+                            xL += iconSize + iconPad;
+                        }
+                        m_brush->SetColor(float4(0,0,0,1));
+                        m_text.render(m_renderTarget.Get(), it.text.c_str(), m_textFormatSmall.Get(), xL, xL + it.width + 64.0f, yText, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                        xL += measure(it.text) + 12.0f;
+                    }
+                }
+
+                // Right side
+                if (!rightItems.empty()) {
+                    float xR = (float)m_width - 10.0f;
+                    for (int i = (int)rightItems.size() - 1; i >= 0; --i) {
+                        auto& it = rightItems[i];
+                        it.width = (it.icon ? iconSize + iconPad : 0.0f) + measure(it.text);
+                        const float itemW = it.width + 6.0f;
+                        const float itemH = iconSize + 2.0f;
+                        xR -= itemW;
+                        D2D1_RECT_F bg = { xR - 4.0f, yText - itemH * 0.5f, xR + itemW - 4.0f, yText + itemH * 0.5f };
+                        D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                        m_brush->SetColor(float4(1,1,1,1));
+                        m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                        float itemX = xR;
+                        if (it.icon) {
+                            D2D1_RECT_F ir = { itemX, yText - iconSize * 0.5f, itemX + iconSize, yText + iconSize * 0.5f };
+                            m_renderTarget->DrawBitmap(it.icon, &ir);
+                            itemX += iconSize + iconPad;
+                        }
+                        m_brush->SetColor(float4(0,0,0,1));
+                        m_text.render(m_renderTarget.Get(), it.text.c_str(), m_textFormatSmall.Get(), itemX, itemX + measure(it.text) + 32.0f, yText, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                        xR -= 12.0f;
+                    }
+                }
+            }
+
+            // Minimap with header (SoF left, Incidents right)
+            if( minimapEnabled )
+            {
+                const float y = 10;
+                const float baseX = 10;
+                const float h = 15;
+
+                // Header items flanking minimap
+                const float fontSizeH = g_cfg.getFloat("Overlay", "font_size", 16.0f);
+                const float iconSizeH = std::max(20.0f, fontSizeH * 1.2f);
+                const float iconPadH = std::max(3.0f,  fontSizeH * 0.25f);
+                const float yCenter = y + h * 0.5f;
+
+                float leftReserved  = 0.0f;
+                float rightReserved = 0.0f;
+
+                if (g_cfg.getBool(m_name, "show_SoF", true)) {
+                    int sof = ir_session.sof; if (sof < 0) sof = 0;
+                    std::wstring sofText = toWide(std::format("{}", sof));
+                    const float textW = computeTextExtent(sofText.c_str(), m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
+                    const float itemH = iconSizeH + 2.0f;
+                    const float itemW = (m_iconSoF ? iconSizeH + iconPadH : 0.0f) + textW + 6.0f;
+                    float xL = baseX;
+                    D2D1_RECT_F bg = { xL - 4.0f, yCenter - itemH * 0.5f, xL + itemW - 4.0f, yCenter + itemH * 0.5f };
+                    D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                    m_brush->SetColor(float4(1,1,1,1));
+                    m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                    if (m_iconSoF) {
+                        D2D1_RECT_F ir = { xL, yCenter - iconSizeH * 0.5f, xL + iconSizeH, yCenter + iconSizeH * 0.5f };
+                        m_renderTarget->DrawBitmap(m_iconSoF.Get(), &ir);
+                        xL += iconSizeH + iconPadH;
+                    }
+                    m_brush->SetColor(float4(0,0,0,1));
+                    m_text.render(m_renderTarget.Get(), sofText.c_str(), m_textFormatSmall.Get(), xL, xL + textW + 32.0f, yCenter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                    leftReserved = itemW + 6.0f;
+                }
 
                 if (g_cfg.getBool(m_name, "show_incidents", true)) {
                     const int inc = ir_PlayerCarTeamIncidentCount.getInt();
                     const int lim = ir_session.incidentLimit;
-                    if (addSpaces) footer += "       ";
-                    if (lim > 0)
-                        footer += std::format("Inc: {}/{}", inc, lim);
-                    else
-                        footer += std::format("Inc: {}/--", inc);
-                    addSpaces = true;
+                    std::wstring incText = toWide(lim > 0 ? std::format("{}/{}", inc, lim) : std::format("{}/--", inc));
+                    const float textW = computeTextExtent(incText.c_str(), m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
+                    const float itemH = iconSizeH + 2.0f;
+                    const float itemW = (m_iconIncidents ? iconSizeH + iconPadH : 0.0f) + textW + 6.0f;
+                    float xR = (float)m_width - baseX - itemW;
+                    D2D1_RECT_F bg = { xR - 4.0f, yCenter - itemH * 0.5f, xR + itemW - 4.0f, yCenter + itemH * 0.5f };
+                    D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
+                    m_brush->SetColor(float4(1,1,1,1));
+                    m_renderTarget->FillRoundedRectangle(&rrh, m_brush.Get());
+                    if (m_iconIncidents) {
+                        D2D1_RECT_F ir = { xR, yCenter - iconSizeH * 0.5f, xR + iconSizeH, yCenter + iconSizeH * 0.5f };
+                        m_renderTarget->DrawBitmap(m_iconIncidents.Get(), &ir);
+                        xR += iconSizeH + iconPadH;
+                    }
+                    m_brush->SetColor(float4(0,0,0,1));
+                    m_text.render(m_renderTarget.Get(), incText.c_str(), m_textFormatSmall.Get(), xR, xR + textW + 32.0f, yCenter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                    rightReserved = itemW + 6.0f;
                 }
 
-                if (g_cfg.getBool(m_name, "show_SoF", true)) {
-                    int sof = ir_session.sof; if (sof < 0) sof = 0;
-                    footer += std::format("SoF: {}", sof);
-                    addSpaces = true;
-                }
-
-                if (g_cfg.getBool(m_name, "show_track_temp", true)) {
-                    if (addSpaces) footer += "       ";
-                    footer += std::format("Track Temp: {:.1f}\u00B0{:c}", trackTemp, tempUnit);
-                    addSpaces = true;
-                }
-
-                if (g_cfg.getBool(m_name, "show_session_end", true)) {
-                    if (addSpaces) footer += "       ";
-                    footer += std::vformat("Session end: {}:{:0>2}:{:0>2}", std::make_format_args(hours, mins, secs));
-                    addSpaces = true;
-                }
-
-                if (g_cfg.getBool(m_name, "show_laps", true)) {
-                    if (addSpaces) footer += "       ";
-                    footer += std::format("Laps: {}/{}{}", laps, (irTotalLaps == 32767 ? "~" : ""), totalLaps);
-                    addSpaces = true;
-                }
-
-                float yFooter = m_height - (m_height - ybottom) / 2;
-                m_brush->SetColor(headerCol);
-                m_text.render( m_renderTarget.Get(), toWide(footer).c_str(), m_textFormat.Get(), xoff, (float)m_width - 2 * xoff, yFooter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
-            }
-
-            // Minimap
-            if( minimapEnabled )
-            {
-                const float y = 10;
-                const float x = 10;
-                const float h = 15;
-                const float w = (float)m_width - 2*x;
+                const float x = baseX + leftReserved;
+                const float w = std::max(0.0f, (float)m_width - x - baseX - rightReserved);
                 D2D1_RECT_F r = { x, y, x+w, y+h };
                 m_brush->SetColor( minimapBgCol );
                 m_renderTarget->FillRectangle( &r, m_brush.Get() );                
@@ -722,4 +847,90 @@ class OverlayRelative : public Overlay
         ColumnLayout m_columns;
         TextCache    m_text;
         float m_fontSpacing = getGlobalFontSpacing();
+        // Position change icons and factory
+        Microsoft::WRL::ComPtr<IWICImagingFactory> m_wicFactory;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posUpIcon;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posDownIcon;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posEqualIcon;
+
+        // Footer icons
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconIncidents;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconSoF;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconTrackTemp;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconSessionTime;
+        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconLaps;
+
+        void loadPositionIcons()
+        {
+            if (!m_renderTarget.Get()) return;
+            if (m_posUpIcon || m_posDownIcon || m_posEqualIcon) return;
+            (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+            if (!m_wicFactory.Get()) {
+                (void)CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory));
+            }
+            if (!m_wicFactory.Get()) return;
+            auto loadPng = [&](const std::wstring& rel) -> Microsoft::WRL::ComPtr<ID2D1Bitmap>
+            {
+                Microsoft::WRL::ComPtr<ID2D1Bitmap> bmp;
+                Microsoft::WRL::ComPtr<IWICBitmapDecoder> dec;
+                Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+                Microsoft::WRL::ComPtr<IWICFormatConverter> conv;
+                const std::wstring path = resolveAssetPathW(rel);
+                if (FAILED(m_wicFactory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &dec))) return bmp;
+                if (FAILED(dec->GetFrame(0, &frame))) return bmp;
+                if (FAILED(m_wicFactory->CreateFormatConverter(&conv))) return bmp;
+                if (FAILED(conv->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return bmp;
+                (void)m_renderTarget->CreateBitmapFromWicBitmap(conv.Get(), nullptr, &bmp);
+                return bmp;
+            };
+            m_posUpIcon    = loadPng(L"assets\\icons\\up.png");
+            m_posDownIcon  = loadPng(L"assets\\icons\\down.png");
+            m_posEqualIcon = loadPng(L"assets\\icons\\equal.png");
+        }
+
+        void releasePositionIcons()
+        {
+            m_posUpIcon.Reset();
+            m_posDownIcon.Reset();
+            m_posEqualIcon.Reset();
+            m_wicFactory.Reset();
+        }
+
+        void loadFooterIcons()
+        {
+            if (!m_renderTarget.Get()) return;
+            (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+            if (!m_wicFactory.Get()) {
+                (void)CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory));
+            }
+            if (!m_wicFactory.Get()) return;
+            auto loadPng = [&](const std::wstring& rel) -> Microsoft::WRL::ComPtr<ID2D1Bitmap>
+            {
+                Microsoft::WRL::ComPtr<ID2D1Bitmap> bmp;
+                Microsoft::WRL::ComPtr<IWICBitmapDecoder> dec;
+                Microsoft::WRL::ComPtr<IWICBitmapFrameDecode> frame;
+                Microsoft::WRL::ComPtr<IWICFormatConverter> conv;
+                const std::wstring path = resolveAssetPathW(rel);
+                if (FAILED(m_wicFactory->CreateDecoderFromFilename(path.c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnLoad, &dec))) return bmp;
+                if (FAILED(dec->GetFrame(0, &frame))) return bmp;
+                if (FAILED(m_wicFactory->CreateFormatConverter(&conv))) return bmp;
+                if (FAILED(conv->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return bmp;
+                (void)m_renderTarget->CreateBitmapFromWicBitmap(conv.Get(), nullptr, &bmp);
+                return bmp;
+            };
+            m_iconIncidents   = loadPng(L"assets\\icons\\incidents.png");
+            m_iconSoF         = loadPng(L"assets\\icons\\SoF.png");
+            m_iconTrackTemp   = loadPng(L"assets\\icons\\temp_dark.png");
+            m_iconSessionTime = loadPng(L"assets\\icons\\session_time.png");
+            m_iconLaps        = loadPng(L"assets\\icons\\laps.png");
+        }
+
+        void releaseFooterIcons()
+        {
+            m_iconIncidents.Reset();
+            m_iconSoF.Reset();
+            m_iconTrackTemp.Reset();
+            m_iconSessionTime.Reset();
+            m_iconLaps.Reset();
+        }
 };

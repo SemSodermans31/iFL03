@@ -63,11 +63,11 @@ class OverlayInputs : public Overlay
             const float barFrac = m_showSteeringWheel ? 0.16f : 0.26f;
             const float graphFrac = std::max(0.1f, 1.0f - wheelFrac - barFrac);
 
-            const int horizontalWidth = std::max(1, (int)(m_width * graphFrac));
-            m_throttleVtx.resize( horizontalWidth );
-            m_brakeVtx.resize( horizontalWidth );
-            m_steeringVtx.resize( horizontalWidth );
-            for( int i=0; i<horizontalWidth; ++i )
+            const int horizontalWidthInt = std::max(1, (int)(m_width * graphFrac));
+            m_throttleVtx.resize( horizontalWidthInt );
+            m_brakeVtx.resize( horizontalWidthInt );
+            m_steeringVtx.resize( horizontalWidthInt );
+            for( int i=0; i<horizontalWidthInt; ++i )
             {
                 m_throttleVtx[i].x = float(i);
                 m_brakeVtx[i].x = float(i);
@@ -112,12 +112,19 @@ class OverlayInputs : public Overlay
 
             const bool leftSide = g_cfg.getBool( m_name, "left_side", false );
 
-            const float horizontalStartX = leftSide ? (wheelWidth + barsWidth) : 0.0f;
+            const float horizontalPadding = 8.0f; // Padding from overlay edge for horizontal graphs
+            const float sectionPadding = 8.0f; // Padding between sections
+            const float horizontalStartX = leftSide ? (wheelWidth + barsWidth) : horizontalPadding;
             const float barsStartX = leftSide ? wheelWidth : horizontalWidth;
             const float wheelStartX = leftSide ? 0.0f : (horizontalWidth + barsWidth);
-            const float horizontalEndX = horizontalStartX + horizontalWidth;
 
-            // Make code below safe against indexing into size-1 when sizes are zero
+            // Adjust horizontal end to leave room for bars when not in left-side mode
+            const float horizontalEndX = leftSide ? (horizontalStartX + horizontalWidth) :
+                std::min(horizontalStartX + horizontalWidth, barsStartX - sectionPadding);
+
+            // Calculate effective width for vertex arrays and scaling
+            const float effectiveHorizontalWidth = horizontalEndX - horizontalStartX;
+            
             if( m_throttleVtx.empty() )
                 m_throttleVtx.resize( 1 );
             if( m_brakeVtx.empty() )
@@ -156,7 +163,7 @@ class OverlayInputs : public Overlay
             
             // Transform function for horizontal graphs
             auto vtx2coord = [&]( const float2& v )->float2 {
-                float scaledX = (v.x / (float)m_throttleVtx.size()) * horizontalWidth;
+                float scaledX = (v.x / (float)m_throttleVtx.size()) * effectiveHorizontalWidth;
                 return float2( horizontalStartX + scaledX + 0.5f, h - 0.5f*thickness - v.y*(h*0.8f-thickness) - h*0.1f );
             };
 
@@ -178,6 +185,10 @@ class OverlayInputs : public Overlay
                     m_brush->SetColor( bgColor );
                     D2D1_ROUNDED_RECT rr = { D2D1::RectF(left, top, right, bottom), cornerRadius, cornerRadius };
                     m_renderTarget->FillRoundedRectangle( rr, m_brush.Get() );
+
+                    const float4 borderColor = float4(0.3f, 0.3f, 0.3f, 0.6f);
+                    m_brush->SetColor(borderColor);
+                    m_renderTarget->DrawRoundedRectangle(rr, m_brush.Get(), 2.0f);
                 }
                 else
                 {
@@ -283,6 +294,10 @@ class OverlayInputs : public Overlay
                         {
                             m_brush->SetColor( bgColor );
                             m_renderTarget->FillGeometry( geom.Get(), m_brush.Get() );
+
+                            const float4 borderColor = float4(0.3f, 0.3f, 0.3f, 0.6f);
+                            m_brush->SetColor(borderColor);
+                            m_renderTarget->DrawGeometry(geom.Get(), m_brush.Get(), 1.0f);
                         }
                     }
                 }
@@ -291,27 +306,22 @@ class OverlayInputs : public Overlay
             // SECTION 1: Horizontal Throttle/Brake Graphs
             if( !m_throttleVtx.empty() && !m_brakeVtx.empty() )
             {
-                // Telemetry background with subtle grid lines and black border (#1f1f1f bg, #121212 lines)
                 {
                     const float graphTop = h * 0.1f;
                     const float graphBottom = h * 0.9f;
                     D2D1_RECT_F teleRect = { horizontalStartX, graphTop, horizontalEndX, graphBottom };
 
-                    // Background fill #1f1f1f with slight transparency
                     float4 teleBg = float4(0.1215686f, 0.1215686f, 0.1215686f, 0.5f);
                     teleBg.w *= getGlobalOpacity();
                     m_brush->SetColor( teleBg );
                     m_renderTarget->FillRectangle( teleRect, m_brush.Get() );
 
-                    // Horizontal lines at 25/50/75% in #121212
                     m_brush->SetColor( float4(0.0705882f, 0.0705882f, 0.0705882f, 1.0f) );
                     for( int i = 1; i <= 3; ++i )
                     {
                         float y = graphTop + (graphBottom - graphTop) * (float)i / 4.0f;
                         m_renderTarget->DrawLine( float2(horizontalStartX, y), float2(horizontalEndX, y), m_brush.Get(), 1.0f );
                     }
-
-                    // Black border #000000
                     m_brush->SetColor( float4(0.0f, 0.0f, 0.0f, 1.0f) );
                     m_renderTarget->DrawRectangle( teleRect, m_brush.Get(), 1.0f );
                 }
