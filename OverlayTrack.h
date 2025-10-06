@@ -27,6 +27,7 @@ SOFTWARE.
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <limits>
 #include <d2d1.h>
 #include "picojson.h"
 #include "Overlay.h"
@@ -55,6 +56,7 @@ protected:
         m_autoOffset = 0.0f;
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
+        resetSectorTiming();
     }
 
     virtual void onDisable()
@@ -64,6 +66,7 @@ protected:
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
         m_text.reset();
+        resetSectorTiming();
     }
 
     virtual void onSessionChanged()
@@ -72,6 +75,7 @@ protected:
         m_autoOffset = 0.0f;
         m_hasAutoOffset = false;
         m_prevPctSample = -1.0f;
+        resetSectorTiming();
     }
 
     virtual void onConfigChanged()
@@ -92,7 +96,7 @@ protected:
 
     virtual bool hasCustomBackground()
     {
-        return true; // We render our own background (transparent)
+        return true;
     }
 
     virtual void onUpdate()
@@ -122,9 +126,8 @@ protected:
         float pct = 0.0f;
         if (StubDataManager::shouldUseStubData()) {
             static float s_p = 0.0f;
-            // Vary speed slightly to simulate realistic racing (slowed down 5x)
-            float baseSpeed = 0.0005f; // 0.0025f / 5
-            float speedVariation = 0.0001f * std::sin(StubDataManager::getAnimationTime() * 0.06f); // 0.0005f / 5, 0.3f / 5
+            float baseSpeed = 0.0005f;
+            float speedVariation = 0.0001f * std::sin(StubDataManager::getAnimationTime() * 0.06f);
             s_p += baseSpeed + speedVariation;
             if (s_p >= 1.0f) s_p -= 1.0f;
             pct = s_p;
@@ -136,7 +139,7 @@ protected:
         // Auto-align S/F crossing (detect wrap high->low once) and allow manual offset and reverse
         if (!StubDataManager::shouldUseStubData() && g_cfg.getBool(m_name, "auto_start_offset", true))
         {
-            if (m_prevPctSample >= 0.0f)
+            if (!m_hasAutoOffset && m_prevPctSample >= 0.0f)
             {
                 if (m_prevPctSample > 0.70f && pct < 0.30f)
                 {
@@ -158,6 +161,13 @@ protected:
         while (pct < 0.0f) pct += 1.0f;
         pct = std::clamp(pct, 0.0f, 0.9999f);
 
+        // Track sector timing based on boundary crossings (live only)
+        if (!StubDataManager::shouldUseStubData()) {
+            buildAdjustedSectorStarts();
+            ensureSectorArraysSized();
+            updateSectorTiming();
+        }
+
         // Begin draw
         m_renderTarget->BeginDraw();
         m_renderTarget->Clear(float4(0,0,0,0));
@@ -169,13 +179,9 @@ protected:
         const float overlayW = dest.right - dest.left;
         const float overlayH = dest.bottom - dest.top;
 
-        // Background panel (subtle)
-        // Removed background fill for full transparency
-
         // Scale and draw track path to fill the overlay area
         if (m_trackPath.size() >= 2)
         {
-            // Calculate path bounds
             float minX = 1.0f, maxX = 0.0f, minY = 1.0f, maxY = 0.0f;
             for (const auto& pt : m_trackPath) {
                 minX = std::min(minX, pt.x);
@@ -185,7 +191,7 @@ protected:
             }
 
             // Add padding
-            const float padding = 0.1f; // 10% padding
+            const float padding = 0.1f;
             const float padW = (maxX - minX) * padding;
             const float padH = (maxY - minY) * padding;
             minX -= padW; maxX += padW;
@@ -201,7 +207,6 @@ protected:
             const float offsetX = (overlayW - scaledW) * 0.5f;
             const float offsetY = (overlayH - scaledH) * 0.5f;
 
-            // Build track geometry once per size/bounds change and reuse
             if (!m_cachedPathGeometry) {
                 if (m_trackPath.size() >= 3) {
                     Microsoft::WRL::ComPtr<ID2D1PathGeometry> pathGeometry;
@@ -221,6 +226,10 @@ protected:
                         sink->Close();
                         m_cachedPathGeometry = pathGeometry;
                         m_cachedTrackWidth = g_cfg.getFloat(m_name, "track_width", 6.0f);
+                        // Cache total path length in normalized space
+                        m_totalPathLength = 0.0f;
+                        for (size_t i = 1; i < m_trackPath.size(); ++i)
+                            m_totalPathLength += distance(m_trackPath[i-1], m_trackPath[i]);
                     }
                 }
             }
@@ -232,6 +241,26 @@ protected:
                 m_renderTarget->DrawGeometry(m_cachedPathGeometry.Get(), m_brush.Get(), outlineWidth);
                 m_brush->SetColor(trackCol);
                 m_renderTarget->DrawGeometry(m_cachedPathGeometry.Get(), m_brush.Get(), trackWidth);
+
+                // Colored sector overlays on top of base path
+                if (g_cfg.getBool(m_name, "color_sectors", false) && m_sectorColors.size() >= 1)
+                {
+                    buildAdjustedSectorStarts();
+                    ensureSectorArraysSized();
+                    for (int s = 0; s + 1 < (int)m_sectorStartsAdjusted.size(); ++s)
+                    {
+                        const float4 col = m_sectorColors[s];
+                        if (col.a <= 0.0f) continue;
+                        drawTrackSubPath(
+                            m_sectorStartsAdjusted[s],
+                            m_sectorStartsAdjusted[s+1],
+                            col,
+                            trackWidth,
+                            minX, minY, scale, offsetX, offsetY,
+                            dest.left, dest.top
+                        );
+                    }
+                }
             }
 
             // Store scaling info for marker positioning
@@ -240,33 +269,24 @@ protected:
             m_pathOffset = float2(offsetX, offsetY);
         }
 
-        // Draw start/finish lines
+        // Draw sector and extended lines
         if (m_trackPath.size() >= 2) {
-            const float4 lineCol = float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity);
-            m_brush->SetColor(lineCol);
-            
-            auto drawLineAt = [&](float linePos)
+            auto drawColoredLineAt = [&](float linePos, const float4& col, float thickness)
             {
+                m_brush->SetColor(col);
                 float2 pos = computeMarkerPosition(linePos);
-                
-                // Apply same scaling as track path
                 const float centerX = dest.left + m_pathOffset.x + (pos.x - m_pathBounds.x) * m_pathScale;
                 const float centerY = dest.top + m_pathOffset.y + (pos.y - m_pathBounds.y) * m_pathScale;
-                
-                // Calculate perpendicular direction for line
-                float2 dir = float2(0, 1); // Default vertical line
+                float2 dir = float2(0, 1);
                 if (m_trackPath.size() >= 2) {
-                    // Find approximate tangent direction at this position
                     float total = 0.0f;
                     for (size_t i = 1; i < m_trackPath.size(); ++i)
                         total += distance(m_trackPath[i-1], m_trackPath[i]);
-                    
                     float target = linePos * total;
                     float acc = 0.0f;
                     for (size_t i = 1; i < m_trackPath.size(); ++i) {
                         float seg = distance(m_trackPath[i-1], m_trackPath[i]);
                         if (acc + seg >= target) {
-                            // Found the segment, calculate tangent
                             float2 tangent = float2(
                                 m_trackPath[i].x - m_trackPath[i-1].x,
                                 m_trackPath[i].y - m_trackPath[i-1].y
@@ -275,7 +295,6 @@ protected:
                             if (len > 0.0001f) {
                                 tangent.x /= len;
                                 tangent.y /= len;
-                                // Perpendicular direction (rotate 90 degrees)
                                 dir = float2(-tangent.y, tangent.x);
                             }
                             break;
@@ -283,26 +302,32 @@ protected:
                         acc += seg;
                     }
                 }
-                
-                // Draw line perpendicular to track direction
                 const float lineLength = std::min(overlayW, overlayH) * 0.06f;
                 const float halfLen = lineLength * 0.5f;
                 const float x1 = centerX + dir.x * halfLen;
                 const float y1 = centerY + dir.y * halfLen;
                 const float x2 = centerX - dir.x * halfLen;
                 const float y2 = centerY - dir.y * halfLen;
-                
-                m_renderTarget->DrawLine(float2(x1, y1), float2(x2, y2), m_brush.Get(), 2.0f);
+                m_renderTarget->DrawLine(float2(x1, y1), float2(x2, y2), m_brush.Get(), thickness);
             };
-
-            if (!m_extendedLines.empty())
+            // Sector lines include S/F at 0.0; skip 1.0 to avoid double-draw at same location
+            if (g_cfg.getBool(m_name, "show_sector_lines", false))
             {
-                for (float linePos : m_extendedLines) drawLineAt(linePos);
+                buildAdjustedSectorStarts();
+                const float4 white = float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity);
+                const float thickness = 2.0f;
+                for (int s = 0; s < (int)m_sectorStartsAdjusted.size(); ++s)
+                {
+                    float pos = m_sectorStartsAdjusted[s];
+                    if (pos >= 0.9999f) continue; // skip 1.0
+                    drawColoredLineAt(pos, white, thickness);
+                }
             }
-            else
-            {
-                // Default: draw start/finish at beginning of path
-                drawLineAt(0.0f);
+
+            // Extended lines remain (optional extra splits); always draw them
+            if (!m_extendedLines.empty()) {
+                const float4 white = float4(1.0f, 1.0f, 1.0f, 0.9f * globalOpacity);
+                for (float linePos : m_extendedLines) drawColoredLineAt(linePos, white, 2.0f);
             }
         }
 
@@ -316,7 +341,7 @@ protected:
             int selfIdx = ir_session.driverCarIdx;
             
             for (int i = 0; i < IR_MAX_CARS; ++i) {
-                if (i == selfIdx) continue; // Skip self
+                if (i == selfIdx) continue;
                 
                 float carPct = 0.0f;
                 if (StubDataManager::shouldUseStubData()) {
@@ -326,10 +351,10 @@ protected:
                     static bool s_init = false;
                     if (!s_init) {
                         for (int j = 0; j < 64; ++j) {
-                            s_baseOffset[j] = (float)j * 0.12f; // Spread cars around track
+                            s_baseOffset[j] = (float)j * 0.12f;
                             while (s_baseOffset[j] >= 1.0f) s_baseOffset[j] -= 1.0f;
-                            // Give each car slightly different speeds for realistic racing (slowed down 5x)
-                            s_speed[j] = 0.0004f + (float)(j % 5) * 0.0001f; // 0.002-0.004 units per frame / 5
+                            
+                            s_speed[j] = 0.0004f + (float)(j % 5) * 0.0001f;
                         }
                         s_init = true;
                     }
@@ -344,35 +369,25 @@ protected:
                     carPct = ir_CarIdxLapDistPct.getFloat(i);
                 }
                 
-                if (carPct < 0.0f) continue; // Car not on track
+                if (carPct < 0.0f) continue;
                 
-                // Check if this car slot is valid (has a driver)
                 if (StubDataManager::shouldUseStubData()) {
-                    // In preview mode, only show cars that have stub data
                     if (!StubDataManager::getStubCar(i)) {
-                        continue; // No stub car data for this slot
+                        continue;
                     }
                 } else {
-                    // In live mode, check for real driver data
                     if (ir_session.cars[i].userName.empty()) {
-                        continue; // No driver in this slot
+                        continue;
                     }
                 }
-                
-                // Determine car color based on type and class
                 float4 carColor = opponentCol;
-
-                // Check for special car types first
                 bool isPaceCar = false;
                 bool isSafetyCar = false;
 
                 if (!StubDataManager::shouldUseStubData()) {
-                    // In live mode, use iRacing flags with intelligent display logic
 
-                    // Pace car logic - only show in useful situations
                     bool carIsPaceCar = ir_session.cars[i].isPaceCar != 0;
                     if (carIsPaceCar) {
-                        // Show pace car in these situations:
                         bool isRaceSession = ir_session.sessionType == SessionType::RACE;
                         int currentLap = ir_Lap.getInt();
                         bool isFirstLap = currentLap <= 1;
@@ -522,30 +537,48 @@ protected:
 
 private:
     int m_lastTrackId = -1;
-    std::vector<float2> m_trackPath; // normalized 0..1 coords
-    std::vector<float> m_extendedLines; // start/finish line positions (0..1)
+    std::vector<float2> m_trackPath;
+    std::vector<float> m_extendedLines;
+    std::vector<float> m_sectorLines; 
+    std::vector<float> m_sectorBoundaries;
     float m_autoOffset = 0.0f;
     bool  m_hasAutoOffset = false;
     float m_prevPctSample = -1.0f;
     
     // Path scaling info
-    float4 m_pathBounds = float4(0, 0, 1, 1); // minX, minY, maxX, maxY
+    float4 m_pathBounds = float4(0, 0, 1, 1);
     float m_pathScale = 1.0f;
     float2 m_pathOffset = float2(0, 0);
 
     // Text rendering for car numbers
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;     // For self car (16pt)
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatSmall; // For other cars (12pt)
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat;
+    Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatSmall;
     TextCache    m_text;
     // Cached drawing data to avoid rebuilding each frame
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> m_cachedPathGeometry;
     float m_cachedTrackWidth = 6.0f;
+
+    // Sector timing coloring
+    std::vector<float> m_sectorBestPersonal;
+    std::vector<float> m_sectorBestSession;
+    std::vector<float4> m_sectorColors;
+    float m_totalPathLength = 0.0f;
+
+    // Per-car sector tracking state
+    float  m_prevPctPerCar[IR_MAX_CARS] = { -1.0f };
+    double m_lastBoundaryTimePerCar[IR_MAX_CARS] = { -1.0 };
+    bool   m_perCarInitialized = false;
+    bool   m_hasCrossedSFPerCar[IR_MAX_CARS] = { false };
+    int    m_lastIncidentCountPerCar[IR_MAX_CARS] = { 0 };
+    bool   m_wasInPitStallSelf = false;
+
 
     void loadPathFromJson()
     {
         // Reset current path and extended lines
         m_trackPath.clear();
         m_extendedLines.clear();
+        m_sectorLines.clear();
         m_lastTrackId = -1;
 
         // Load JSON
@@ -616,11 +649,21 @@ private:
             }
         }
 
+        // Build sector lines and boundaries from SDK-provided SplitTimeInfo
+        m_sectorLines.clear();
+        m_sectorBoundaries.clear();
+        if (!ir_session.sectorStartPct.empty())
+        {
+            m_sectorBoundaries = ir_session.sectorStartPct;
+            for (size_t i = 1; i + 1 < m_sectorBoundaries.size(); ++i)
+                m_sectorLines.push_back(m_sectorBoundaries[i]);
+        }
+
         m_lastTrackId = id;
         
         char buf[128];
-        _snprintf_s(buf, _countof(buf), _TRUNCATE, "OverlayTrack: loaded %zu points and %zu extended lines for trackId %d\n", 
-               m_trackPath.size(), m_extendedLines.size(), id);
+        _snprintf_s(buf, _countof(buf), _TRUNCATE, "OverlayTrack: loaded %zu points, %zu extended lines, %zu sector boundaries for trackId %d\n", 
+               m_trackPath.size(), m_extendedLines.size(), m_sectorBoundaries.size(), id);
         OutputDebugStringA(buf);
     }
 
@@ -644,7 +687,6 @@ private:
             }
             return m_trackPath.back();
         }
-        // Fallback: unit circle parameterization (centered)
         const float ang = pct * 6.2831853f - 1.5707963f;
         const float rx = 0.40f, ry = 0.40f;
         return float2(0.5f + cosf(ang) * rx, 0.5f + sinf(ang) * ry);
@@ -662,4 +704,305 @@ private:
         return float2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
     }
 
+    // Sector timing and rendering support
+    std::vector<float> m_sectorStartsAdjusted;
+    bool  m_sectorsInitialized = false;
+
+    void resetSectorTiming()
+    {
+        m_sectorStartsAdjusted.clear();
+        m_sectorsInitialized = false;
+
+        m_sectorBestPersonal.clear();
+        m_sectorBestSession.clear();
+        m_sectorColors.clear();
+
+        for (int i = 0; i < IR_MAX_CARS; ++i) {
+            m_prevPctPerCar[i] = -1.0f;
+            m_lastBoundaryTimePerCar[i] = -1.0;
+            m_hasCrossedSFPerCar[i] = false;
+            m_lastIncidentCountPerCar[i] = 0;
+        }
+        m_perCarInitialized = false;
+    }
+
+    void buildAdjustedSectorStarts()
+    {
+        std::vector<float> base = ir_session.sectorStartPct;
+        if (base.empty())
+        {
+            // In preview mode there is no SDK session YAML, so synthesize equal thirds
+            if (StubDataManager::shouldUseStubData())
+            {
+                base = { 0.0f, 1.0f/3.0f, 2.0f/3.0f, 1.0f };
+            }
+            else
+            {
+                return;
+            }
+        }
+        float startOffset = g_cfg.getFloat(m_name, "start_offset_pct", 0.0f);
+        if (m_hasAutoOffset) startOffset += m_autoOffset;
+        const bool rev = g_cfg.getBool(m_name, "reverse_direction", false);
+        m_sectorStartsAdjusted.clear();
+        for (float p : base)
+        {
+            float q = rev ? (1.0f - p) : p;
+            q += startOffset;
+            while (q >= 1.0f) q -= 1.0f;
+            while (q < 0.0f) q += 1.0f;
+            m_sectorStartsAdjusted.push_back(q);
+        }
+        std::sort(m_sectorStartsAdjusted.begin(), m_sectorStartsAdjusted.end());
+        if (m_sectorStartsAdjusted.empty() || m_sectorStartsAdjusted.front() > 0.0001f)
+            m_sectorStartsAdjusted.insert(m_sectorStartsAdjusted.begin(), 0.0f);
+        if (m_sectorStartsAdjusted.back() < 0.9999f)
+            m_sectorStartsAdjusted.push_back(1.0f);
+        m_sectorsInitialized = true;
+
+        ensureSectorArraysSized();
+    }
+    
+    // Helpers for sector overlay & timing
+    float adjustPctForOverlay(float pct) const
+    {
+        if (g_cfg.getBool(m_name, "reverse_direction", false))
+            pct = 1.0f - pct;
+        float startOffset = g_cfg.getFloat(m_name, "start_offset_pct", 0.0f);
+        if (m_hasAutoOffset) startOffset += m_autoOffset;
+        pct = pct + startOffset;
+        while (pct >= 1.0f) pct -= 1.0f;
+        while (pct < 0.0f) pct += 1.0f;
+        return std::clamp(pct, 0.0f, 0.9999f);
+    }
+
+    int boundaryIndexAt(float pct) const
+    {
+        if (m_sectorStartsAdjusted.size() < 2) return 0;
+        int idx = 0;
+        for (int i = 0; i < (int)m_sectorStartsAdjusted.size(); ++i)
+            if (m_sectorStartsAdjusted[i] <= pct) idx = i;
+        return idx;
+    }
+
+    bool crossedBoundary(float prevPct, float curPct, float boundary) const
+    {
+        if (prevPct < 0.0f) return false;
+        if (prevPct <= curPct) {
+            return prevPct < boundary && boundary <= curPct;
+        } else {
+            // wrap around
+            return boundary > prevPct || boundary <= curPct;
+        }
+    }
+
+    void ensureSectorArraysSized()
+    {
+        const int nBounds = (int)m_sectorStartsAdjusted.size();
+        const int nSectors = nBounds > 0 ? nBounds - 1 : 0;
+        if ((int)m_sectorBestPersonal.size() != nSectors) {
+            m_sectorBestPersonal.assign(nSectors, std::numeric_limits<float>::infinity());
+        }
+        if ((int)m_sectorBestSession.size() != nSectors) {
+            m_sectorBestSession.assign(nSectors, std::numeric_limits<float>::infinity());
+        }
+        if ((int)m_sectorColors.size() != nSectors) {
+            m_sectorColors.assign(nSectors, float4(0,0,0,0));
+        }
+    }
+
+    // Draw a sub-path covering [startPct, endPct)
+    void drawTrackSubPath(float startPct, float endPct, const float4& col, float width,
+                          float minX, float minY, float scale, float offsetX, float offsetY,
+                          float left, float top)
+    {
+        if (m_trackPath.size() < 2 || m_totalPathLength <= 0.0f) return;
+
+        const float startDist = startPct * m_totalPathLength;
+        const float endDist   = endPct   * m_totalPathLength;
+
+        Microsoft::WRL::ComPtr<ID2D1PathGeometry> segGeom;
+        Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+        if (FAILED(m_d2dFactory->CreatePathGeometry(&segGeom)) || FAILED(segGeom->Open(&sink)))
+            return;
+
+        float acc = 0.0f;
+        bool started = false;
+
+        auto toScreen = [&](const float2& p)->D2D1_POINT_2F {
+            const float sx = left + offsetX + (p.x - minX) * scale;
+            const float sy = top  + offsetY + (p.y - minY) * scale;
+            return D2D1::Point2F(sx, sy);
+        };
+
+        for (size_t i = 1; i < m_trackPath.size(); ++i) {
+            const float2 A = m_trackPath[i-1];
+            const float2 B = m_trackPath[i];
+            const float seg = distance(A, B);
+            if (seg <= 0.0f) continue;
+
+            const float segStart = acc;
+            const float segEnd   = acc + seg;
+
+            if (segEnd > startDist && segStart < endDist) {
+                // Clamp to [startDist, endDist]
+                const float t1 = std::max(0.0f, (startDist - segStart) / seg);
+                const float t2 = std::min(1.0f, (endDist   - segStart) / seg);
+                const float2 P1 = lerp(A, B, std::max(0.0f, t1));
+                const float2 P2 = lerp(A, B, std::min(1.0f, t2));
+
+                if (!started) {
+                    sink->BeginFigure(toScreen(P1), D2D1_FIGURE_BEGIN_HOLLOW);
+                    started = true;
+                }
+                if (t2 > t1) {
+                    sink->AddLine(toScreen(P2));
+                }
+            }
+
+            acc += seg;
+            if (acc >= endDist) break;
+        }
+
+        if (started) {
+            sink->EndFigure(D2D1_FIGURE_END_OPEN);
+            sink->Close();
+            m_brush->SetColor(col);
+            m_renderTarget->DrawGeometry(segGeom.Get(), m_brush.Get(), width);
+        }
+    }
+
+    void updateSectorTiming()
+    {
+        if (m_sectorStartsAdjusted.size() < 2) return;
+
+        const double now = ir_SessionTime.getDouble();
+        const int selfIdx = ir_session.driverCarIdx;
+
+        // Initialize per-car state once
+        if (!m_perCarInitialized) {
+            for (int i = 0; i < IR_MAX_CARS; ++i) {
+                float raw = ir_CarIdxLapDistPct.getFloat(i);
+                if (raw < 0.0f) { m_prevPctPerCar[i] = -1.0f; continue; }
+                m_prevPctPerCar[i] = adjustPctForOverlay(raw);
+                m_lastBoundaryTimePerCar[i] = -1.0;
+            }
+            m_perCarInitialized = true;
+            return;
+        }
+
+        auto isValidCar = [&](int i)->bool {
+            if (i < 0 || i >= IR_MAX_CARS) return false;
+            if (ir_session.cars[i].userName.empty()) return false;
+            if (ir_session.cars[i].isSpectator) return false;
+            return true;
+        };
+
+        const float4 purple = float4(0.70f, 0.30f, 1.00f, 0.9f);
+        const float4 green  = float4(0.20f, 0.85f, 0.25f, 0.9f);
+        const float4 yellow = float4(1.00f, 0.85f, 0.00f, 0.9f);
+
+        const int nBounds = (int)m_sectorStartsAdjusted.size();
+        for (int i = 0; i < IR_MAX_CARS; ++i) {
+            float raw = ir_CarIdxLapDistPct.getFloat(i);
+            if (raw < 0.0f) continue;
+
+            float cur = adjustPctForOverlay(raw);
+            float prev = m_prevPctPerCar[i];
+
+            // Optional gating for self to avoid flicker when stationary/pitting
+            if (i == selfIdx) {
+                bool inPitStall = ir_PlayerCarInPitStall.getBool();
+                bool onPitRoad  = ir_OnPitRoad.getBool();
+                float speedMs   = ir_Speed.getFloat();
+
+                // If we just entered pit stall, treat next run as a fresh outlap
+                if (inPitStall && !m_wasInPitStallSelf) {
+                    m_hasCrossedSFPerCar[selfIdx] = false;
+                    m_lastBoundaryTimePerCar[selfIdx] = -1.0;
+                    ensureSectorArraysSized();
+                    for (size_t si = 0; si < m_sectorColors.size(); ++si) m_sectorColors[si] = float4(0,0,0,0);
+                }
+                m_wasInPitStallSelf = inPitStall;
+
+                if (inPitStall || onPitRoad || speedMs < 0.5f) {
+                    m_prevPctPerCar[i] = cur;
+                    continue;
+                }
+            }
+
+            // Determine which boundaries were crossed between prev and cur
+            int idxPrev = (prev < 0.0f) ? boundaryIndexAt(cur) : boundaryIndexAt(prev);
+            int idxCur  = boundaryIndexAt(cur);
+
+            // Start processing from the next boundary after prev
+            int idx = (idxPrev + 1) % nBounds;
+            bool wrapped = prev > cur; // wrapped around 1.0 -> 0.0
+
+            // helper lambda to test if boundary idx lies between prev and cur on unit circle
+            auto boundaryInRange = [&](int bIdx)->bool {
+                float b = m_sectorStartsAdjusted[bIdx];
+                if (!wrapped) return prev < b && b <= cur;
+                return (b > prev) || (b <= cur);
+            };
+
+            for (int processed = 0; processed < nBounds; ++processed) {
+                if (boundaryInRange(idx)) {
+                    // We crossed boundary idx
+                    int s = idx - 1; if (s < 0) s = nBounds - 2;
+
+                    if (m_lastBoundaryTimePerCar[i] >= 0.0) {
+                        float sectorTime = float(now - m_lastBoundaryTimePerCar[i]);
+                        const float kMinValidSectorTime = 0.05f;
+                        if (sectorTime > kMinValidSectorTime && sectorTime < 600.0f) {
+                            bool isValidSector = true;
+                            if (i == selfIdx && isValidCar(i)) {
+                                int incNow = ir_session.cars[i].incidentCount;
+                                isValidSector = (incNow <= m_lastIncidentCountPerCar[i]);
+                                m_lastIncidentCountPerCar[i] = incNow;
+                            }
+
+                            if (sectorTime < m_sectorBestSession[s])
+                                m_sectorBestSession[s] = sectorTime;
+
+                            if (i == selfIdx && isValidCar(i)) {
+                                const bool newPB = (sectorTime < m_sectorBestPersonal[s]);
+                                if (newPB) m_sectorBestPersonal[s] = sectorTime;
+
+                                if (m_hasCrossedSFPerCar[selfIdx]) {
+                                    if (isValidSector && sectorTime <= m_sectorBestSession[s] + 1e-4f) {
+                                        m_sectorColors[s] = purple;
+                                    } else if (isValidSector && newPB) {
+                                        m_sectorColors[s] = green;
+                                    } else {
+                                        m_sectorColors[s] = yellow;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Start timing next sector from now
+                    m_lastBoundaryTimePerCar[i] = now;
+
+                    // Clear color for the sector just entered (idx)
+                    if (i == selfIdx && isValidCar(i)) {
+                        int sNext = idx; if (sNext >= nBounds - 1) sNext = 0;
+                        if (sNext >= 0 && sNext < (int)m_sectorColors.size())
+                            m_sectorColors[sNext] = float4(0,0,0,0);
+                    }
+
+                    // Mark S/F crossed for self
+                    if (i == selfIdx && idx == 0) {
+                        m_hasCrossedSFPerCar[selfIdx] = true;
+                    }
+
+                }
+
+                if (idx == idxCur) break;
+                idx = (idx + 1) % nBounds;
+            }
+
+            m_prevPctPerCar[i] = cur;
+        }
+    }
 };

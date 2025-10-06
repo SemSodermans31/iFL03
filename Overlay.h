@@ -46,7 +46,6 @@ class Overlay
         virtual bool    canEnableWhileNotDriving() const;
         virtual bool    canEnableWhileDisconnected() const;
 
-        // Performance controls
         void            setTargetFPS( int fps );
         int             getTargetFPS() const;
         void            setStaticMode( bool on );
@@ -65,11 +64,16 @@ class Overlay
 
         void            setWindowPosAndSize( int x, int y, int w, int h, bool callSetWindowPos=true );
         void            saveWindowPosAndSize();
-        
+
         void            handleMouseWheel( int delta, int x, int y ) { onMouseWheel( delta, x, y ); }
 
         float           getGlobalOpacity() const;
         void            applyPositionSetting();
+
+        int             getX() const { return m_xpos; }
+        int             getY() const { return m_ypos; }
+        int             getWidth() const { return m_width; }
+        int             getHeight() const { return m_height; }
 
     protected:
 

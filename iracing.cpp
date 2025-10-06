@@ -568,6 +568,98 @@ ConnectionStatus ir_tick()
             car.race.position = 0;
         }
 
+        // SplitTimeInfo -> Sectors for current track
+        {
+            ir_session.sectorStartPct.clear();
+            // Always ensure 0.0 is included
+            ir_session.sectorStartPct.push_back(0.0f);
+
+            auto tryParseNumSectors = [&](const char* prefix, int &outNum)->bool {
+                char p[128];
+                _snprintf_s(p, _countof(p), _TRUNCATE, "%sSplitTimeInfo:NumSectors:", prefix);
+                return parseYamlInt(sessionYaml, p, &outNum);
+            };
+
+            auto tryParseSectorStart = [&](const char* prefix, int s, float &outStart)->bool {
+                char p[256];
+                // Try common key names in order
+                _snprintf_s(p, _countof(p), _TRUNCATE, "%sSplitTimeInfo:Sectors:SectorNum:{%d}SectorStartPct:", prefix, s);
+                if (parseYamlFloat(sessionYaml, p, &outStart)) return true;
+                _snprintf_s(p, _countof(p), _TRUNCATE, "%sSplitTimeInfo:Sectors:SectorNum:{%d}StartPct:", prefix, s);
+                if (parseYamlFloat(sessionYaml, p, &outStart)) return true;
+                _snprintf_s(p, _countof(p), _TRUNCATE, "%sSplitTimeInfo:Sectors:SectorNum:{%d}SectorPct:", prefix, s);
+                if (parseYamlFloat(sessionYaml, p, &outStart)) return true;
+                return false;
+            };
+
+            // Determine correct root (some builds put SplitTimeInfo at root, some under SessionInfo)
+            int numRoot = -1, numUnderSession = -1;
+            bool haveRoot = tryParseNumSectors("", numRoot);
+            bool haveSess = tryParseNumSectors("SessionInfo:", numUnderSession);
+            const char* chosenPrefix = haveRoot ? "" : (haveSess ? "SessionInfo:" : "");
+            int numSectors = haveRoot ? numRoot : (haveSess ? numUnderSession : -1);
+
+            int parsed = 0;
+            if (numSectors > 1 && numSectors <= 32)
+            {
+                for (int s = 0; s < numSectors; ++s)
+                {
+                    float sp = -1.0f;
+                    if (tryParseSectorStart(chosenPrefix, s, sp))
+                    {
+                        if (sp > 0.0f && sp < 1.0f) { ir_session.sectorStartPct.push_back(sp); ++parsed; }
+                    }
+                    else
+                    {
+                        // Try the other location if first failed
+                        const char* alt = (chosenPrefix[0] == '\0') ? "SessionInfo:" : "";
+                        if (tryParseSectorStart(alt, s, sp))
+                            if (sp > 0.0f && sp < 1.0f) { ir_session.sectorStartPct.push_back(sp); ++parsed; }
+                    }
+                }
+            }
+            else
+            {
+                // Unknown count; attempt up to a reasonable cap
+                for (int s = 0; s < 32; ++s)
+                {
+                    float sp = -1.0f;
+                    if (tryParseSectorStart("", s, sp) || tryParseSectorStart("SessionInfo:", s, sp))
+                    {
+                        if (sp > 0.0f && sp < 1.0f) { ir_session.sectorStartPct.push_back(sp); ++parsed; }
+                    }
+                    else
+                    {
+                        // Stop after first gap if we already parsed some
+                        if (s > 0) break;
+                    }
+                }
+            }
+
+            // Sort and unique
+            std::sort(ir_session.sectorStartPct.begin(), ir_session.sectorStartPct.end());
+            ir_session.sectorStartPct.erase(std::unique(ir_session.sectorStartPct.begin(), ir_session.sectorStartPct.end()), ir_session.sectorStartPct.end());
+
+            // Append 1.0 as lap end if needed
+            if (ir_session.sectorStartPct.empty() || ir_session.sectorStartPct.front() > 0.0001f)
+                ir_session.sectorStartPct.insert(ir_session.sectorStartPct.begin(), 0.0f);
+            if (ir_session.sectorStartPct.back() < 0.9999f)
+                ir_session.sectorStartPct.push_back(1.0f);
+
+            if ((int)ir_session.sectorStartPct.size() <= 2)
+            {
+                // Fallback to 3 equal sectors
+                ir_session.sectorStartPct = {0.0f, 1.0f/3.0f, 2.0f/3.0f, 1.0f};
+                OutputDebugStringA("SplitTimeInfo not found; using fallback thirds.\n");
+            }
+            else
+            {
+                char buf[128];
+                _snprintf_s(buf, _countof(buf), _TRUNCATE, "Parsed %d sector boundaries from SplitTimeInfo.\n", (int)ir_session.sectorStartPct.size());
+                OutputDebugStringA(buf);
+            }
+        }
+
         // Qualifying results info
         for( int pos=0; pos<IR_MAX_CARS; ++pos )
         {
