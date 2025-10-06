@@ -120,6 +120,10 @@ protected:
 			D2D1_ROUNDED_RECT rr = { r, topH/2, topH/2 };
 			m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
 
+			// Subtle border like other overlays
+			m_brush->SetColor( float4(0.3f, 0.3f, 0.3f, 0.6f) );
+			m_renderTarget->DrawRoundedRectangle( &rr, m_brush.Get(), 2.0f );
+
 			float4 topTextCol = flagIsDark ? white : float4(info.color.x, info.color.y, info.color.z, 1.0f);
 			topTextCol.w = globalOpacity;
 			m_brush->SetColor( topTextCol );
@@ -134,7 +138,13 @@ protected:
 			D2D1_ROUNDED_RECT rr = { r, topH/2, topH/2 };
 			m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
 
-			
+			// Border using darker tint of the flag color
+			float4 borderCol = flagCol;
+			borderCol.x *= 0.6f; // Make it darker
+			borderCol.y *= 0.6f;
+			borderCol.z *= 0.6f;
+			m_brush->SetColor( borderCol );
+			m_renderTarget->DrawRoundedRectangle( &rr, m_brush.Get(), 2.0f );
 
 			float4 bottomTextCol = flagIsDark ? white : black;
 			bottomTextCol.w = globalOpacity;
