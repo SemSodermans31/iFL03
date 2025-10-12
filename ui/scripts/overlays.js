@@ -210,58 +210,93 @@ function setupEventListeners() {
 		});
 	}
 
-	// D-pad movement controls
-	const dpadUp = document.getElementById('dpad-up');
-	if (dpadUp) {
-		dpadUp.addEventListener('click', function() {
+	// D-pad movement controls with tap/hold functionality
+
+	function setupDpadButton(buttonId, direction) {
+		const button = document.getElementById(buttonId);
+		if (!button) return;
+
+		let isHolding = false;
+		let holdInterval = null;
+		let tapTimeout = null;
+
+		function moveOverlay(deltaX, deltaY) {
 			if (selectedOverlay) {
 				const configKey = overlayConfig[selectedOverlay].configKey;
-				sendCommand('moveOverlay', {
+				sendCommand('moveOverlayDelta', {
 					component: configKey,
-					direction: 'up'
+					deltaX: deltaX,
+					deltaY: deltaY
 				});
 			}
+		}
+
+		function startHold() {
+			isHolding = true;
+			// Move 100px every 100ms while holding
+			holdInterval = setInterval(() => {
+				const deltaX = direction === 'left' ? -100 : direction === 'right' ? 100 : 0;
+				const deltaY = direction === 'up' ? -100 : direction === 'down' ? 100 : 0;
+				moveOverlay(deltaX, deltaY);
+			}, 100);
+		}
+
+		function stopHold() {
+			if (holdInterval) {
+				clearInterval(holdInterval);
+				holdInterval = null;
+			}
+			isHolding = false;
+		}
+
+		button.addEventListener('mousedown', function(e) {
+			e.preventDefault();
+			if (!selectedOverlay) return;
+
+			// Clear any existing timers
+			if (tapTimeout) clearTimeout(tapTimeout);
+			if (holdInterval) clearInterval(holdInterval);
+
+			// Start tap detection timeout
+			tapTimeout = setTimeout(() => {
+				// If still pressed after 300ms, start hold mode
+				startHold();
+			}, 300);
+		});
+
+		button.addEventListener('mouseup', function(e) {
+			e.preventDefault();
+			if (!selectedOverlay) return;
+
+			if (tapTimeout) {
+				clearTimeout(tapTimeout);
+				tapTimeout = null;
+
+				// If not holding, it was a tap - move 10px
+				if (!isHolding) {
+					const deltaX = direction === 'left' ? -10 : direction === 'right' ? 10 : 0;
+					const deltaY = direction === 'up' ? -10 : direction === 'down' ? 10 : 0;
+					moveOverlay(deltaX, deltaY);
+				}
+			}
+
+			stopHold();
+		});
+
+		button.addEventListener('mouseleave', function() {
+			// Stop movement if mouse leaves button while pressed
+			if (tapTimeout) {
+				clearTimeout(tapTimeout);
+				tapTimeout = null;
+			}
+			stopHold();
 		});
 	}
 
-	const dpadDown = document.getElementById('dpad-down');
-	if (dpadDown) {
-		dpadDown.addEventListener('click', function() {
-			if (selectedOverlay) {
-				const configKey = overlayConfig[selectedOverlay].configKey;
-				sendCommand('moveOverlay', {
-					component: configKey,
-					direction: 'down'
-				});
-			}
-		});
-	}
-
-	const dpadLeft = document.getElementById('dpad-left');
-	if (dpadLeft) {
-		dpadLeft.addEventListener('click', function() {
-			if (selectedOverlay) {
-				const configKey = overlayConfig[selectedOverlay].configKey;
-				sendCommand('moveOverlay', {
-					component: configKey,
-					direction: 'left'
-				});
-			}
-		});
-	}
-
-	const dpadRight = document.getElementById('dpad-right');
-	if (dpadRight) {
-		dpadRight.addEventListener('click', function() {
-			if (selectedOverlay) {
-				const configKey = overlayConfig[selectedOverlay].configKey;
-				sendCommand('moveOverlay', {
-					component: configKey,
-					direction: 'right'
-				});
-			}
-		});
-	}
+	setupDpadButton('dpad-up', 'up');
+	setupDpadButton('dpad-down', 'down');
+	setupDpadButton('dpad-left', 'left');
+	setupDpadButton('dpad-right', 'right');
 
 	const dpadCenter = document.getElementById('dpad-center');
 	if (dpadCenter) {

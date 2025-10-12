@@ -41,9 +41,10 @@ SOFTWARE.
 #include <filesystem>
 #include "Logger.h"
 
+static constexpr bool hr_failed(HRESULT hr) noexcept { return FAILED(hr); }
 #define HRCHECK( x_ ) do{ \
     HRESULT hr_ = x_; \
-    if( FAILED(hr_) ) { \
+    if( hr_failed(hr_) ) { \
         Logger::instance().logError(std::string("HRESULT failure: ") + #x_ + " (" + __FILE__ + ":" + std::to_string(__LINE__) + ") hr=0x" + [] (HRESULT v){ char buf[16]; sprintf_s(buf, "%08X", static_cast<unsigned>(v)); return std::string(buf); }(hr_)); \
         printf("ERROR: failed call to %s (%s:%d), hr=0x%x\n", #x_, __FILE__, __LINE__,hr_); \
         exit(1); \

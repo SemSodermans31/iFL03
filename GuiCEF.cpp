@@ -104,12 +104,15 @@ namespace {
 	}
 	case WM_SIZE:
 		{
-			if (g_browser.get())
-			{
-				HWND child = g_browser->GetHost()->GetWindowHandle();
-				RECT rc; GetClientRect(hwnd, &rc);
-				MoveWindow(child, 0, 0, rc.right - rc.left, rc.bottom - rc.top, TRUE);
-			}
+            if (g_browser.get())
+            {
+                HWND child = g_browser->GetHost()->GetWindowHandle();
+                RECT rc = {0,0,0,0};
+                if (!GetClientRect(hwnd, &rc)) {
+                    rc.left = rc.top = 0; rc.right = 0; rc.bottom = 0;
+                }
+                MoveWindow(child, 0, 0, rc.right - rc.left, rc.bottom - rc.top, TRUE);
+            }
 			break;
 		}
 		case WM_CLOSE:
@@ -244,6 +247,27 @@ namespace {
 			return false;
 		}
 
+		static bool extractIntField(const std::string& s, const char* field, int& out)
+		{
+			std::string pat = std::string("\"") + field + "\":";
+			size_t p = s.find(pat);
+			if (p == std::string::npos) return false;
+			p += pat.size();
+			// Skip whitespace
+			while (p < s.size() && (s[p]==' '||s[p]=='\t')) p++;
+			// Find end of number (digit, minus sign, or end of string)
+			size_t end = p;
+			while (end < s.size() && (isdigit(s[end]) || s[end] == '-')) end++;
+			if (end == p) return false; // No digits found
+			std::string numStr = s.substr(p, end - p);
+			try {
+				out = std::stoi(numStr);
+				return true;
+			} catch (...) {
+				return false;
+			}
+		}
+
 		bool OnQuery(CefRefPtr<CefBrowser> browser,
 			CefRefPtr<CefFrame> frame,
 			int64_t query_id,
@@ -338,6 +362,17 @@ namespace {
 					if (deltaX != 0 || deltaY != 0) {
 						app_move_overlay(component.c_str(), deltaX, deltaY);
 					}
+				}
+				callback->Success(app_get_state_json());
+				return true;
+			}
+			if (has("\"cmd\":\"moveOverlayDelta\"")) {
+				std::string component;
+				int deltaX = 0, deltaY = 0;
+				if (extractStringField(req, "component", component) &&
+					extractIntField(req, "deltaX", deltaX) &&
+					extractIntField(req, "deltaY", deltaY)) {
+					app_move_overlay(component.c_str(), deltaX, deltaY);
 				}
 				callback->Success(app_get_state_json());
 				return true;
@@ -677,11 +712,15 @@ void cefCreateMainWindow()
 	if (!g_cefInitialized) return;
 	if (!g_client.get()) g_client = new SimpleClient();
 
-	if (!g_parentHwnd)
-		createParentWindow();
+    if (!g_parentHwnd)
+        createParentWindow();
 
-	CefWindowInfo window_info;
-	RECT rc; GetClientRect(g_parentHwnd, &rc);
+    if (!g_parentHwnd)
+        return;
+
+    CefWindowInfo window_info;
+    RECT rc = {0,0,0,0};
+    if (!GetClientRect(g_parentHwnd, &rc)) { rc.left = rc.top = 0; rc.right = 1280; rc.bottom = 720; }
 	CefRect rect(0, 0, rc.right - rc.left, rc.bottom - rc.top);
 	window_info.SetAsChild(g_parentHwnd, rect);
 

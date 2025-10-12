@@ -158,7 +158,7 @@ bool irsdkClient::getVarBool(int idx, int entry)
 			if(entry >= 0 && entry < vh->count)
 			{
 				const char * data = m_data + vh->offset;
-				switch(vh->type)
+                switch(vh->type)
 				{
 				// 1 byte
 				case irsdk_char:
@@ -180,9 +180,11 @@ bool irsdkClient::getVarBool(int idx, int entry)
 					break;
 
 				// 8 bytes
-				case irsdk_double:
+                case irsdk_double:
 					return (((const double*)data)[entry]) >= 1.0;
 					break;
+                default:
+                    break;
 				}
 			}
 			else
@@ -211,7 +213,7 @@ int irsdkClient::getVarInt(int idx, int entry)
 			if(entry >= 0 && entry < vh->count)
 			{
 				const char * data = m_data + vh->offset;
-				switch(vh->type)
+                switch(vh->type)
 				{
 				// 1 byte
 				case irsdk_char:
@@ -230,9 +232,11 @@ int irsdkClient::getVarInt(int idx, int entry)
 					break;
 
 				// 8 bytes
-				case irsdk_double:
+                case irsdk_double:
 					return (int)(((const double*)data)[entry]);
 					break;
+                default:
+                    break;
 				}
 			}
 			else
@@ -261,7 +265,7 @@ float irsdkClient::getVarFloat(int idx, int entry)
 			if(entry >= 0 && entry < vh->count)
 			{
 				const char * data = m_data + vh->offset;
-				switch(vh->type)
+                switch(vh->type)
 				{
 				// 1 byte
 				case irsdk_char:
@@ -280,9 +284,11 @@ float irsdkClient::getVarFloat(int idx, int entry)
 					break;
 
 				// 8 bytes
-				case irsdk_double:
+                case irsdk_double:
 					return (float)(((const double*)data)[entry]);
 					break;
+                default:
+                    break;
 				}
 			}
 			else
@@ -311,7 +317,7 @@ double irsdkClient::getVarDouble(int idx, int entry)
 			if(entry >= 0 && entry < vh->count)
 			{
 				const char * data = m_data + vh->offset;
-				switch(vh->type)
+                switch(vh->type)
 				{
 				// 1 byte
 				case irsdk_char:
@@ -330,9 +336,11 @@ double irsdkClient::getVarDouble(int idx, int entry)
 					break;
 
 				// 8 bytes
-				case irsdk_double:
+                case irsdk_double:
 					return (double)(((const double*)data)[entry]);
 					break;
+                default:
+                    break;
 				}
 			}
 			else
