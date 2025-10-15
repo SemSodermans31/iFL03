@@ -29,6 +29,8 @@ SOFTWARE.
 #include "OverlayDebug.h"
 #include "stub_data.h"
 #include <wincodec.h>
+#include <algorithm>
+#include <math.h>
 
 class OverlayInputs : public Overlay
 {
@@ -58,6 +60,8 @@ class OverlayInputs : public Overlay
         virtual void onConfigChanged()
         {
             m_showSteeringWheel = g_cfg.getBool( m_name, "show_steering_wheel", true );
+            m_showGhost = g_cfg.getBool( m_name, "show_ghost_data", false );
+            m_selectedGhostFile = g_cfg.getString("General", "ghost_telemetry_file", "");
 
             const float wheelFrac = m_showSteeringWheel ? 0.2f : 0.0f;
             const float barFrac = m_showSteeringWheel ? 0.16f : 0.26f;
@@ -67,11 +71,17 @@ class OverlayInputs : public Overlay
             m_throttleVtx.resize( horizontalWidthInt );
             m_brakeVtx.resize( horizontalWidthInt );
             m_steeringVtx.resize( horizontalWidthInt );
+            m_ghostThrottleVtx.resize( horizontalWidthInt );
+            m_ghostBrakeVtx.resize( horizontalWidthInt );
+            m_ghostSteeringVtx.resize( horizontalWidthInt );
             for( int i=0; i<horizontalWidthInt; ++i )
             {
                 m_throttleVtx[i].x = float(i);
                 m_brakeVtx[i].x = float(i);
                 m_steeringVtx[i].x = float(i);
+                m_ghostThrottleVtx[i].x = float(i);
+                m_ghostBrakeVtx[i].x = float(i);
+                m_ghostSteeringVtx[i].x = float(i);
             }
             
             // Create text format for labels and values using centralized settings
@@ -90,6 +100,9 @@ class OverlayInputs : public Overlay
                 loadSteeringWheelBitmap();
             else
                 m_wheelBitmap.Reset();
+
+            // (Re)load ghost telemetry if selection changed
+            loadGhostIfNeeded();
 
             // Per-overlay FPS (configurable; default 60)
             setTargetFPS(g_cfg.getInt(m_name, "target_fps", 60));
@@ -141,6 +154,30 @@ class OverlayInputs : public Overlay
                 (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
                 ir_SteeringWheelAngle.getFloat();
 
+            // Advance ghost sample based on current LapDistPct
+            float lapPct = useStubData ? fmodf((float)GetTickCount64() * 0.00002f, 1.0f) : ir_LapDistPct.getFloat();
+            if (lapPct < 0.0f) lapPct = 0.0f; if (lapPct > 1.0f) lapPct = 1.0f;
+            float ghostThr = 0.0f, ghostBrk = 0.0f, ghostSteerNorm = 0.5f;
+            if (m_showGhost && !m_ghostSamples.empty())
+            {
+                // binary search by LapDistPct
+                int lo = 0, hi = (int)m_ghostSamples.size()-1;
+                while (lo < hi)
+                {
+                    int mid = (lo+hi+1)/2;
+                    if (m_ghostSamples[mid].lapPct <= lapPct) lo = mid; else hi = mid-1;
+                }
+                const GhostSample& a = m_ghostSamples[lo];
+                const GhostSample& b = (lo+1 < (int)m_ghostSamples.size()) ? m_ghostSamples[lo+1] : a;
+                float t = (b.lapPct > a.lapPct) ? (lapPct - a.lapPct) / (b.lapPct - a.lapPct) : 0.0f;
+                ghostThr = a.throttle * (1.0f - t) + b.throttle * t;
+                ghostBrk = a.brake * (1.0f - t) + b.brake * t;
+                float sA = a.steerAngle, sB = b.steerAngle;
+                float s = sA * (1.0f - t) + sB * t;
+                float sn = 0.5f - std::max(-1.0f, std::min(1.0f, s / (3.14159f * 0.5f))) * 0.5f;
+                ghostSteerNorm = sn;
+            }
+
             // Advance input vertices for horizontal graphs
             {
                 for( int i=0; i<(int)m_throttleVtx.size()-1; ++i )
@@ -158,6 +195,25 @@ class OverlayInputs : public Overlay
                 for( int i=0; i<(int)m_steeringVtx.size()-1; ++i )
                     m_steeringVtx[i].y = m_steeringVtx[i+1].y;
                 m_steeringVtx[(int)m_steeringVtx.size()-1].y = steeringNorm;
+            }
+
+            // Advance ghost vertices similarly so we have a time-series trace aligned to current lap position sample
+            if (m_showGhost && m_ghostActive)
+            {
+                for( int i=0; i<(int)m_ghostThrottleVtx.size()-1; ++i )
+                    m_ghostThrottleVtx[i].y = m_ghostThrottleVtx[i+1].y;
+                if (!m_ghostThrottleVtx.empty())
+                    m_ghostThrottleVtx[(int)m_ghostThrottleVtx.size()-1].y = ghostThr;
+
+                for( int i=0; i<(int)m_ghostBrakeVtx.size()-1; ++i )
+                    m_ghostBrakeVtx[i].y = m_ghostBrakeVtx[i+1].y;
+                if (!m_ghostBrakeVtx.empty())
+                    m_ghostBrakeVtx[(int)m_ghostBrakeVtx.size()-1].y = ghostBrk;
+
+                for( int i=0; i<(int)m_ghostSteeringVtx.size()-1; ++i )
+                    m_ghostSteeringVtx[i].y = m_ghostSteeringVtx[i+1].y;
+                if (!m_ghostSteeringVtx.empty())
+                    m_ghostSteeringVtx[(int)m_ghostSteeringVtx.size()-1].y = ghostSteerNorm;
             }
 
             const float thickness = g_cfg.getFloat( m_name, "line_thickness", 2.0f );
@@ -382,7 +438,39 @@ class OverlayInputs : public Overlay
                 brakeLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
                 brakeLineSink->Close();
 
-                // Draw lines
+                // Ghost overlays (draw after fills but before live lines so they appear beneath live)
+                if (m_showGhost && m_ghostActive && effectiveHorizontalWidth > 1.0f)
+                {
+                    auto buildLine = [&](const std::vector<float2>& src, Microsoft::WRL::ComPtr<ID2D1PathGeometry1>& outPath){
+                        m_d2dFactory->CreatePathGeometry(&outPath);
+                        Microsoft::WRL::ComPtr<ID2D1GeometrySink> sink;
+                        outPath->Open(&sink);
+                        if (!src.empty())
+                        {
+                            sink->BeginFigure(vtx2coord(src[0]), D2D1_FIGURE_BEGIN_HOLLOW);
+                            for (int i=1;i<(int)src.size();++i) sink->AddLine(vtx2coord(src[i]));
+                            sink->EndFigure(D2D1_FIGURE_END_OPEN);
+                        }
+                        sink->Close();
+                    };
+
+                    Microsoft::WRL::ComPtr<ID2D1PathGeometry1> gThr, gBrk, gSteer;
+                    buildLine(m_ghostThrottleVtx, gThr);
+                    buildLine(m_ghostBrakeVtx, gBrk);
+                    if (g_cfg.getBool(m_name, "show_steering_line", false)) buildLine(m_ghostSteeringVtx, gSteer);
+
+                    const float ghostThickness = std::max(1.0f, thickness);
+                    // Fixed, bright ghost colors: throttle=light bright blue, brake=light bright orange, steering=white
+                    float4 thrCol = float4(0.25f, 0.75f, 1.0f, 1.0f);
+                    float4 brkCol = float4(1.0f, 0.65f, 0.00f, 1.0f);
+                    float4 steCol = float4(1.0f, 1.0f, 1.0f, 1.0f);
+
+                    if (gThr) { m_brush->SetColor(thrCol); m_renderTarget->DrawGeometry(gThr.Get(), m_brush.Get(), ghostThickness); }
+                    if (gBrk) { m_brush->SetColor(brkCol); m_renderTarget->DrawGeometry(gBrk.Get(), m_brush.Get(), ghostThickness); }
+                    if (gSteer) { m_brush->SetColor(steCol); m_renderTarget->DrawGeometry(gSteer.Get(), m_brush.Get(), ghostThickness); }
+                }
+
+                // Draw live lines on top
                 m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) ) );
                 m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
                 m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) ) );
@@ -577,10 +665,19 @@ class OverlayInputs : public Overlay
         std::vector<float2> m_throttleVtx;
         std::vector<float2> m_brakeVtx;
         std::vector<float2> m_steeringVtx;
+        std::vector<float2> m_ghostThrottleVtx;
+        std::vector<float2> m_ghostBrakeVtx;
+        std::vector<float2> m_ghostSteeringVtx;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatBold;
         Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormatPercent;
         Microsoft::WRL::ComPtr<ID2D1Bitmap> m_wheelBitmap;
         bool m_showSteeringWheel = true;
+        bool m_showGhost = false;
+
+        struct GhostSample { float lapPct; float throttle; float brake; float steerAngle; };
+        std::vector<GhostSample> m_ghostSamples;
+        std::string m_selectedGhostFile;
+        bool m_ghostActive = false;
 
         void loadSteeringWheelBitmap()
         {
@@ -625,5 +722,88 @@ class OverlayInputs : public Overlay
             if (FAILED(wic->CreateFormatConverter(&converter))) return;
             if (FAILED(converter->Initialize(frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeMedianCut))) return;
             m_renderTarget->CreateBitmapFromWicBitmap(converter.Get(), nullptr, &m_wheelBitmap);
+        }
+
+        void loadGhostIfNeeded()
+        {
+            // Check config flag
+            if (!m_showGhost) { m_ghostSamples.clear(); m_ghostActive = false; return; }
+            // Resolve selected file
+            if (m_selectedGhostFile.empty()) { m_ghostSamples.clear(); m_ghostActive = false; return; }
+
+            // Try to load CSV from repo or local
+            std::wstring path = resolveAssetPathW(L"assets\\tracks\\telemetry\\" + toWide(m_selectedGhostFile));
+            std::string csv;
+            if (!loadFileW(path, csv)) { m_ghostSamples.clear(); m_ghostActive = false; return; }
+
+            // Parse header
+            m_ghostSamples.clear();
+            m_ghostSamples.reserve(4096);
+            int idxLapPct = -1, idxThr = -1, idxBrk = -1, idxSteer = -1;
+            size_t pos = 0, lineEnd = csv.find('\n', pos);
+            if (lineEnd == std::string::npos) { m_ghostActive = false; return; }
+            std::string header = csv.substr(0, lineEnd);
+            {
+                // split by comma
+                std::vector<std::string> cols; cols.reserve(32);
+                size_t s = 0;
+                while (s <= header.size()) {
+                    size_t c = header.find(',', s);
+                    if (c == std::string::npos) c = header.size();
+                    cols.push_back(header.substr(s, c - s));
+                    s = c + 1;
+                }
+                for (int i=0;i<(int)cols.size();++i) {
+                    const std::string& k = cols[i];
+                    if (k == "LapDistPct") idxLapPct = i;
+                    else if (k == "Throttle") idxThr = i;
+                    else if (k == "Brake") idxBrk = i;
+                    else if (k == "SteeringWheelAngle") idxSteer = i;
+                }
+            }
+            if (idxLapPct < 0 || idxThr < 0 || idxBrk < 0 || idxSteer < 0) { m_ghostActive = false; return; }
+
+            // Parse rows (simple, robust)
+            pos = lineEnd + 1;
+            while (pos < csv.size())
+            {
+                lineEnd = csv.find('\n', pos);
+                size_t len = (lineEnd == std::string::npos) ? csv.size() - pos : (lineEnd - pos);
+                if (len == 0) { if (lineEnd == std::string::npos) break; pos = lineEnd + 1; continue; }
+                std::string row = csv.substr(pos, len);
+                pos = (lineEnd == std::string::npos) ? csv.size() : (lineEnd + 1);
+
+                // Split
+                std::vector<std::string> fields; fields.reserve(32);
+                size_t s = 0;
+                while (s <= row.size()) {
+                    size_t c = row.find(',', s);
+                    if (c == std::string::npos) c = row.size();
+                    fields.push_back(row.substr(s, c - s));
+                    s = c + 1;
+                }
+                auto parseF = [](const std::string& v)->float { return v.empty() ? 0.0f : (float)atof(v.c_str()); };
+                if ((int)fields.size() > std::max(std::max(idxLapPct, idxThr), std::max(idxBrk, idxSteer)))
+                {
+                    GhostSample gs;
+                    gs.lapPct = parseF(fields[idxLapPct]);
+                    gs.throttle = parseF(fields[idxThr]);
+                    gs.brake = parseF(fields[idxBrk]);
+                    gs.steerAngle = parseF(fields[idxSteer]); // radians per CSV header semantics
+                    if (gs.lapPct >= 0.0f && gs.lapPct <= 1.0f)
+                        m_ghostSamples.push_back(gs);
+                }
+                if ((int)m_ghostSamples.size() > 200000) break; // safety cap
+            }
+
+            // Ensure sorted by lapPct
+            std::sort(m_ghostSamples.begin(), m_ghostSamples.end(), [](const GhostSample& a, const GhostSample& b){ return a.lapPct < b.lapPct; });
+            // Deduplicate equal lapPct by keeping last
+            std::vector<GhostSample> compact;
+            compact.reserve(m_ghostSamples.size());
+            float lastPct = -1.0f;
+            for (const auto& s : m_ghostSamples) { if (compact.empty() || s.lapPct > lastPct) { compact.push_back(s); lastPct = s.lapPct; } else { compact.back() = s; } }
+            m_ghostSamples.swap(compact);
+            m_ghostActive = !m_ghostSamples.empty();
         }
 };

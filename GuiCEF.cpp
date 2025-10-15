@@ -264,6 +264,13 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+			// Startup at Windows login
+			if (has("\"cmd\":\"setStartup\"")) {
+				bool on = false; (void)extractBoolField(req, "on", on);
+				app_set_startup_enabled(on);
+				callback->Success(app_get_state_json());
+				return true;
+			}
 			if (has("\"cmd\":\"openExternal\"")) {
 				std::string url;
 				if (extractStringField(req, "url", url)) {
@@ -392,6 +399,7 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
+            // Backward compat: allow direct set for General.ghost_telemetry_file via setConfigString too
 			if (has("\"cmd\":\"setConfigInt\"")) {
 				std::string component, key;
 				if (extractStringField(req, "component", component) && 
@@ -528,10 +536,12 @@ namespace {
 				callback->Success(app_get_state_json());
 				return true;
 			}
-			// SaveSettings supports a small set of keys sent from UI (currently performance_mode_30hz)
+			// SaveSettings supports a small set of keys sent from UI (currently performance_mode_30hz, launch_at_startup)
 			if (has("\"cmd\":\"saveSettings\"")) {
 				bool perf30 = false; (void)extractBoolField(req, "performance_mode_30hz", perf30);
 				app_set_config_bool("General", "performance_mode_30hz", perf30);
+				bool startup = false; (void)extractBoolField(req, "launch_at_startup", startup);
+				app_set_startup_enabled(startup);
 				callback->Success(app_get_state_json());
 				return true;
 			}

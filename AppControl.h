@@ -55,6 +55,10 @@ void app_set_config_string_vec(const char* component, const char* key, const std
 // Build current state JSON for the GUI
 std::string app_get_state_json();
 
+// Windows startup management
+bool app_is_startup_enabled();
+void app_set_startup_enabled(bool on);
+
 // Overlay movement functions
 void app_move_overlay(const char* sectionKey, int deltaX, int deltaY);
 void app_center_overlay(const char* sectionKey);

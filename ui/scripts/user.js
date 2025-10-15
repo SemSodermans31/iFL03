@@ -71,6 +71,9 @@ function updateUI() {
 
 	// Update general lists
 	updateGeneralLists();
+
+	// Update Ghost Telemetry UI
+	updateGhostTelemetryUI();
 }
 
 function updateConnectionStatus(status) {
@@ -139,6 +142,50 @@ function renderStringList(containerId, items, onRemove) {
         row.appendChild(btn);
         container.appendChild(row);
     });
+}
+
+function updateGhostTelemetryUI() {
+    const sel = document.getElementById('ghostTelemetrySelect');
+    const toggle = document.getElementById('ghostShowToggle');
+    if (!sel || !toggle) return;
+
+    // Populate files list from state
+    const files = (currentState.ghostTelemetry && Array.isArray(currentState.ghostTelemetry.files)) ? currentState.ghostTelemetry.files : [];
+    const selected = (currentState.ghostTelemetry && typeof currentState.ghostTelemetry.selected === 'string') ? currentState.ghostTelemetry.selected : '';
+
+    sel.innerHTML = '';
+    const optNone = document.createElement('option');
+    optNone.value = '';
+    optNone.textContent = files.length ? 'None' : 'No CSV files found';
+    sel.appendChild(optNone);
+    files.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = f;
+        sel.appendChild(opt);
+    });
+    sel.value = selected || '';
+
+    // Reflect show toggle from Inputs config
+    const showGhost = currentState.config && currentState.config.OverlayInputs && !!currentState.config.OverlayInputs.show_ghost_data;
+    toggle.checked = showGhost;
+
+    // Wire listeners once
+    if (!sel._ifl03Bound) {
+        sel.addEventListener('change', function() {
+            // Persist selection in General.ghost_telemetry_file
+            setConfigString('General', 'ghost_telemetry_file', this.value || '');
+        });
+        sel._ifl03Bound = true;
+    }
+
+    if (!toggle._ifl03Bound) {
+        toggle.addEventListener('change', function() {
+            // Toggle OverlayInputs.show_ghost_data
+            sendCommand({ cmd: 'setConfigBool', component: 'OverlayInputs', key: 'show_ghost_data', value: this.checked }, 'Setting saved', 'Failed to save setting');
+        });
+        toggle._ifl03Bound = true;
+    }
 }
 
 function addListEntry(component, key, inputId) {

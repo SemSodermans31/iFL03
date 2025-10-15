@@ -24,6 +24,7 @@ SOFTWARE.
 
 #include "AppControl.h"
 #include "Config.h"
+#include "util.h"
 #include "preview_mode.h"
 #include "iracing.h"
 #include "stub_data.h"
@@ -61,6 +62,60 @@ void app_set_ui_edit(bool on)
 void app_set_preview_mode(bool on)
 {
 	preview_mode_set(on);
+}
+
+static std::wstring getExecutablePathW()
+{
+    wchar_t path[MAX_PATH] = {0};
+    GetModuleFileNameW(NULL, path, MAX_PATH);
+    return std::wstring(path);
+}
+
+static std::wstring getQuotedExecutableWithWorkingDir()
+{
+    std::wstring exe = getExecutablePathW();
+    // Wrap exe in quotes; set working dir to exe folder using "-workdir" style is not needed if app uses GetModuleFileName
+    // Some apps store value as just the exe path. We'll keep it simple.
+    std::wstring cmd = L"\"" + exe + L"\"";
+    return cmd;
+}
+
+static const wchar_t* kRunKeyPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+static const wchar_t* kRunValueName = L"iFL03";
+
+bool app_is_startup_enabled()
+{
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKeyPath, 0, KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
+        return false;
+    DWORD type = 0;
+    DWORD size = 0;
+    LONG rc = RegQueryValueExW(hKey, kRunValueName, nullptr, &type, nullptr, &size);
+    RegCloseKey(hKey);
+    return (rc == ERROR_SUCCESS) && (type == REG_SZ || type == REG_EXPAND_SZ) && size > sizeof(wchar_t);
+}
+
+void app_set_startup_enabled(bool on)
+{
+    // Persist intent in config first so UI reflects even if registry fails
+    g_cfg.setBool("General", "launch_at_startup", on);
+    g_cfg.save();
+
+    HKEY hKey = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kRunKeyPath, 0, KEY_SET_VALUE | KEY_QUERY_VALUE, &hKey) != ERROR_SUCCESS)
+        return;
+
+    if (on)
+    {
+        const std::wstring cmd = getQuotedExecutableWithWorkingDir();
+        RegSetValueExW(hKey, kRunValueName, 0, REG_SZ, reinterpret_cast<const BYTE*>(cmd.c_str()), (DWORD)((cmd.size() + 1) * sizeof(wchar_t)));
+    }
+    else
+    {
+        RegDeleteValueW(hKey, kRunValueName);
+    }
+
+    RegCloseKey(hKey);
 }
 
 static void setOverlayEnabled(const char* sectionKey, bool on)
@@ -187,19 +242,52 @@ std::string app_get_state_json()
 		return out;
 	};
 
-	const std::string buddiesJson = buildStringArrayJson("General", "buddies");
-	const std::string flaggedJson = buildStringArrayJson("General", "flagged");
+    const std::string buddiesJson = buildStringArrayJson("General", "buddies");
+    const std::string flaggedJson = buildStringArrayJson("General", "flagged");
+
+    // Build ghost telemetry files list from assets/tracks/telemetry
+    auto buildGhostFilesJson = [&]() -> std::string {
+        std::string out = "";
+        std::wstring dir = resolveAssetPathW(L"assets\\tracks\\telemetry\\");
+        WIN32_FIND_DATAW fd = {};
+        HANDLE h = FindFirstFileW((dir + L"*.csv").c_str(), &fd);
+        if (h != INVALID_HANDLE_VALUE)
+        {
+            bool first = true;
+            do {
+                if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                    continue;
+                std::wstring fnameW(fd.cFileName);
+                // Convert to UTF-8
+                int required = WideCharToMultiByte(CP_UTF8, 0, fnameW.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                std::string fname;
+                if (required > 1) {
+                    fname.resize(required - 1);
+                    WideCharToMultiByte(CP_UTF8, 0, fnameW.c_str(), -1, fname.data(), required - 1, nullptr, nullptr);
+                }
+                if (!first) out += ","; else first = false;
+                out += "\"" + escapeJson(fname) + "\"";
+            } while (FindNextFileW(h, &fd));
+            FindClose(h);
+        }
+        return out;
+    };
+    const std::string ghostFilesJson = buildGhostFilesJson();
+    const std::string selectedGhostFile = g_cfg.getString("General","ghost_telemetry_file","");
+
+    const bool launchAtStartup = g_cfg.getBool("General","launch_at_startup", false) || app_is_startup_enabled();
 
     snprintf(buf, sizeof(buf),
 		"{\"uiEdit\":%s,\"previewMode\":%s,\"connectionStatus\":\"%s\"," 
-		"\"currentCar\":\"%s\",\"currentCarConfig\":\"%s\",\"availableCarConfigs\":%s,"
+        "\"currentCar\":\"%s\",\"currentCarConfig\":\"%s\",\"availableCarConfigs\":%s,"
+        "\"ghostTelemetry\":{\"files\":[%s],\"selected\":\"%s\"},"
         "\"overlays\":{"
         "\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayFuel\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s,\"OverlayDelta\":%s,\"OverlayRadar\":%s,\"OverlayTrack\":%s,\"OverlayTire\":%s,\"OverlayPit\":%s},"
-		"\"config\":{\"General\":{\"units\":\"%s\",\"performance_mode_30hz\":%s,\"buddies\":[%s],\"flagged\":[%s]},"
-		"\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_all_classes\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s,\"show_SoF\":%s,\"show_laps\":%s,\"show_session_end\":%s,\"show_track_temp\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"config\":{\"General\":{\"units\":\"%s\",\"performance_mode_30hz\":%s,\"launch_at_startup\":%s,\"buddies\":[%s],\"flagged\":[%s]},"
+        "\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_all_classes\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s,\"show_SoF\":%s,\"show_laps\":%s,\"show_session_end\":%s,\"show_track_temp\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
 		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
         "\"OverlayFuel\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"fuel_estimate_factor\":%.2f,\"fuel_reserve_margin\":%.2f,\"fuel_target_lap\":%d,\"fuel_decimal_places\":%d,\"fuel_estimate_avg_green_laps\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"steering_wheel\":\"%s\",\"left_side\":%s,\"show_steering_line\":%s,\"show_steering_wheel\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"steering_wheel\":\"%s\",\"left_side\":%s,\"show_steering_line\":%s,\"show_steering_wheel\":%s,\"show_ghost_data\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
         "\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"minimap_enabled\":%s,\"minimap_is_relative\":%s,\"show_ir_pred\":%s,\"show_irating\":%s,\"show_last\":%s,\"show_license\":%s,\"show_pit_age\":%s,\"show_sr\":%s,\"show_positions_gained\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
 		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
 		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_weather_type\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
@@ -215,7 +303,9 @@ std::string app_get_state_json()
 		ConnectionStatusStr[st],
 		escapeJson(currentCarName).c_str(),
 		escapeJson(g_cfg.getCurrentCarName()).c_str(),
-		carConfigsJson.c_str(),
+        carConfigsJson.c_str(),
+        ghostFilesJson.c_str(),
+        escapeJson(selectedGhostFile).c_str(),
         boolStr(g_cfg.getBool("OverlayStandings","enabled",true)),
         boolStr(g_cfg.getBool("OverlayDDU","enabled",true)),
         boolStr(g_cfg.getBool("OverlayFuel","enabled",true)),
@@ -231,8 +321,9 @@ std::string app_get_state_json()
         boolStr(g_cfg.getBool("OverlayPit","enabled",true)),
 		escapeJson(g_cfg.getString("General","units","metric")).c_str(),
 		boolStr(g_cfg.getBool("General","performance_mode_30hz",false)),
-		buddiesJson.c_str(),
-		flaggedJson.c_str(),
+        launchAtStartup ? "true" : "false",
+        buddiesJson.c_str(),
+        flaggedJson.c_str(),
 		// OverlayStandings config
 		boolStr(g_cfg.getBool("OverlayStandings","enabled",true)),
         escapeJson(g_cfg.getString("OverlayStandings","toggle_hotkey","ctrl+1")).c_str(),
@@ -304,6 +395,7 @@ std::string app_get_state_json()
 		boolStr(g_cfg.getBool("OverlayInputs","left_side",false)),
 		boolStr(g_cfg.getBool("OverlayInputs","show_steering_line",false)),
         boolStr(g_cfg.getBool("OverlayInputs","show_steering_wheel",true)),
+        boolStr(g_cfg.getBool("OverlayInputs","show_ghost_data",false)),
 		escapeJson(g_cfg.getString("OverlayInputs","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayInputs","font_size", 16.0f),
 		g_cfg.getFloat("OverlayInputs","font_spacing", 0.30f),

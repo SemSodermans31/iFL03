@@ -42,6 +42,18 @@
 				<h2 class="mb-3 text-sm uppercase tracking-wide text-slate-400">General Settings</h2>
 				<div class="space-y-3">
 					<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+						<span class="text-[#a8a8a8]">Launch at Windows startup</span>
+						<span class="relative inline-flex h-6 w-11 items-center">
+							<input type="checkbox" id="chk_startup" class="peer sr-only" />
+							<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+							<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+						</span>
+					</label>
+					<div class="text-sm text-[#a8a8a8]">
+						When enabled, iFL03 will start automatically when you sign in to Windows.
+					</div>
+
+					<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
 						<span class="text-[#a8a8a8]">Performance Mode (30Hz)</span>
 						<span class="relative inline-flex h-6 w-11 items-center">
 							<input type="checkbox" id="chk_performance_mode" class="peer sr-only" />

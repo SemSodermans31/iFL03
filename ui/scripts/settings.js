@@ -13,6 +13,14 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupEventListeners() {
+	// Startup toggle
+	const startupCheckbox = document.getElementById('chk_startup');
+	if (startupCheckbox) {
+		startupCheckbox.addEventListener('change', function() {
+			sendCommand('setStartup', { on: this.checked });
+		});
+	}
+
 	// Performance mode toggle
 	const performanceModeCheckbox = document.getElementById('chk_performance_mode');
 	if (performanceModeCheckbox) {
@@ -78,6 +86,12 @@ function requestState() {
 function updateUI() {
 	// Update connection status
 	updateConnectionStatus(currentState.connectionStatus);
+
+	// Update startup toggle
+	const startupCheckbox = document.getElementById('chk_startup');
+	if (startupCheckbox && currentState.config) {
+		startupCheckbox.checked = currentState.config.General?.launch_at_startup || false;
+	}
 	
 	// Update performance mode
 	const performanceModeCheckbox = document.getElementById('chk_performance_mode');
@@ -147,6 +161,12 @@ function saveAllSettings() {
 	// Collect all current values and save them
 	const settings = {};
 	
+	// Startup
+	const startupCheckbox = document.getElementById('chk_startup');
+	if (startupCheckbox) {
+		settings.launch_at_startup = startupCheckbox.checked;
+	}
+
 	// Performance mode
 	const performanceModeCheckbox = document.getElementById('chk_performance_mode');
 	if (performanceModeCheckbox) {

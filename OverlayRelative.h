@@ -642,8 +642,15 @@ class OverlayRelative : public Overlay
                 if (!leftItems.empty()) {
                     float xL = 10.0f;
                     for (auto& it : leftItems) {
+                        const float xStart = xL;
                         it.width = (it.icon ? iconSize + iconPad : 0.0f) + measure(it.text);
-                        const float itemW = it.width + 6.0f;
+                        // Enforce a minimum width for session time equal to width of "999:99:99"
+                        float minItemW = 0.0f;
+                        if (it.icon == m_iconSessionTime.Get()) {
+                            const float minTextW = computeTextExtent(L"999:99:99", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
+                            minItemW = (it.icon ? iconSize + iconPad : 0.0f) + minTextW + 6.0f;
+                        }
+                        const float itemW = std::max(it.width + 6.0f, minItemW);
                         const float itemH = iconSize + 2.0f;
                         D2D1_RECT_F bg = { xL - 4.0f, yText - itemH * 0.5f, xL + itemW - 4.0f, yText + itemH * 0.5f };
                         D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
@@ -656,7 +663,7 @@ class OverlayRelative : public Overlay
                         }
                         m_brush->SetColor(float4(0,0,0,1));
                         m_text.render(m_renderTarget.Get(), it.text.c_str(), m_textFormatSmall.Get(), xL, xL + it.width + 64.0f, yText, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
-                        xL += measure(it.text) + 12.0f;
+                        xL = xStart + itemW + 12.0f;
                     }
                 }
 
@@ -706,8 +713,9 @@ class OverlayRelative : public Overlay
                     int sof = ir_session.sof; if (sof < 0) sof = 0;
                     std::wstring sofText = toWide(std::format("{}", sof));
                     const float textW = computeTextExtent(sofText.c_str(), m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
+                    const float minTextW = computeTextExtent(L"99999", m_dwriteFactory.Get(), m_textFormatSmall.Get(), m_fontSpacing).x;
                     const float itemH = iconSizeH + 2.0f;
-                    const float itemW = (m_iconSoF ? iconSizeH + iconPadH : 0.0f) + textW + 6.0f;
+                    const float itemW = (m_iconSoF ? iconSizeH + iconPadH : 0.0f) + std::max(textW, minTextW) + 6.0f;
                     float xL = baseX;
                     D2D1_RECT_F bg = { xL - 4.0f, yCenter - itemH * 0.5f, xL + itemW - 4.0f, yCenter + itemH * 0.5f };
                     D2D1_ROUNDED_RECT rrh = { bg, itemH * 0.5f, itemH * 0.5f };
