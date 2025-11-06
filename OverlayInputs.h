@@ -150,6 +150,7 @@ class OverlayInputs : public Overlay
             const bool useStubData = StubDataManager::shouldUseStubData();
             const float currentThrottle = useStubData ? StubDataManager::getStubThrottle() : ir_Throttle.getFloat();
             const float currentBrake = useStubData ? StubDataManager::getStubBrake() : ir_Brake.getFloat();
+            const bool absActive = useStubData ? false : ir_BrakeABSactive.getBool();
             const float currentSteeringAngle = useStubData ?
                 (StubDataManager::getStubSteering() - 0.5f) * 2.0f * 3.14159f * 0.25f :
                 ir_SteeringWheelAngle.getFloat();
@@ -473,8 +474,14 @@ class OverlayInputs : public Overlay
                 // Draw live lines on top
                 m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) ) );
                 m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
-                m_brush->SetColor( g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) ) );
-                m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
+                {
+                    // When ABS is active, highlight the brake line in yellow
+                    const bool showAbsYellow = absActive && currentBrake > 0.02f;
+                    const float4 brakeCol = showAbsYellow ? float4(1.0f, 0.85f, 0.20f, 0.95f)
+                                                          : g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) );
+                    m_brush->SetColor( brakeCol );
+                    m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
+                }
 
                 // Optional steering angle line (white)
                 if( g_cfg.getBool( m_name, "show_steering_line", false ) && !m_steeringVtx.empty() )
