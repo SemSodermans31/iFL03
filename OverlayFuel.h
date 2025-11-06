@@ -83,7 +83,8 @@ protected:
 	virtual void onSessionChanged()
 	{
 		m_isValidFuelLap = false;
-		m_lapStartRemainingFuel = ir_FuelLevel.getFloat();
+		const bool useStub = StubDataManager::shouldUseStubData();
+		m_lapStartRemainingFuel = useStub ? StubDataManager::getStubFuelLevel() : ir_FuelLevel.getFloat();
 
 		// Build cache key based on car+track combination
 		std::string newCacheKey = buildFuelCacheKey();
@@ -108,6 +109,15 @@ protected:
 					m_fuelUsedLastLaps.push_back(cachedAvgPerLap);
 			}
 		}
+
+		// If still no fuel data and we're in preview mode, seed with stub data
+		if (m_fuelUsedLastLaps.empty() && StubDataManager::shouldUseStubData())
+		{
+			const int numLapsToAvg = g_cfg.getInt(m_name, "fuel_estimate_avg_green_laps", 4);
+			const float stubFuelPerLap = StubDataManager::getStubFuelPerLap();
+			for (int i = 0; i < numLapsToAvg; ++i)
+				m_fuelUsedLastLaps.push_back(stubFuelPerLap);
+		}
 	}
 
 	virtual void onUpdate()
@@ -126,7 +136,7 @@ protected:
 		const int currentLap = useStub ? StubDataManager::getStubLap() : (ir_isPreStart() ? 0 : std::max(0, ir_CarIdxLap.getInt(carIdx)));
 		const int remainingLaps = useStub ? StubDataManager::getStubLapsRemaining() : ir_getLapsRemaining();
 
-		const float remainingFuel = ir_FuelLevel.getFloat();
+		const float remainingFuel = useStub ? StubDataManager::getStubFuelLevel() : ir_FuelLevel.getFloat();
 		const float fuelCapacity = ir_session.fuelMaxLtr;
 
 		const int prevLap = m_prevCurrentLap;
@@ -202,9 +212,14 @@ protected:
 		const float barH = 14.0f;
 		const float barL = xPad, barR = w - xPad;
 
+		// Text field widths for fuel bar labels
+		const float leftTextWidth = 20.0f;
+		const float rightTextWidth = 80.0f;
+		const float centerTextWidth = 60.0f;
+
 		// Fuel bar with stroke
 		{
-			const float pct = std::clamp(ir_FuelLevelPct.getFloat(), 0.0f, 1.0f);
+			const float pct = std::clamp(useStub ? StubDataManager::getStubFuelLevelPct() : ir_FuelLevelPct.getFloat(), 0.0f, 1.0f);
 			const float radius = barH / 2.0f;
 			D2D1_ROUNDED_RECT rBg = { { barL, barTop, barR, barTop + barH }, radius, radius };
 			m_brush->SetColor(float4(0.5f, 0.5f, 0.5f, 0.5f));
@@ -220,23 +235,24 @@ protected:
 
 		// Fuel bar labels
 		m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-		// "E" on the left
-		m_text.render(m_renderTarget.Get(), L"E", m_textFormatSmall.Get(), barL, barL + 20, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+		// "E" on the left (aligned to left edge of bar)
+		m_text.render(m_renderTarget.Get(), L"E", m_textFormatSmall.Get(), barL, barL + leftTextWidth, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
 
 		// Remaining fuel in the middle
 		if (remainingFuel >= 0.0f)
 		{
 			float val = remainingFuel; if (imperial) val *= 0.264172f;
-			swprintf(s, _countof(s), imperial ? L"%.1f gl" : L"%.1f lt", val);
-			m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), barL + (barR - barL)/2 - 30, barL + (barR - barL)/2 + 30, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+			swprintf(s, _countof(s), imperial ? L"%.1f G" : L"%.1f L", val);
+			const float centerX = barL + (barR - barL) / 2.0f;
+			m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), centerX - centerTextWidth/2, centerX + centerTextWidth/2, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
 		}
 
-		// Full tank capacity on the right
+		// Full tank capacity on the right (aligned to right edge of bar)
 		if (fuelCapacity > 0.0f)
 		{
 			float val = fuelCapacity; if (imperial) val *= 0.264172f;
-			swprintf(s, _countof(s), imperial ? L"%.1f gl" : L"%.1f lt", val);
-			m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), barR - 50, barR, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+			swprintf(s, _countof(s), imperial ? L"%.1f G" : L"%.1f L", val);
+			m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), barR - rightTextWidth, barR, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
 		}
 
 		// Column data
@@ -261,28 +277,7 @@ protected:
 			if (avgPerLap > 0.0f)
 			{
 				float val = avgPerLap; if (imperial) val *= 0.264172f;
-				swprintf(s, _countof(s), imperial ? L"%.2f gl" : L"%.2f lt", val);
-				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
-			}
-			rowCnt++;
-		}
-
-		{
-			float y = colYStart + rowCnt * lineHeight;
-			if (rowCnt & 1 && alternateLineBgCol.a > 0)
-			{
-				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
-				m_brush->SetColor(alternateLineBgCol);
-				m_renderTarget->FillRectangle(&r, m_brush.Get());
-			}
-
-			m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-			m_text.render(m_renderTarget.Get(), L"Laps left", m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
-
-			if (perLapConsEst > 0.0f)
-			{
-				const float estLaps = (remainingFuel - reserve) / perLapConsEst;	
-				swprintf(s, _countof(s), L"%.*f", g_cfg.getInt(m_name, "fuel_decimal_places", 2), estLaps);
+				swprintf(s, _countof(s), imperial ? L"%.2f G" : L"%.2f L", val);
 				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
 			}
 			rowCnt++;
@@ -311,10 +306,10 @@ protected:
 				{
 					value = (targetLap + 1 - currentLap) * perLapConsEst - (m_lapStartRemainingFuel - reserve);
 				}
-				const bool warn = (value > ir_PitSvFuel.getFloat()) || (value > 0 && !ir_dpFuelFill.getFloat());
+				const bool warn = (value > (useStub ? StubDataManager::getStubPitServiceFuel() : ir_PitSvFuel.getFloat())) || (value > 0 && !(useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat()));
 				m_brush->SetColor(warn ? warnCol : goodCol);
 				float val = value; if (imperial) val *= 0.264172f;
-				swprintf(s, _countof(s), imperial ? L"%3.2f gl" : L"%3.2f lt", val);
+				swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", val);
 				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
 			}
 			rowCnt++;
@@ -330,31 +325,75 @@ protected:
 			}
 
 			m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-			m_text.render(m_renderTarget.Get(), (targetLap==0?L"Add":L"Tgt"), m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+			m_text.render(m_renderTarget.Get(), (targetLap==0?L"Add":L"Target"), m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
 
 			if (targetLap != 0) {
 				float targetFuel = (m_lapStartRemainingFuel - reserve) / (targetLap + 1 - currentLap);
 
 				if (imperial)
 					targetFuel *= 0.264172f;
-				swprintf(s, _countof(s), imperial ? L"%3.2f gl" : L"%3.2f lt", targetFuel);
+				swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", targetFuel);
 				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
 			}
 			else {
-				float add = ir_PitSvFuel.getFloat();
+				float add = useStub ? StubDataManager::getStubPitServiceFuel() : ir_PitSvFuel.getFloat();
 				if (add >= 0)
 				{
-					if (ir_dpFuelFill.getFloat())
+					if (useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat())
 						m_brush->SetColor(goodCol);
 
 					if (imperial)
 						add *= 0.264172f;
-					swprintf(s, _countof(s), imperial ? L"%3.2f gl" : L"%3.2f lt", add);
-					m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
-					m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
+					swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", add);
+					m_text; 
 				}
 			}
 			rowCnt++;
+		}
+
+		// Empty row for spacing
+		{
+			float y = colYStart + rowCnt * lineHeight;
+			if (rowCnt & 1 && alternateLineBgCol.a > 0)
+			{
+				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
+				m_brush->SetColor(alternateLineBgCol);
+				m_renderTarget->FillRectangle(&r, m_brush.Get());
+			}
+			rowCnt++;
+		}
+
+		{
+			float y = colYStart + rowCnt * lineHeight;
+			if (rowCnt & 1 && alternateLineBgCol.a > 0)
+			{
+				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
+				m_brush->SetColor(alternateLineBgCol);
+				m_renderTarget->FillRectangle(&r, m_brush.Get());
+			}
+
+			const float4 goldCol = float4(1.0f, 0.84f, 0.0f, textCol.w * globalOpacity);
+			m_brush->SetColor(goldCol);
+			m_text.render(m_renderTarget.Get(), L"Laps left", m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+
+			if (perLapConsEst > 0.0f)
+			{
+				const float estLaps = (remainingFuel - reserve) / perLapConsEst;
+				const bool lowFuelWarning = (estLaps <= 2.0f);
+				m_brush->SetColor(lowFuelWarning ? warnCol : goldCol);
+				swprintf(s, _countof(s), L"%.*f", g_cfg.getInt(m_name, "fuel_decimal_places", 2), estLaps);
+				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+				m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
+			}
+			rowCnt++;
+		}
+
+		{
+			const float lapsLeftBorderY = colYStart + (rowCnt - 1 - 0.5f) * lineHeight;
+			D2D1_POINT_2F startPoint = { 4.0f, lapsLeftBorderY };
+			D2D1_POINT_2F endPoint = { w - 4.0f, lapsLeftBorderY };
+			m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, 1.0f));
+			m_renderTarget->DrawLine(startPoint, endPoint, m_brush.Get(), 3.0f);
 		}
 
 		// Draw white border at the top of rows
@@ -409,5 +448,3 @@ protected:
 			return std::string(buf);
 		}
 };
-
-

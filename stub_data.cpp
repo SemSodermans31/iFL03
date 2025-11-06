@@ -82,6 +82,7 @@ void StubDataManager::populateSessionCars()
     
     ir_session.sessionType = SessionType::PRACTICE;
     ir_session.driverCarIdx = -1;
+    ir_session.fuelMaxLtr = 120.0f;
 
     auto makeColor = [](float r, float g, float b){ return float4(r, g, b, 1.0f); };
     auto licenseColorFor = [&](char lic)->float4{
@@ -356,4 +357,37 @@ float StubDataManager::getStubWindDirection()
 {
     updateAnimation();
     return static_cast<float>(fmod(s_animationTime * 0.02f, 2.0f * M_PI));
+}
+
+// Fuel-specific stub data
+float StubDataManager::getStubFuelLevel()
+{
+    // Return static fuel level that simulates being about 3/4 through a stint
+    // With 120L tank capacity, return 85L (about 70% full)
+    return 85.0f;
+}
+
+float StubDataManager::getStubFuelLevelPct()
+{
+    // Calculate percentage based on current fuel level vs max capacity
+    return getStubFuelLevel() / 120.0f; // 120L is our max capacity
+}
+
+float StubDataManager::getStubPitServiceFuel()
+{
+    // Pit service has about 100L available
+    return 100.0f;
+}
+
+bool StubDataManager::getStubFuelFillAvailable()
+{
+    // Fuel fill is available in preview mode
+    return true;
+}
+
+float StubDataManager::getStubFuelPerLap()
+{
+    // Return typical F3 fuel consumption per lap at Hungaroring
+    // Around 2.8-3.2 liters per lap is realistic for F3 turbo engine
+    return 3.0f;
 }

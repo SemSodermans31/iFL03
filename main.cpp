@@ -591,6 +591,8 @@ int main()
                     case (int)Hotkey::Pit:
                         g_cfg.setBool( "OverlayPit", "enabled", !g_cfg.getBool("OverlayPit","enabled",true) );
                         break;
+                    default: // no-op to avoid unannotated fallthrough warning
+                        break;
                     }
                     
                     if (!g_cfg.save())

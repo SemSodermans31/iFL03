@@ -101,6 +101,13 @@ public:
     // Get stub car by index
     static const StubCar* getStubCar(int carIdx);
     
+    // Fuel-specific stub data
+    static float getStubFuelLevel();
+    static float getStubFuelLevelPct();
+    static float getStubPitServiceFuel();
+    static bool getStubFuelFillAvailable();
+    static float getStubFuelPerLap();
+
     // Weather-specific stub data
     static float getStubTrackTemp();
     static float getStubAirTemp();
