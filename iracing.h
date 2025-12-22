@@ -74,6 +74,7 @@ struct Car
     std::string     classColStr;
     float4          classCol = float4(0, 0, 0, 1);
     int             classId = 0;
+    std::string     carClassShortName;   // e.g. "GT3", "LMP1", "GTE"
     int             irating = 0;
     int             isSelf = 0;
     int             isPaceCar = 0;

@@ -31,6 +31,7 @@ SOFTWARE.
 #include <wincodec.h>
 #include <algorithm>
 #include <math.h>
+#include <vector>
 
 class OverlayInputs : public Overlay
 {
@@ -71,6 +72,7 @@ class OverlayInputs : public Overlay
             m_throttleVtx.resize( horizontalWidthInt );
             m_brakeVtx.resize( horizontalWidthInt );
             m_steeringVtx.resize( horizontalWidthInt );
+			m_brakeAbsFlags.resize( horizontalWidthInt );
             m_ghostThrottleVtx.resize( horizontalWidthInt );
             m_ghostBrakeVtx.resize( horizontalWidthInt );
             m_ghostSteeringVtx.resize( horizontalWidthInt );
@@ -83,6 +85,7 @@ class OverlayInputs : public Overlay
                 m_ghostBrakeVtx[i].x = float(i);
                 m_ghostSteeringVtx[i].x = float(i);
             }
+			std::fill(m_brakeAbsFlags.begin(), m_brakeAbsFlags.end(), 0);
             
             // Create text format for labels and values using centralized settings
             createGlobalTextFormat(1.0f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatBold);
@@ -188,6 +191,15 @@ class OverlayInputs : public Overlay
                 for( int i=0; i<(int)m_brakeVtx.size()-1; ++i )
                     m_brakeVtx[i].y = m_brakeVtx[i+1].y;
                 m_brakeVtx[(int)m_brakeVtx.size()-1].y = currentBrake;
+
+				// Track ABS activation per-sample to persist colored segments
+				if( m_brakeAbsFlags.size() != m_brakeVtx.size() )
+					m_brakeAbsFlags.resize( m_brakeVtx.size(), 0 );
+				for( int i=0; i<(int)m_brakeAbsFlags.size()-1; ++i )
+					m_brakeAbsFlags[i] = m_brakeAbsFlags[i+1];
+				const unsigned char absNow = (absActive && currentBrake > 0.02f) ? 1u : 0u;
+				if( !m_brakeAbsFlags.empty() )
+					m_brakeAbsFlags[(int)m_brakeAbsFlags.size()-1] = absNow;
 
                 float s = currentSteeringAngle / (3.14159f * 0.5f); 
                 if( s < -1.0f ) s = -1.0f;
@@ -428,16 +440,43 @@ class OverlayInputs : public Overlay
                 throttleLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
                 throttleLineSink->Close();
 
-                // Brake (line)
-                Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeLinePath;
-                Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeLineSink;
-                m_d2dFactory->CreatePathGeometry( &brakeLinePath );
-                brakeLinePath->Open( &brakeLineSink );
-                brakeLineSink->BeginFigure( vtx2coord(m_brakeVtx[0]), D2D1_FIGURE_BEGIN_HOLLOW );
-                for( int i=1; i<(int)m_brakeVtx.size(); ++i )
-                    brakeLineSink->AddLine( vtx2coord(m_brakeVtx[i]) );
-                brakeLineSink->EndFigure( D2D1_FIGURE_END_OPEN );
-                brakeLineSink->Close();
+				// Brake (line) with persistent ABS-colored segments
+				Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeAbsOnPath;
+				Microsoft::WRL::ComPtr<ID2D1PathGeometry1> brakeAbsOffPath;
+				Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeAbsOnSink;
+				Microsoft::WRL::ComPtr<ID2D1GeometrySink>  brakeAbsOffSink;
+				m_d2dFactory->CreatePathGeometry( &brakeAbsOnPath );
+				brakeAbsOnPath->Open( &brakeAbsOnSink );
+				m_d2dFactory->CreatePathGeometry( &brakeAbsOffPath );
+				brakeAbsOffPath->Open( &brakeAbsOffSink );
+				if( !m_brakeVtx.empty() && m_brakeAbsFlags.size() == m_brakeVtx.size() )
+				{
+					auto flushSegment = [&](int s, int e, bool absOn)
+					{
+						if( s < 0 || e < s ) return;
+						Microsoft::WRL::ComPtr<ID2D1GeometrySink>& sink = absOn ? brakeAbsOnSink : brakeAbsOffSink;
+						sink->BeginFigure( vtx2coord(m_brakeVtx[s]), D2D1_FIGURE_BEGIN_HOLLOW );
+						for( int i = s + 1; i <= e; ++i )
+							sink->AddLine( vtx2coord(m_brakeVtx[i]) );
+						sink->EndFigure( D2D1_FIGURE_END_OPEN );
+					};
+					int startIdx = 0;
+					bool currentFlag = m_brakeAbsFlags[0] != 0;
+					for( int i = 1; i < (int)m_brakeVtx.size(); ++i )
+					{
+						bool f = m_brakeAbsFlags[i] != 0;
+						if( f != currentFlag )
+						{
+							// Include the transition point in the previous segment
+							flushSegment( startIdx, i, currentFlag );
+							startIdx = i;
+							currentFlag = f;
+						}
+					}
+					flushSegment( startIdx, (int)m_brakeVtx.size() - 1, currentFlag );
+				}
+				brakeAbsOnSink->Close();
+				brakeAbsOffSink->Close();
 
                 // Ghost overlays (draw after fills but before live lines so they appear beneath live)
                 if (m_showGhost && m_ghostActive && effectiveHorizontalWidth > 1.0f)
@@ -474,14 +513,13 @@ class OverlayInputs : public Overlay
                 // Draw live lines on top
                 m_brush->SetColor( g_cfg.getFloat4( m_name, "throttle_col", float4(0.38f,0.91f,0.31f,0.8f) ) );
                 m_renderTarget->DrawGeometry( throttleLinePath.Get(), m_brush.Get(), thickness );
-                {
-                    // When ABS is active, highlight the brake line in yellow
-                    const bool showAbsYellow = absActive && currentBrake > 0.02f;
-                    const float4 brakeCol = showAbsYellow ? float4(1.0f, 0.85f, 0.20f, 0.95f)
-                                                          : g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) );
-                    m_brush->SetColor( brakeCol );
-                    m_renderTarget->DrawGeometry( brakeLinePath.Get(), m_brush.Get(), thickness );
-                }
+				// Draw brake with persistent colors: orange where ABS was active, red otherwise
+				const float4 brakeColAbs = float4(1.0f, 0.85f, 0.20f, 0.95f);
+				const float4 brakeColOff = g_cfg.getFloat4( m_name, "brake_col", float4(0.93f,0.03f,0.13f,0.8f) );
+				m_brush->SetColor( brakeColOff );
+				m_renderTarget->DrawGeometry( brakeAbsOffPath.Get(), m_brush.Get(), thickness );
+				m_brush->SetColor( brakeColAbs );
+				m_renderTarget->DrawGeometry( brakeAbsOnPath.Get(), m_brush.Get(), thickness );
 
                 // Optional steering angle line (white)
                 if( g_cfg.getBool( m_name, "show_steering_line", false ) && !m_steeringVtx.empty() )
@@ -672,6 +710,7 @@ class OverlayInputs : public Overlay
         std::vector<float2> m_throttleVtx;
         std::vector<float2> m_brakeVtx;
         std::vector<float2> m_steeringVtx;
+		std::vector<unsigned char> m_brakeAbsFlags;
         std::vector<float2> m_ghostThrottleVtx;
         std::vector<float2> m_ghostBrakeVtx;
         std::vector<float2> m_ghostSteeringVtx;

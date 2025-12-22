@@ -475,6 +475,9 @@ class TextCache
         //
         void render( ID2D1RenderTarget* renderTarget, const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, float ycenter, ID2D1SolidColorBrush* brush, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
+            if( !renderTarget || !brush )
+                return;
+
             IDWriteTextLayout* textLayout = getOrCreateTextLayout( str, textFormat, xmin, xmax, align, characterSpacing );
             if( !textLayout )
                 return;
@@ -504,15 +507,23 @@ class TextCache
 
         IDWriteTextLayout* getOrCreateTextLayout( const wchar_t* str, IDWriteTextFormat* textFormat, float xmin, float xmax, DWRITE_TEXT_ALIGNMENT align, float characterSpacing = 0.0f )
         {
-            if( xmax < xmin || !str )
+            // Defensive: this can be called during overlay config changes where
+            // the DWrite factory/text format may not be initialized yet.
+            if( xmax < xmin || !str || !textFormat || !m_factory )
+                return nullptr;
+
+            const float width = xmax - xmin;
+            if( width <= 0.0f )
+                return nullptr;
+
+            const int len = (int)wcslen( str );
+            if( len <= 0 )
                 return nullptr;
 
             const float fontSize = textFormat->GetFontSize();
-            const float width = xmax - xmin;
 
             textFormat->SetTextAlignment( align );
 
-            const int len = (int)wcslen( str );
             unsigned hash = MurmurHash2( str, len*sizeof(wchar_t), 0x12341234 );
             hash ^= (unsigned)(uint64_t(textFormat) & 0xffffffff);
             hash ^= (unsigned)(uint64_t(textFormat) >> 32);
@@ -526,7 +537,9 @@ class TextCache
 
             if( it == m_cache.end() )
             {
-                m_factory->CreateTextLayout( str, len, textFormat, width, fontSize*2, &textLayout );
+                const HRESULT hr = m_factory->CreateTextLayout( str, len, textFormat, width, fontSize*2, &textLayout );
+                if( FAILED(hr) || !textLayout )
+                    return nullptr;
                 
                 // Apply character spacing if specified
                 if( characterSpacing != 0.0f && textLayout )
@@ -538,7 +551,6 @@ class TextCache
                         textLayout1->SetCharacterSpacing( characterSpacing, characterSpacing, 0, textRange );
                     }
                 }
-                
                 m_cache.insert( std::make_pair(hash, textLayout) );
             }
             else
@@ -557,7 +569,16 @@ inline float2 computeTextExtent( const wchar_t* str, IDWriteFactory* factory, ID
 {
     IDWriteTextLayout* textLayout = nullptr;
 
-    factory->CreateTextLayout( str, (int)wcslen(str), textFormat, 99999, 99999, &textLayout );
+    if( !str || !factory || !textFormat )
+        return float2(0,0);
+
+    const int len = (int)wcslen(str);
+    if( len <= 0 )
+        return float2(0,0);
+
+    const HRESULT hr = factory->CreateTextLayout( str, len, textFormat, 99999, 99999, &textLayout );
+    if( FAILED(hr) || !textLayout )
+        return float2(0,0);
     
     // Apply character spacing if specified
     if( characterSpacing != 0.0f && textLayout )

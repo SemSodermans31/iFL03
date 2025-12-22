@@ -539,6 +539,9 @@ ConnectionStatus ir_tick()
             _snprintf_s(path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}CarClassID:", carIdx);
             parseYamlInt(sessionYaml, path, &car.classId);
 
+            _snprintf_s(path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}CarClassShortName:", carIdx);
+            parseYamlStr(sessionYaml, path, car.carClassShortName);
+
             _snprintf_s( path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}IRating:", carIdx );
             parseYamlInt( sessionYaml, path, &car.irating );
 
@@ -679,6 +682,15 @@ ConnectionStatus ir_tick()
         }
 
         // Session info (may override qual results from above, but that's ok since hopefully they're the same!)
+        //
+        // While parsing session results, we also accumulate Strength of Field (SoF) using
+        // the same definition as iRacing: average iRating of the drivers in our class
+        // who are part of the race field. For non-race contexts (practice, test, etc.)
+        // we fall back to averaging over all known drivers in our class.
+        int ownClass = ir_PlayerCarClass.getInt();
+        double sofRace = 0.0;
+        int sofRaceCnt = 0;
+
         for( int session=0; ; ++session )
         {
             std::string sessionNameStr;
@@ -739,26 +751,47 @@ ConnectionStatus ir_tick()
 
                         _snprintf_s(path, _countof(path), _TRUNCATE, "SessionInfo:Sessions:SessionNum:{%d}ResultsPositions:Position:{%d}FastestTime:", session, pos);
                         parseYamlFloat(sessionYaml, path, &ir_session.cars[carIdx].race.fastestTime);
+
+                        // Contribute this car to the SoF for the race session (per-class)
+                        const Car& car = ir_session.cars[carIdx];
+                        if( !car.isPaceCar && !car.isSpectator && !car.userName.empty() && car.classId == ownClass )
+                        {
+                            sofRace += car.irating;
+                            ++sofRaceCnt;
+                        }
                     }
                 }
             }
         }
 
         // SoF
-        double sof = 0;
-        int cnt = 0;
-        int ownClass = ir_PlayerCarClass.getInt();
-        for( int i=0; i<IR_MAX_CARS; ++i )
+        //
+        // Primary path: when we have race results, SoF is the average iRating of all
+        // drivers in our car class that appear in the RACE session results. This
+        // mirrors how iRacing defines SoF for a race.
+        //
+        // Fallback path: if we don't have race results yet (e.g., practice sessions),
+        // approximate SoF by averaging over all known drivers in our class.
+        if( sofRaceCnt > 0 )
         {
-            const Car& car = ir_session.cars[i];
-
-            if( car.isPaceCar || car.isSpectator || car.userName.empty() || car.classId != ownClass)
-                continue;
-
-            sof += car.irating;
-            cnt++;
+            ir_session.sof = int( sofRace / sofRaceCnt );
         }
-        ir_session.sof = int(sof / cnt);
+        else
+        {
+            double sof = 0.0;
+            int cnt = 0;
+            for( int i=0; i<IR_MAX_CARS; ++i )
+            {
+                const Car& car = ir_session.cars[i];
+
+                if( car.isPaceCar || car.isSpectator || car.userName.empty() || car.classId != ownClass )
+                    continue;
+
+                sof += car.irating;
+                ++cnt;
+            }
+            ir_session.sof = (cnt > 0) ? int( sof / cnt ) : 0;
+        }
 
         ir_handleConfigChange();
 
