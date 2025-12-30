@@ -44,41 +44,40 @@ protected:
 
 	virtual float2 getDefaultSize()
 	{
-		// Wide and not too tall – two stacked bands
-		return float2(640, 200);
+		// Wide but compact (Kapps-like "card")
+		return float2(640, 220);
+	}
+
+	virtual void onEnable()
+	{
+		onConfigChanged();
+		m_text.reset(m_dwriteFactory.Get());
+		m_bgBrush.Reset();
+		m_panelBrush.Reset();
+		m_bannerClipLayer.Reset();
 	}
 
 	virtual void onConfigChanged()
 	{
-		// Compute scale factors from current window size
-		const float2 ref = getDefaultSize();
-		if( m_width <= 0 || m_height <= 0 || ref.x <= 0 || ref.y <= 0 )
-		{
-			m_scaleFactorX = m_scaleFactorY = m_scaleFactor = 1.0f;
-		}
-		else
-		{
-			m_scaleFactorX = (float)m_width / ref.x;
-			m_scaleFactorY = (float)m_height / ref.y;
-			m_scaleFactor = std::min(m_scaleFactorX, m_scaleFactorY);
-			m_scaleFactor = std::max(0.5f, std::min(6.0f, m_scaleFactor));
-		}
-
-
-		// Fonts (centralized)
-		m_text.reset( m_dwriteFactory.Get() );
-		
-		const float baseScale = std::max(0.5f, std::min(6.0f, m_scaleFactor));
-		createGlobalTextFormat(baseScale * 3.2f, 900, "oblique", m_textFormatLarge);
 		// Per-overlay FPS (configurable; default 10)
 		setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
+
+		// Centralized fonts
+		m_text.reset(m_dwriteFactory.Get());
+		createGlobalTextFormat(1.05f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatTop);
+		createGlobalTextFormat(2.10f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatMain);
+
+		// Recreate D2D brushes (render target may change)
+		m_bgBrush.Reset();
+		m_panelBrush.Reset();
+		m_bannerClipLayer.Reset();
+
+		// Per-overlay FPS (configurable; default 10)
+		// (already set above)
 	}
 
 	virtual void onUpdate()
 	{
-		const float4 white = float4(1,1,1,1);
-		const float4 black = float4(0,0,0,1);
-		const float4 darkBg = float4(0,0,0,0.7f * getGlobalOpacity());
 		const float globalOpacity = getGlobalOpacity();
 
 		wchar_t sTop[256] = L"";
@@ -98,10 +97,6 @@ protected:
 		float4 flagCol = info.color;
 		flagCol.w *= globalOpacity;
 
-		const float padding = std::max(6.0f, 16.0f * m_scaleFactor);
-		const float topH = (float)m_height * 0.45f;
-		const float bottomH = (float)m_height - topH;
-
 		// Contrast helpers
 		auto luminance = [](const float4& c)->float { return 0.2126f*c.x + 0.7152f*c.y + 0.0722f*c.z; };
 		const bool flagIsDark = luminance(info.color) < 0.35f;
@@ -113,50 +108,186 @@ protected:
 		m_renderTarget->BeginDraw();
 		m_renderTarget->Clear( float4(0,0,0,0) );
 
-		// TOP BAND: dark background, text in flag color (or white if flag too dark)
+		ensureStyleBrushes();
+
+		// Layout (Kapps-like card)
 		{
-			m_brush->SetColor( float4(darkBg.x,darkBg.y,darkBg.z, darkBg.w) );
-			D2D1_RECT_F r = { padding, padding, (float)m_width - padding, padding + topH };
-			D2D1_ROUNDED_RECT rr = { r, topH/2, topH/2 };
-			m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
+			const float W = (float)m_width;
+			const float H = (float)m_height;
+			const float minDim = std::max(1.0f, std::min(W, H));
+			const float pad = std::clamp(minDim * 0.045f, 8.0f, 18.0f);
+			const float innerPad = std::clamp(minDim * 0.045f, 10.0f, 20.0f);
+			const float corner = std::clamp(minDim * 0.070f, 10.0f, 26.0f);
 
-			// Subtle border like other overlays
-			m_brush->SetColor( float4(0.3f, 0.3f, 0.3f, 0.6f) );
-			m_renderTarget->DrawRoundedRectangle( &rr, m_brush.Get(), 2.0f );
+			D2D1_RECT_F rCard = { pad, pad, W - pad, H - pad };
+			const float cardW = std::max(1.0f, rCard.right - rCard.left);
+			const float cardH = std::max(1.0f, rCard.bottom - rCard.top);
 
-			float4 topTextCol = flagIsDark ? white : float4(info.color.x, info.color.y, info.color.z, 1.0f);
-			topTextCol.w = globalOpacity;
-			m_brush->SetColor( topTextCol );
-			const float yTop = padding + topH * 0.52f;
-			m_text.render( m_renderTarget.Get(), sTop, m_textFormatLarge.Get(), r.left + padding, r.right - padding, yTop, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
-		}
+			// Card background gradient
+			{
+				D2D1_ROUNDED_RECT rr = { rCard, corner, corner };
+				if (m_bgBrush) {
+					m_bgBrush->SetStartPoint(D2D1_POINT_2F{ rCard.left, rCard.top });
+					m_bgBrush->SetEndPoint(D2D1_POINT_2F{ rCard.left, rCard.bottom });
+					m_renderTarget->FillRoundedRectangle(&rr, m_bgBrush.Get());
+				} else {
+					m_brush->SetColor(float4(0.05f, 0.05f, 0.06f, 0.92f * globalOpacity));
+					m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+				}
+			}
 
-		// BOTTOM BAND: background = flag color, text = black or white for contrast
-		{
-			D2D1_RECT_F r = { padding, padding + topH + padding*0.5f, (float)m_width - padding, (float)m_height - padding };
-			m_brush->SetColor( flagCol );
-			D2D1_ROUNDED_RECT rr = { r, topH/2, topH/2 };
-			m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
+			// Banner (dark panel + colored accent strip)
+			const float bannerH = std::clamp(cardH * 0.22f, 34.0f, 60.0f);
+			D2D1_RECT_F rBanner = {
+				rCard.left + innerPad,
+				rCard.top + innerPad,
+				rCard.right - innerPad,
+				rCard.top + innerPad + bannerH
+			};
+			const float bannerRadius = bannerH * 0.22f;
 
-			// Border using darker tint of the flag color
-			float4 borderCol = flagCol;
-			borderCol.x *= 0.6f; // Make it darker
-			borderCol.y *= 0.6f;
-			borderCol.z *= 0.6f;
-			m_brush->SetColor( borderCol );
-			m_renderTarget->DrawRoundedRectangle( &rr, m_brush.Get(), 2.0f );
+			{
+				const float panelCorner = std::clamp(corner * 0.75f, 8.0f, 22.0f);
+				D2D1_ROUNDED_RECT rrBan = { rBanner, bannerRadius, bannerRadius };
+				if (m_panelBrush) {
+					m_panelBrush->SetStartPoint(D2D1_POINT_2F{ rBanner.left, rBanner.top });
+					m_panelBrush->SetEndPoint(D2D1_POINT_2F{ rBanner.left, rBanner.bottom });
+					m_renderTarget->FillRoundedRectangle(&rrBan, m_panelBrush.Get());
+				} else {
+					m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.88f * globalOpacity));
+					m_renderTarget->FillRoundedRectangle(&rrBan, m_brush.Get());
+				}
 
-			float4 bottomTextCol = flagIsDark ? white : black;
-			bottomTextCol.w = globalOpacity;
-			m_brush->SetColor( bottomTextCol );
-			const float yBottom = r.top + (r.bottom - r.top) * 0.52f;
-			m_text.render( m_renderTarget.Get(), sBottom, m_textFormatLarge.Get(), r.left + padding, r.right - padding, yBottom, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
+				// Subtle border
+				m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * globalOpacity));
+				m_renderTarget->DrawRoundedRectangle(&rrBan, m_brush.Get(), 1.5f);
+
+				// Banner text: flag name (top text)
+				if (m_textFormatTop) {
+					m_textFormatTop->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+					m_textFormatTop->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+				}
+				float4 topTextCol = flagIsDark ? float4(1, 1, 1, 0.95f * globalOpacity)
+					: float4(info.color.x, info.color.y, info.color.z, 0.95f * globalOpacity);
+				m_brush->SetColor(topTextCol);
+				m_text.render(
+					m_renderTarget.Get(),
+					sTop,
+					m_textFormatTop.Get(),
+					rBanner.left + innerPad,
+					rBanner.right - innerPad,
+					(rBanner.top + rBanner.bottom) * 0.5f,
+					m_brush.Get(),
+					DWRITE_TEXT_ALIGNMENT_CENTER,
+					getGlobalFontSpacing()
+				);
+			}
+
+			// Main panel: filled with flag color (flat), with subtle border like Kapps cards
+			const float gap = std::clamp(cardH * 0.035f, 8.0f, 14.0f);
+			D2D1_RECT_F rPanel = {
+				rCard.left + innerPad,
+				rBanner.bottom + gap,
+				rCard.right - innerPad,
+				rCard.bottom - innerPad
+			};
+			if (rPanel.bottom > rPanel.top + 20.0f)
+			{
+				// Slightly larger radius for the bottom "flag" panel (requested)
+				const float panelW = std::max(1.0f, rPanel.right - rPanel.left);
+				const float panelH = std::max(1.0f, rPanel.bottom - rPanel.top);
+				float panelCorner = std::clamp(corner * 0.95f, 20.0f, 30.0f);
+				panelCorner = std::min(panelCorner, std::min(panelW, panelH) * 0.5f);
+				D2D1_ROUNDED_RECT rrPanel = { rPanel, panelCorner, panelCorner };
+				m_brush->SetColor(flagCol);
+				m_renderTarget->FillRoundedRectangle(&rrPanel, m_brush.Get());
+
+				float4 borderCol = flagCol;
+				borderCol.x *= 0.55f;
+				borderCol.y *= 0.55f;
+				borderCol.z *= 0.55f;
+				borderCol.w = std::min(borderCol.w, 0.85f * globalOpacity);
+				m_brush->SetColor(borderCol);
+				m_renderTarget->DrawRoundedRectangle(&rrPanel, m_brush.Get(), 1.5f);
+
+				// Main text: message (bottom text)
+				if (m_textFormatMain) {
+					m_textFormatMain->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+					m_textFormatMain->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+				}
+				float4 bottomTextCol = flagIsDark ? float4(1, 1, 1, 0.95f * globalOpacity)
+					: float4(0, 0, 0, 0.95f * globalOpacity);
+				m_brush->SetColor(bottomTextCol);
+				m_text.render(
+					m_renderTarget.Get(),
+					sBottom,
+					m_textFormatMain.Get(),
+					rPanel.left + innerPad,
+					rPanel.right - innerPad,
+					(rPanel.top + rPanel.bottom) * 0.5f,
+					m_brush.Get(),
+					DWRITE_TEXT_ALIGNMENT_CENTER,
+					getGlobalFontSpacing()
+				);
+			}
 		}
 
 		m_renderTarget->EndDraw();
 	}
 
 private:
+
+	void ensureStyleBrushes()
+	{
+		if (!m_renderTarget) return;
+		if (m_bgBrush && m_panelBrush) return;
+
+		// Card background gradient (same palette as OverlayPit)
+		{
+			D2D1_GRADIENT_STOP stops[3] = {};
+			stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.16f, 0.18f, 0.22f, 0.95f);
+			stops[1].position = 0.45f; stops[1].color = D2D1::ColorF(0.06f, 0.07f, 0.09f, 0.95f);
+			stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.95f);
+
+			Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+			HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+				stops,
+				ARRAYSIZE(stops),
+				D2D1_GAMMA_2_2,
+				D2D1_EXTEND_MODE_CLAMP,
+				stopCollection.GetAddressOf()
+			);
+			if (SUCCEEDED(hr)) {
+				D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+				props.startPoint = D2D1_POINT_2F{ 0,0 };
+				props.endPoint = D2D1_POINT_2F{ 0,1 };
+				m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_bgBrush.GetAddressOf());
+			}
+		}
+
+		// Inner panel gradient (same palette as OverlayPit)
+		{
+			D2D1_GRADIENT_STOP stops[3] = {};
+			stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.08f, 0.09f, 0.11f, 0.92f);
+			stops[1].position = 0.55f; stops[1].color = D2D1::ColorF(0.04f, 0.045f, 0.055f, 0.92f);
+			stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.92f);
+
+			Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+			HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+				stops,
+				ARRAYSIZE(stops),
+				D2D1_GAMMA_2_2,
+				D2D1_EXTEND_MODE_CLAMP,
+				stopCollection.GetAddressOf()
+			);
+			if (SUCCEEDED(hr)) {
+				D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+				props.startPoint = D2D1_POINT_2F{ 0,0 };
+				props.endPoint = D2D1_POINT_2F{ 0,1 };
+				m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_panelBrush.GetAddressOf());
+			}
+		}
+	}
 
 	struct FlagInfo
 	{
@@ -175,7 +306,7 @@ private:
 		if (preview_mode_get())
 		{
 			auto set = [&](const char* top, const char* bottom, const float4& c)->FlagInfo{ FlagInfo f; f.active=true; f.topText=top; f.bottomText=bottom; f.color=c; return f; };
-			return set("GO!","Start Go", col(0.1f,0.9f,0.1f));
+			return set("GO!","Green Green!!", col(0.1f,0.9f,0.1f));
 		}
 
 		const int flags = ir_SessionFlags.getInt();
@@ -224,9 +355,9 @@ private:
 		
 		// 5. Start Light Sequence (during race start only)
 		if( isStartingSequence() ) {
-			if( flags & irsdk_startGo )    return set("GO!","Start Go", col(0.1f,0.9f,0.1f));
-			if( flags & irsdk_startSet )   return set("SET","Start Set", col(1.0f,0.9f,0.0f));
-			if( flags & irsdk_startReady ) return set("GET READY","Start Ready", col(1,0,0));
+			if( flags & irsdk_startGo )    return set("GO!","Green Green!!", col(0.1f,0.9f,0.1f));
+			if( flags & irsdk_startSet )   return set("SET","Start Lights ", col(1.0f,0.9f,0.0f));
+			if( flags & irsdk_startReady ) return set("GET READY","Start Lights", col(1,0,0));
 		}
 		
 		// 6. Session Information Flags (context-sensitive)
@@ -248,12 +379,13 @@ private:
 
 protected:
 
-	// Scaling factors
-	float m_scaleFactorX = 1.0f;
-	float m_scaleFactorY = 1.0f;
-	float m_scaleFactor = 1.0f;
-
-	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatLarge;
+	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatTop;
+	Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_textFormatMain;
 	TextCache m_text;
 	float m_fontSpacing = getGlobalFontSpacing();
+
+	// Styling brushes (cached; recreated on config change / enable)
+	Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_bgBrush;
+	Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_panelBrush;
+	Microsoft::WRL::ComPtr<ID2D1Layer> m_bannerClipLayer;
 };

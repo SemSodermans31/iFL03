@@ -33,6 +33,7 @@ SOFTWARE.
 #include "Config.h"
 #include "OverlayDebug.h"
 #include "stub_data.h"
+#include "ClassColors.h"
 
 // Lightweight overlay showing the same fuel calculator values as DDU
 class OverlayFuel : public Overlay
@@ -50,9 +51,20 @@ public:
 protected:
 	virtual float2 getDefaultSize() { return float2(350, 160); }
 
-	virtual void onEnable() { onConfigChanged(); }
+	virtual void onEnable()
+	{
+		onConfigChanged();
+		m_text.reset(m_dwriteFactory.Get());
+		m_bgBrush.Reset();
+		m_panelBrush.Reset();
+	}
 
-	virtual void onDisable() { m_text.reset(); }
+	virtual void onDisable()
+	{
+		m_text.reset();
+		m_bgBrush.Reset();
+		m_panelBrush.Reset();
+	}
 
 	virtual void onConfigChanged()
 	{
@@ -78,6 +90,10 @@ protected:
 		}
 
 		setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
+
+		// Recreate D2D brushes (render target may change)
+		m_bgBrush.Reset();
+		m_panelBrush.Reset();
 	}
 
 	virtual void onSessionChanged()
@@ -191,109 +207,218 @@ protected:
 		m_renderTarget->BeginDraw();
 		m_renderTarget->Clear(float4(0,0,0,0));
 
-		// Background rounded rect
-		const float w = (float)m_width, h = (float)m_height;
-		const float cornerRadius = g_cfg.getFloat(m_name, "corner_radius", 6.0f);
-		D2D1_ROUNDED_RECT rr;
-		rr.rect = { 0.5f, 0.5f, w-0.5f, h-0.5f };
-		rr.radiusX = cornerRadius; rr.radiusY = cornerRadius;
-		float4 bg = bgCol; bg.w *= globalOpacity;
-		m_brush->SetColor(bg);
-		m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+		ensureStyleBrushes();
 
-		// Title
-		m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-		m_text.render(m_renderTarget.Get(), L"Fuel", m_textFormat.Get(), 10, w-10, 15, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+		// Layout (Kapps-like card)
+		const float W = (float)m_width;
+		const float H = (float)m_height;
+		const float minDim = std::max(1.0f, std::min(W, H));
+		const float pad = std::clamp(minDim * 0.045f, 8.0f, 18.0f);
+		const float innerPad = std::clamp(minDim * 0.045f, 10.0f, 20.0f);
+		float corner = std::clamp(minDim * 0.070f, 10.0f, 26.0f);
 
-		// Bars and labels
-		wchar_t s[128];
-		const float xPad = 12.0f;
-		const float barTop = 35.0f;
-		const float barH = 14.0f;
-		const float barL = xPad, barR = w - xPad;
-
-		// Text field widths for fuel bar labels
-		const float leftTextWidth = 20.0f;
-		const float rightTextWidth = 80.0f;
-		const float centerTextWidth = 60.0f;
-
-		// Fuel bar with stroke
+		// Optional override (legacy config)
 		{
-			const float pct = std::clamp(useStub ? StubDataManager::getStubFuelLevelPct() : ir_FuelLevelPct.getFloat(), 0.0f, 1.0f);
-			const float radius = barH / 2.0f;
-			D2D1_ROUNDED_RECT rBg = { { barL, barTop, barR, barTop + barH }, radius, radius };
-			m_brush->SetColor(float4(0.5f, 0.5f, 0.5f, 0.5f));
-			m_renderTarget->FillRoundedRectangle(&rBg, m_brush.Get());
-			D2D1_ROUNDED_RECT rFg = { { barL, barTop, barL + pct * (barR - barL), barTop + barH }, radius, radius };
-			m_brush->SetColor(pct < 0.1f ? warnCol : goodCol);
-			m_renderTarget->FillRoundedRectangle(&rFg, m_brush.Get());
-
-			// White stroke around the bar
-			m_brush->SetColor(float4(1,1,1,0.9f));
-			m_renderTarget->DrawRoundedRectangle(&rBg, m_brush.Get(), 2.0f);
+			const float cfgCorner = g_cfg.getFloat(m_name, "corner_radius", -1.0f);
+			if (cfgCorner > 0.0f) corner = std::clamp(cfgCorner, 3.0f, minDim * 0.5f);
 		}
 
-		// Fuel bar labels
-		m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-		// "E" on the left (aligned to left edge of bar)
-		m_text.render(m_renderTarget.Get(), L"E", m_textFormatSmall.Get(), barL, barL + leftTextWidth, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+		D2D1_RECT_F rCard = { pad, pad, W - pad, H - pad };
+		const float cardW = std::max(1.0f, rCard.right - rCard.left);
+		const float cardH = std::max(1.0f, rCard.bottom - rCard.top);
 
-		// Remaining fuel in the middle
-		if (remainingFuel >= 0.0f)
+		// Card background gradient
 		{
-			float val = remainingFuel; if (imperial) val *= 0.264172f;
-			swprintf(s, _countof(s), imperial ? L"%.1f G" : L"%.1f L", val);
-			const float centerX = barL + (barR - barL) / 2.0f;
-			m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), centerX - centerTextWidth/2, centerX + centerTextWidth/2, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+			D2D1_ROUNDED_RECT rrCard = { rCard, corner, corner };
+			if (m_bgBrush) {
+				m_bgBrush->SetStartPoint(D2D1_POINT_2F{ rCard.left, rCard.top });
+				m_bgBrush->SetEndPoint(D2D1_POINT_2F{ rCard.left, rCard.bottom });
+				m_renderTarget->FillRoundedRectangle(&rrCard, m_bgBrush.Get());
+			} else {
+				m_brush->SetColor(float4(0.05f, 0.05f, 0.06f, 0.92f * globalOpacity));
+				m_renderTarget->FillRoundedRectangle(&rrCard, m_brush.Get());
+			}
 		}
 
-		// Full tank capacity on the right (aligned to right edge of bar)
-		if (fuelCapacity > 0.0f)
-		{
-			float val = fuelCapacity; if (imperial) val *= 0.264172f;
-			swprintf(s, _countof(s), imperial ? L"%.1f G" : L"%.1f L", val);
-			m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), barR - rightTextWidth, barR, barTop + barH + 12, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
-		}
+		const float bannerH = std::clamp(cardH * 0.075f, 18.0f, 26.0f);
+		D2D1_RECT_F rBanner = {
+			rCard.left + innerPad,
+			rCard.top + innerPad,
+			rCard.right - innerPad,
+			rCard.top + innerPad + bannerH
+		};
+		const float bannerRadius = bannerH * 0.22f;
 
-		// Column data
-		const float baseFontSize = g_cfg.getFloat(m_name, "font_size", g_cfg.getFloat("Overlay", "font_size", 16.0f));
-		const float lineHeight = baseFontSize * 1.75f;
-		const float colYStart = 100.0f;
-		int rowCnt = 0;
+		// Determine warning state for accent color
+		const float fuelPct = std::clamp(useStub ? StubDataManager::getStubFuelLevelPct() : ir_FuelLevelPct.getFloat(), 0.0f, 1.0f);
+		const bool fuelWarn = fuelPct < 0.10f;
+		float4 accentCol = fuelWarn ? warnCol : ClassColors::self();
+		accentCol.w *= globalOpacity;
 
 		{
-			float y = colYStart + rowCnt * lineHeight;
-			// Alternating background
-			if (rowCnt & 1 && alternateLineBgCol.a > 0)
-			{
-				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
-				m_brush->SetColor(alternateLineBgCol);
-				m_renderTarget->FillRectangle(&r, m_brush.Get());
+			D2D1_ROUNDED_RECT rrBan = { rBanner, bannerRadius, bannerRadius };
+			if (m_panelBrush) {
+				m_panelBrush->SetStartPoint(D2D1_POINT_2F{ rBanner.left, rBanner.top });
+				m_panelBrush->SetEndPoint(D2D1_POINT_2F{ rBanner.left, rBanner.bottom });
+				m_renderTarget->FillRoundedRectangle(&rrBan, m_panelBrush.Get());
+			} else {
+				m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.88f * globalOpacity));
+				m_renderTarget->FillRoundedRectangle(&rrBan, m_brush.Get());
 			}
 
+			// Subtle border
+			m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * globalOpacity));
+			m_renderTarget->DrawRoundedRectangle(&rrBan, m_brush.Get(), 1.5f);
+
+			// Banner text
+			if (m_textFormatLarge) {
+				m_textFormatLarge->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+				m_textFormatLarge->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+			}
+			m_brush->SetColor(float4(0.95f, 0.95f, 0.98f, 0.92f * globalOpacity));
+			m_text.render(m_renderTarget.Get(), L"FUEL", m_textFormatLarge.Get(), rBanner.left + innerPad, rBanner.right - innerPad, (rBanner.top + rBanner.bottom) * 0.5f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+		} // end banner
+
+		// Fuel bar (inset)
+		const float gap = std::clamp(cardH * 0.035f, 8.0f, 14.0f);
+		const float barH = std::clamp(cardH * 0.11f, 22.0f, 34.0f);
+		D2D1_RECT_F rBar = {
+			rCard.left + innerPad,
+			rBanner.bottom + gap,
+			rCard.right - innerPad,
+			rBanner.bottom + gap + barH
+		};
+
+		wchar_t s[128];
+
+		if (rBar.bottom > rBar.top + 8.0f)
+		{
+			const float barCorner = std::clamp(barH * 0.22f, 4.0f, 10.0f);
+			D2D1_ROUNDED_RECT rrBg = { rBar, barCorner, barCorner };
+
+			// Bar background + border
+			m_brush->SetColor(float4(0.04f, 0.05f, 0.06f, 0.70f * globalOpacity));
+			m_renderTarget->FillRoundedRectangle(&rrBg, m_brush.Get());
+			m_brush->SetColor(float4(0.80f, 0.82f, 0.86f, 0.28f * globalOpacity));
+			m_renderTarget->DrawRoundedRectangle(&rrBg, m_brush.Get(), 1.5f);
+
+			// Bar fill
+			const float fillW = (rBar.right - rBar.left) * fuelPct;
+			if (fillW > 0.0f) {
+				D2D1_RECT_F rFill = { rBar.left, rBar.top, rBar.left + fillW, rBar.bottom };
+				D2D1_ROUNDED_RECT rrFill = { rFill, barCorner, barCorner };
+				float4 fillCol = fuelWarn ? warnCol : goodCol;
+				fillCol.w *= globalOpacity;
+				m_brush->SetColor(fillCol);
+				m_renderTarget->FillRoundedRectangle(&rrFill, m_brush.Get());
+			}
+
+			// Center text (remaining fuel)
+			if (remainingFuel >= 0.0f) {
+				float val = remainingFuel; if (imperial) val *= 0.264172f;
+				swprintf(s, _countof(s), imperial ? L"%.1f GAL" : L"%.1f L", val);
+				if (m_textFormat) {
+					m_textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+					m_textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+				}
+				m_brush->SetColor(float4(1, 1, 1, 0.92f * globalOpacity));
+				m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), rBar.left, rBar.right, (rBar.top + rBar.bottom) * 0.5f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+			}
+		}
+
+		// Capacity + "E" footer under the bar (small, subtle)
+		const float yLabels = rBar.bottom + std::max(18.0f, gap * 1.45f);
+		{
+			const float yLbl = yLabels;
 			m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-			m_text.render(m_renderTarget.Get(), L"Avg per lap", m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+			if (m_textFormatSmall) {
+				m_textFormatSmall->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+				m_textFormatSmall->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+			}
+			m_text.render(m_renderTarget.Get(), L"E", m_textFormatSmall.Get(), rBar.left, rBar.left + 28.0f, yLbl, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+
+			if (fuelCapacity > 0.0f) {
+				float val = fuelCapacity; if (imperial) val *= 0.264172f;
+				swprintf(s, _countof(s), imperial ? L"%.1f GAL" : L"%.1f L", val);
+				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), rBar.right - 110.0f, rBar.right, yLbl, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+			}
+		}
+
+		// Data panel (rows)
+		// Extra breathing room between the labels row and the first data row
+		const float rowsTop = yLabels + std::max(26.0f, gap * 1.85f);
+		D2D1_RECT_F rPanel = {
+			rCard.left + innerPad,
+			rowsTop,
+			rCard.right - innerPad,
+			rCard.bottom - innerPad
+		};
+
+		if (rPanel.bottom > rPanel.top + 20.0f)
+		{
+			const float panelCorner = std::clamp(corner * 0.75f, 8.0f, 22.0f);
+			D2D1_ROUNDED_RECT rrPanel = { rPanel, panelCorner, panelCorner };
+			if (m_panelBrush) {
+				m_panelBrush->SetStartPoint(D2D1_POINT_2F{ rPanel.left, rPanel.top });
+				m_panelBrush->SetEndPoint(D2D1_POINT_2F{ rPanel.left, rPanel.bottom });
+				m_renderTarget->FillRoundedRectangle(&rrPanel, m_panelBrush.Get());
+			} else {
+				m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.88f * globalOpacity));
+				m_renderTarget->FillRoundedRectangle(&rrPanel, m_brush.Get());
+			}
+			m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * globalOpacity));
+			m_renderTarget->DrawRoundedRectangle(&rrPanel, m_brush.Get(), 1.5f);
+		}
+
+		const float xPad = rPanel.left + std::max(8.0f, innerPad * 0.75f);
+		const float xRight = rPanel.right - std::max(8.0f, innerPad * 0.75f);
+
+		// Column data (same values/logic as before)
+		const float baseFontSize = g_cfg.getFloat(m_name, "font_size", g_cfg.getFloat("Overlay", "font_size", 16.0f));
+		const float lineHeight = baseFontSize * 1.75f;
+		float y = rPanel.top + std::max(14.0f, lineHeight * 0.70f);
+		int rowCnt = 0;
+
+		auto drawRowBg = [&](float yCenter, bool isAlt)
+		{
+			if (!isAlt) return;
+			if (alternateLineBgCol.a <= 0) return;
+			float4 c = alternateLineBgCol;
+			c.w *= globalOpacity;
+			m_brush->SetColor(c);
+			D2D1_RECT_F r = { rPanel.left + 2.0f, yCenter - lineHeight * 0.5f, rPanel.right - 2.0f, yCenter + lineHeight * 0.5f };
+			m_renderTarget->FillRectangle(&r, m_brush.Get());
+		};
+
+		auto drawLabel = [&](const wchar_t* label, float yCenter, const float4& col)
+		{
+			m_brush->SetColor(float4(col.x, col.y, col.z, col.w * globalOpacity));
+			m_text.render(m_renderTarget.Get(), label, m_textFormatSmall.Get(), xPad, (xPad + xRight) * 0.5f, yCenter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+		};
+
+		auto drawValue = [&](const wchar_t* value, float yCenter, const float4& col)
+		{
+			m_brush->SetColor(float4(col.x, col.y, col.z, col.w * globalOpacity));
+			m_text.render(m_renderTarget.Get(), value, m_textFormatSmall.Get(), (xPad + xRight) * 0.5f, xRight, yCenter, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+		};
+
+		{
+			drawRowBg(y, (rowCnt & 1) != 0);
+			drawLabel(L"Avg per lap", y, textCol);
 
 			if (avgPerLap > 0.0f)
 			{
 				float val = avgPerLap; if (imperial) val *= 0.264172f;
 				swprintf(s, _countof(s), imperial ? L"%.2f G" : L"%.2f L", val);
-				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+				drawValue(s, y, textCol);
 			}
 			rowCnt++;
+			y += lineHeight;
 		}
 
 		{
-			float y = colYStart + rowCnt * lineHeight;
-			if (rowCnt & 1 && alternateLineBgCol.a > 0)
-			{
-				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
-				m_brush->SetColor(alternateLineBgCol);
-				m_renderTarget->FillRectangle(&r, m_brush.Get());
-			}
-
-			m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-			m_text.render(m_renderTarget.Get(), L"Refuel to finish", m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+			drawRowBg(y, (rowCnt & 1) != 0);
+			drawLabel(L"Refuel to finish", y, textCol);
 
 			if (perLapConsEst > 0.0f)
 			{
@@ -307,25 +432,18 @@ protected:
 					value = (targetLap + 1 - currentLap) * perLapConsEst - (m_lapStartRemainingFuel - reserve);
 				}
 				const bool warn = (value > (useStub ? StubDataManager::getStubPitServiceFuel() : ir_PitSvFuel.getFloat())) || (value > 0 && !(useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat()));
-				m_brush->SetColor(warn ? warnCol : goodCol);
+				const float4 valCol = warn ? warnCol : goodCol;
 				float val = value; if (imperial) val *= 0.264172f;
 				swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", val);
-				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+				drawValue(s, y, valCol);
 			}
 			rowCnt++;
+			y += lineHeight;
 		}
 
 		{
-			float y = colYStart + rowCnt * lineHeight;
-			if (rowCnt & 1 && alternateLineBgCol.a > 0)
-			{
-				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
-				m_brush->SetColor(alternateLineBgCol);
-				m_renderTarget->FillRectangle(&r, m_brush.Get());
-			}
-
-			m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
-			m_text.render(m_renderTarget.Get(), (targetLap==0?L"Add":L"Target"), m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+			drawRowBg(y, (rowCnt & 1) != 0);
+			drawLabel((targetLap == 0 ? L"Add" : L"Target"), y, textCol);
 
 			if (targetLap != 0) {
 				float targetFuel = (m_lapStartRemainingFuel - reserve) / (targetLap + 1 - currentLap);
@@ -333,82 +451,53 @@ protected:
 				if (imperial)
 					targetFuel *= 0.264172f;
 				swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", targetFuel);
-				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+				drawValue(s, y, textCol);
 			}
 			else {
 				float add = useStub ? StubDataManager::getStubPitServiceFuel() : ir_PitSvFuel.getFloat();
 				if (add >= 0)
 				{
-					if (useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat())
-						m_brush->SetColor(goodCol);
-
+					const bool canFill = (useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat()) != 0.0f;
+					const float4 addCol = canFill ? goodCol : warnCol;
 					if (imperial)
 						add *= 0.264172f;
 					swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", add);
-					m_text; 
+					drawValue(s, y, addCol);
 				}
 			}
 			rowCnt++;
+			y += lineHeight;
 		}
 
 		// Empty row for spacing
 		{
-			float y = colYStart + rowCnt * lineHeight;
-			if (rowCnt & 1 && alternateLineBgCol.a > 0)
-			{
-				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
-				m_brush->SetColor(alternateLineBgCol);
-				m_renderTarget->FillRectangle(&r, m_brush.Get());
-			}
+			drawRowBg(y, (rowCnt & 1) != 0);
 			rowCnt++;
+			y += lineHeight;
 		}
 
 		{
-			float y = colYStart + rowCnt * lineHeight;
-			if (rowCnt & 1 && alternateLineBgCol.a > 0)
-			{
-				D2D1_RECT_F r = { 4.0f, y - lineHeight/2, w - 4.0f, y + lineHeight/2 };
-				m_brush->SetColor(alternateLineBgCol);
-				m_renderTarget->FillRectangle(&r, m_brush.Get());
-			}
+			drawRowBg(y, (rowCnt & 1) != 0);
 
-			const float4 goldCol = float4(1.0f, 0.84f, 0.0f, textCol.w * globalOpacity);
-			m_brush->SetColor(goldCol);
-			m_text.render(m_renderTarget.Get(), L"Laps left", m_textFormatSmall.Get(), xPad, w/2, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+			const float4 goldCol = float4(1.0f, 0.84f, 0.0f, textCol.w);
+			drawLabel(L"Laps left", y, goldCol);
 
 			if (perLapConsEst > 0.0f)
 			{
 				const float estLaps = (remainingFuel - reserve) / perLapConsEst;
 				const bool lowFuelWarning = (estLaps <= 2.0f);
-				m_brush->SetColor(lowFuelWarning ? warnCol : goldCol);
+				const float4 lapsCol = lowFuelWarning ? warnCol : goldCol;
 				swprintf(s, _countof(s), L"%.*f", g_cfg.getInt(m_name, "fuel_decimal_places", 2), estLaps);
-				m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), w/2, w-xPad, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
-				m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * globalOpacity));
+				drawValue(s, y, lapsCol);
 			}
 			rowCnt++;
-		}
-
-		{
-			const float lapsLeftBorderY = colYStart + (rowCnt - 1 - 0.5f) * lineHeight;
-			D2D1_POINT_2F startPoint = { 4.0f, lapsLeftBorderY };
-			D2D1_POINT_2F endPoint = { w - 4.0f, lapsLeftBorderY };
-			m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, 1.0f));
-			m_renderTarget->DrawLine(startPoint, endPoint, m_brush.Get(), 3.0f);
-		}
-
-		// Draw white border at the top of rows
-		{
-			const float borderY = colYStart - lineHeight/2;
-			D2D1_POINT_2F startPoint = { 4.0f, borderY };
-			D2D1_POINT_2F endPoint = { w - 4.0f, borderY };
-			m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, 1.0f));
-			m_renderTarget->DrawLine(startPoint, endPoint, m_brush.Get(), 3.0f);
+			y += lineHeight;
 		}
 
 		m_renderTarget->EndDraw();
 	}
 
-	virtual bool hasCustomBackground() { return false; }
+	virtual bool hasCustomBackground() { return true; }
 
 protected:
 	Microsoft::WRL::ComPtr<IDWriteTextFormat>	m_textFormat;
@@ -447,4 +536,61 @@ protected:
 			_snprintf_s(buf, _countof(buf), _TRUNCATE, "t%d_%s_c%d", trackId, cfg.c_str(), carId);
 			return std::string(buf);
 		}
+
+private:
+	void ensureStyleBrushes()
+	{
+		if (!m_renderTarget) return;
+		if (m_bgBrush && m_panelBrush) return;
+
+		// Card background gradient (same palette as OverlayPit/OverlayFlags)
+		{
+			D2D1_GRADIENT_STOP stops[3] = {};
+			stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.16f, 0.18f, 0.22f, 0.95f);
+			stops[1].position = 0.45f; stops[1].color = D2D1::ColorF(0.06f, 0.07f, 0.09f, 0.95f);
+			stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.95f);
+
+			Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+			HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+				stops,
+				ARRAYSIZE(stops),
+				D2D1_GAMMA_2_2,
+				D2D1_EXTEND_MODE_CLAMP,
+				stopCollection.GetAddressOf()
+			);
+			if (SUCCEEDED(hr)) {
+				D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+				props.startPoint = D2D1_POINT_2F{ 0,0 };
+				props.endPoint = D2D1_POINT_2F{ 0,1 };
+				m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_bgBrush.GetAddressOf());
+			}
+		}
+
+		// Inner panel gradient (same palette as OverlayPit/OverlayFlags)
+		{
+			D2D1_GRADIENT_STOP stops[3] = {};
+			stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.08f, 0.09f, 0.11f, 0.92f);
+			stops[1].position = 0.55f; stops[1].color = D2D1::ColorF(0.04f, 0.045f, 0.055f, 0.92f);
+			stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.92f);
+
+			Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+			HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+				stops,
+				ARRAYSIZE(stops),
+				D2D1_GAMMA_2_2,
+				D2D1_EXTEND_MODE_CLAMP,
+				stopCollection.GetAddressOf()
+			);
+			if (SUCCEEDED(hr)) {
+				D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+				props.startPoint = D2D1_POINT_2F{ 0,0 };
+				props.endPoint = D2D1_POINT_2F{ 0,1 };
+				m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_panelBrush.GetAddressOf());
+			}
+		}
+	}
+
+	// Styling brushes (cached; recreated on config change / enable)
+	Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_bgBrush;
+	Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_panelBrush;
 };
