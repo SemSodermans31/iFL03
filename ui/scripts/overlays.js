@@ -68,6 +68,11 @@ const overlayConfig = {
 		name: 'Pit Entry',
 		configKey: 'OverlayPit',
 		description: 'Distance to pitlane entry'
+	},
+	'traffic': {
+		name: 'Traffic',
+		configKey: 'OverlayTraffic',
+		description: 'Faster-class warning popup (multiclass)'
 	}
 };
 
@@ -598,6 +603,7 @@ function updateOverlaySettings(overlayKey) {
 		const defaults = {
 			OverlayInputs: 30,
 			OverlayPit: 30,
+			OverlayTraffic: 15,
 			OverlayDelta: 15,
 			OverlayTrack: 15,
 			OverlayDDU: 10,
