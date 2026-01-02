@@ -36,7 +36,22 @@
 			</div>
 		</header>
 
-		<main class="flex-1 flex min-h-0 overflow-hidden bg-[#000000]">
+		<header id="overlays-help-section" class="sticky top-0 z-10 bg-[#121212] m-2 rounded-xl">
+			<div class="m-2 rounded-xl">
+				<div class="flex items-start justify-between gap-4">
+					<div id="overlays-help-content" class="text-left flex-1 p-2">
+						<h2 class="text-lg p-2 font-semibold text-slate-100">How do I use the overlays?</h2>
+						<p class="text-sm p-2 text-[#a8a8a8]">The overlays are displayed in a grid below. You can click on an overlay to open the settings for that overlay on the right side of the screen.</p>
+						<p class="text-sm p-2 text-[#a8a8a8]">Once an overlay is active, a green border will appear around the overlay icon.</p>
+					</div>
+					<button id="btn-toggle-overlays-help" class="shrink-0 rounded-lg bg-[#1f1f1f] px-3 py-2 text-sm font-medium text-slate-200 hover:bg-[#3c3c3c]">
+						Hide
+					</button>
+				</div>
+			</div>
+		</header>
+
+		<main class="flex-1 flex min-h-0 overflow-hidden bg-[#000000]">			
 			<!-- Overlay Grid -->
 			<div class="flex-1 overflow-y-auto m-2 rounded-xl">
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

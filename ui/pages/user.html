@@ -133,6 +133,20 @@
 				</div>
 			</section>
 
+			<!-- UI Preferences -->
+			<section class="rounded-xl bg-[#121212] p-6 space-y-4">
+				<h2 class="text-lg font-semibold text-slate-100">UI Preferences</h2>
+				<label class="flex items-center justify-between gap-4 rounded-lg bg-[#1f1f1f] px-3 py-2">
+					<span class="text-slate-200">Show “How do I use the overlays?” section</span>
+					<span class="relative inline-flex h-6 w-11 items-center">
+						<input type="checkbox" id="toggle-overlays-help" class="peer sr-only" />
+						<span class="block h-6 w-11 rounded-full bg-slate-600 transition-colors duration-200 ease-in-out peer-checked:bg-green-600"></span>
+						<span class="pointer-events-none absolute left-0 top-0.5 ml-0.5 h-5 w-5 rounded-full bg-white shadow translate-x-0 transition-transform duration-200 ease-in-out peer-checked:translate-x-[1.25rem]"></span>
+					</span>
+				</label>
+				<p class="text-xs text-[#a8a8a8]">Controls the help panel at the top of the Overlays page.</p>
+			</section>
+
 			<!-- Status Messages -->
 			<div id="statusMessage" class="hidden rounded-lg p-4">
 				<div id="statusText" class="text-sm font-medium"></div>

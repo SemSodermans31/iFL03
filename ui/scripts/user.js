@@ -38,6 +38,18 @@ function setupEventListeners() {
 	if (buddiesAdd) buddiesAdd.addEventListener('click', () => addListEntry('General', 'buddies', 'buddies-input'));
 	const flaggedAdd = document.getElementById('flagged-add');
 	if (flaggedAdd) flaggedAdd.addEventListener('click', () => addListEntry('General', 'flagged', 'flagged-input'));
+
+	// UI preferences
+	const overlaysHelpToggle = document.getElementById('toggle-overlays-help');
+	if (overlaysHelpToggle) {
+		overlaysHelpToggle.addEventListener('change', function() {
+			sendCommand(
+				{ cmd: 'setConfigBool', component: 'General', key: 'show_overlays_help', value: this.checked },
+				'Setting saved',
+				'Failed to save setting'
+			);
+		});
+	}
 }
 
 function requestState() {
@@ -74,6 +86,17 @@ function updateUI() {
 
 	// Update Ghost Telemetry UI
 	updateGhostTelemetryUI();
+
+	// Update UI preferences
+	updateUiPreferences();
+}
+
+function updateUiPreferences() {
+	const overlaysHelpToggle = document.getElementById('toggle-overlays-help');
+	if (!overlaysHelpToggle) return;
+	// Default to true if key is missing
+	const show = currentState?.config?.General?.show_overlays_help !== false;
+	overlaysHelpToggle.checked = !!show;
 }
 
 function updateConnectionStatus(status) {
