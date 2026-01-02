@@ -32,8 +32,6 @@ SOFTWARE.
 #include "ClassColors.h"
 #include "stub_data.h"
 
-// Warning popup for multiclass: a faster-class car approaching from behind.
-// Styling follows the Kapps-like "card" philosophy used by OverlayPit/Flags/Fuel.
 class OverlayTraffic : public Overlay
 {
 public:
@@ -112,7 +110,7 @@ protected:
         Target best = {};
         const bool found = selectBestTarget(best);
 
-        const float now = useStub ? (float)GetTickCount() * 0.001f : ir_SessionTime.getFloat();
+        const float now = useStub ? (float)GetTickCount() * 0.001f : ir_nowf();
 
         // Session time going backwards (replay/seek) -> clear state
         if (m_lastSessionTime >= 0.0f && now + 0.001f < m_lastSessionTime)
@@ -168,7 +166,6 @@ protected:
 
         ensureStyleBrushes();
 
-        // Layout (Kapps-like card)
         const float W = (float)m_width;
         const float H = (float)m_height;
         const float minDim = std::max(1.0f, std::min(W, H));
@@ -402,7 +399,7 @@ private:
         const float selfPct = std::clamp(ir_LapDistPct.getFloat(), 0.0f, 1.0f);
         const float selfEst = ir_CarIdxEstTime.getFloat(selfIdx);
 
-        // Use an estimate of *our* lap time to normalize wrap correction and distance conversion.
+        // Use an estimate of *our* lap time (same reference as OverlayRelative) to normalize wrap correction and distance conversion.
         float lapTimeRef = selfClassEst;
         if (lapTimeRef <= 0.1f) lapTimeRef = ir_estimateLaptime();
         if (lapTimeRef <= 0.1f) lapTimeRef = 120.0f;
@@ -434,11 +431,15 @@ private:
             }
 
             const float otherPct = ir_CarIdxLapDistPct.getFloat(i);
-            const float otherEst = ir_CarIdxEstTime.getFloat(i);
-            if (otherPct < 0.0f || otherEst <= 0.0f || selfEst <= 0.0f) continue;
+            // Match OverlayRelative: normalize other car's EstTime into *our* class-time domain before comparing.
+            const float classRatio = (selfClassEst > 0.1f) ? (otherClassEst / selfClassEst) : 1.0f;
+            if (classRatio <= 0.01f) continue;
+            const float otherEstNorm = ir_CarIdxEstTime.getFloat(i) / classRatio;
+            if (otherPct < 0.0f || otherEstNorm <= 0.0f || selfEst <= 0.0f) continue;
 
             // Delta in seconds, wrap-safe. Positive means other ahead, negative means other behind.
-            float delta = otherEst - selfEst;
+            // (After normalization, this matches the sign behavior used by OverlayRelative.)
+            float delta = otherEstNorm - selfEst;
             const bool wrap = fabsf(otherPct - selfPct) > 0.5f;
             if (wrap)
             {

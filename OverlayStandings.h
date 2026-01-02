@@ -69,11 +69,9 @@ public:
 
     void setCarBrandIcons(const std::map<std::string, IWICFormatConverter*>& carBrandIconsMap, bool loaded)
     {
-        // Release any previous
-        for (auto& it : m_carIdToIconMap) {
-            if (it.second) it.second->Release();
-        }
+        // Drop any cached bitmaps (they are tied to this overlay's render target)
         m_carIdToIconMap.clear();
+        m_brandConvToBitmap.clear();
         m_carBrandIconsMap = carBrandIconsMap;
         m_carBrandIconsLoaded = loaded;
     }
@@ -110,11 +108,9 @@ protected:
     {
         m_text.reset();
 
-        // Clear car brand bitmap pointers on disable
-        for (auto pair : m_carIdToIconMap) {
-            pair.second->Release();
-        }
+        // Clear car brand bitmap caches on disable
         m_carIdToIconMap.clear();
+        m_brandConvToBitmap.clear();
 
         // Release positions gained icons/factory
         releasePositionIcons();
@@ -210,6 +206,7 @@ protected:
         if (useStubData) {
             StubDataManager::populateSessionCars();
         }
+        const int talkerCarIdx = (!useStubData && ir_RadioTransmitCarIdx.isValid()) ? ir_RadioTransmitCarIdx.getInt() : -1;
         
         // Apply global opacity to colors
         const float globalOpacity = getGlobalOpacity();
@@ -825,6 +822,7 @@ protected:
 
                 const CarInfo&  ci  = carInfo[row.carInfoIndex];
                 const Car&      car = ir_session.cars[ci.carIdx];
+                const bool      isTalking = (talkerCarIdx >= 0 && talkerCarIdx == ci.carIdx);
 
                 // Alternating line backgrounds (within class)
                 if ((row.rowIndexInClass & 1) && alternateLineBgCol.a > 0)
@@ -888,28 +886,42 @@ protected:
                 // Car number
                 {
                     clm = m_columns.get((int)Columns::CAR_NUMBER);
-                    swprintf(s, _countof(s), L"#%S", car.carNumberStr.c_str());
-                    r = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textR, rowY + lineHeight / 2 };
-                    rr.rect = { r.left - 2, r.top + 1, r.right + 2, r.bottom - 1 };
-                    rr.radiusX = 3;
-                    rr.radiusY = 3;
-                    // Use class base color for number background (matches header base color)
-                    float4 numBg = ClassColors::get(ci.classIdx);
-                    numBg.a *= globalOpacity;
-                    if (isGone) numBg.a *= 0.5f;
-                    m_brush->SetColor(numBg);
-                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
-                    // Left accent strip using class light color
+                    // While driver is transmitting on voice, replace the car-number badge with the push-to-talk icon.
+                    if (isTalking && m_pushToTalkIcon)
                     {
-                        float4 stripCol = ClassColors::getLight(ci.classIdx);
-                        stripCol.a = numBg.a;
-                        m_brush->SetColor(stripCol);
-                        const float stripW = 3.0f;
-                        D2D1_RECT_F strip = { rr.rect.left + 1.0f, rr.rect.top + 1.0f, rr.rect.left + 1.0f + stripW, rr.rect.bottom - 1.0f };
-                        m_renderTarget->FillRectangle(&strip, m_brush.Get());
+                        const float cellL = xoff + clm->textL;
+                        const float cellR = xoff + clm->textR;
+                        const float cellW = cellR - cellL;
+                        const float iconSize = std::max(0.0f, std::min(lineHeight - 6.0f, cellW));
+                        const float cx = (cellL + cellR) * 0.5f;
+                        D2D1_RECT_F ir = { cx - iconSize * 0.5f, rowY - iconSize * 0.5f, cx + iconSize * 0.5f, rowY + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(m_pushToTalkIcon.Get(), &ir);
                     }
-                    m_brush->SetColor(float4(1, 1, 1, 1));
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    else
+                    {
+                        swprintf(s, _countof(s), L"#%S", car.carNumberStr.c_str());
+                        r = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textR, rowY + lineHeight / 2 };
+                        rr.rect = { r.left - 2, r.top + 1, r.right + 2, r.bottom - 1 };
+                        rr.radiusX = 3;
+                        rr.radiusY = 3;
+                        // Use class base color for number background (matches header base color)
+                        float4 numBg = ClassColors::get(ci.classIdx);
+                        numBg.a *= globalOpacity;
+                        if (isGone) numBg.a *= 0.5f;
+                        m_brush->SetColor(numBg);
+                        m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        // Left accent strip using class light color
+                        {
+                            float4 stripCol = ClassColors::getLight(ci.classIdx);
+                            stripCol.a = numBg.a;
+                            m_brush->SetColor(stripCol);
+                            const float stripW = 3.0f;
+                            D2D1_RECT_F strip = { rr.rect.left + 1.0f, rr.rect.top + 1.0f, rr.rect.left + 1.0f + stripW, rr.rect.bottom - 1.0f };
+                            m_renderTarget->FillRectangle(&strip, m_brush.Get());
+                        }
+                        m_brush->SetColor(float4(1, 1, 1, 1));
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
                 }
 
                 // Name
@@ -979,13 +991,29 @@ protected:
                 // Car brand
                 if ((clm = m_columns.get((int)Columns::CAR_BRAND)) && m_carBrandIconsLoaded)
                 {
-                    if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end()) {
-                        m_renderTarget->CreateBitmapFromWicBitmap(findCarBrandIcon(car.carName, m_carBrandIconsMap), nullptr, &m_carIdToIconMap[car.carID]);
+                    if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end())
+                    {
+                        // Cache by *brand converter* first (dedupe across different carIDs using same manufacturer icon),
+                        // then map carID -> bitmap for fast lookup during rendering.
+                        IWICFormatConverter* conv = findCarBrandIcon(car.carName, m_carBrandIconsMap);
+                        if (conv)
+                        {
+                            auto& brandBmp = m_brandConvToBitmap[conv];
+                            if (!brandBmp)
+                            {
+                                (void)m_renderTarget->CreateBitmapFromWicBitmap(conv, nullptr, &brandBmp);
+                            }
+                            if (brandBmp)
+                            {
+                                m_carIdToIconMap[car.carID] = brandBmp;
+                            }
+                        }
                     }
 
-                    if (m_carIdToIconMap[car.carID] != 0) {
+                    const auto itBmp = m_carIdToIconMap.find(car.carID);
+                    if (itBmp != m_carIdToIconMap.end() && itBmp->second) {
                         D2D1_RECT_F br = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textL + lineHeight, rowY + lineHeight / 2 };
-                        m_renderTarget->DrawBitmap(m_carIdToIconMap[car.carID], br);
+                        m_renderTarget->DrawBitmap(itBmp->second.Get(), br);
                     }
                 }
 
@@ -1201,6 +1229,7 @@ protected:
 
                 const CarInfo&  ci = carInfo[i];
                 const Car&      car = ir_session.cars[ci.carIdx];
+                const bool      isTalking = (talkerCarIdx >= 0 && talkerCarIdx == ci.carIdx);
 
                 // Dim color if player is disconnected.
                 const bool isGone = !car.isSelf && ir_CarIdxTrackSurface.getInt(ci.carIdx) == irsdk_NotInWorld;
@@ -1256,28 +1285,42 @@ protected:
                 // Car number
                 {
                     clm = m_columns.get((int)Columns::CAR_NUMBER);
-                    swprintf(s, _countof(s), L"#%S", car.carNumberStr.c_str());
-                    r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
-                    rr.rect = { r.left - 2, r.top + 1, r.right + 2, r.bottom - 1 };
-                    rr.radiusX = 3;
-                    rr.radiusY = 3;
-                    // Use class base color for number background (matches header base color)
-                    float4 numBg = ClassColors::get(ci.classIdx);
-                    numBg.a *= globalOpacity;
-                    if (isGone) numBg.a *= 0.5f;
-                    m_brush->SetColor(numBg);
-                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
-                    // Left accent strip using class light color
+                    // While driver is transmitting on voice, replace the car-number badge with the push-to-talk icon.
+                    if (isTalking && m_pushToTalkIcon)
                     {
-                        float4 stripCol = ClassColors::getLight(ci.classIdx);
-                        stripCol.a = numBg.a;
-                        m_brush->SetColor(stripCol);
-                        const float stripW = 3.0f;
-                        D2D1_RECT_F strip = { rr.rect.left + 1.0f, rr.rect.top + 1.0f, rr.rect.left + 1.0f + stripW, rr.rect.bottom - 1.0f };
-                        m_renderTarget->FillRectangle(&strip, m_brush.Get());
+                        const float cellL = xoff + clm->textL;
+                        const float cellR = xoff + clm->textR;
+                        const float cellW = cellR - cellL;
+                        const float iconSize = std::max(0.0f, std::min(lineHeight - 6.0f, cellW));
+                        const float cx = (cellL + cellR) * 0.5f;
+                        D2D1_RECT_F ir = { cx - iconSize * 0.5f, y - iconSize * 0.5f, cx + iconSize * 0.5f, y + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(m_pushToTalkIcon.Get(), &ir);
                     }
-                    m_brush->SetColor(float4(1, 1, 1, 1));
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    else
+                    {
+                        swprintf(s, _countof(s), L"#%S", car.carNumberStr.c_str());
+                        r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                        rr.rect = { r.left - 2, r.top + 1, r.right + 2, r.bottom - 1 };
+                        rr.radiusX = 3;
+                        rr.radiusY = 3;
+                        // Use class base color for number background (matches header base color)
+                        float4 numBg = ClassColors::get(ci.classIdx);
+                        numBg.a *= globalOpacity;
+                        if (isGone) numBg.a *= 0.5f;
+                        m_brush->SetColor(numBg);
+                        m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        // Left accent strip using class light color
+                        {
+                            float4 stripCol = ClassColors::getLight(ci.classIdx);
+                            stripCol.a = numBg.a;
+                            m_brush->SetColor(stripCol);
+                            const float stripW = 3.0f;
+                            D2D1_RECT_F strip = { rr.rect.left + 1.0f, rr.rect.top + 1.0f, rr.rect.left + 1.0f + stripW, rr.rect.bottom - 1.0f };
+                            m_renderTarget->FillRectangle(&strip, m_brush.Get());
+                        }
+                        m_brush->SetColor(float4(1, 1, 1, 1));
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
                 }
 
                 // Name
@@ -1347,13 +1390,27 @@ protected:
                 // Car brand
                 if ((clm = m_columns.get((int)Columns::CAR_BRAND)) && m_carBrandIconsLoaded)
                 {
-                    if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end()) {
-                        m_renderTarget->CreateBitmapFromWicBitmap(findCarBrandIcon(car.carName, m_carBrandIconsMap), nullptr, &m_carIdToIconMap[car.carID]);
+                    if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end())
+                    {
+                        IWICFormatConverter* conv = findCarBrandIcon(car.carName, m_carBrandIconsMap);
+                        if (conv)
+                        {
+                            auto& brandBmp = m_brandConvToBitmap[conv];
+                            if (!brandBmp)
+                            {
+                                (void)m_renderTarget->CreateBitmapFromWicBitmap(conv, nullptr, &brandBmp);
+                            }
+                            if (brandBmp)
+                            {
+                                m_carIdToIconMap[car.carID] = brandBmp;
+                            }
+                        }
                     }
 
-                    if (m_carIdToIconMap[car.carID] != 0) {
+                    const auto itBmp = m_carIdToIconMap.find(car.carID);
+                    if (itBmp != m_carIdToIconMap.end() && itBmp->second) {
                         D2D1_RECT_F br = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textL + lineHeight, y + lineHeight / 2 };
-                        m_renderTarget->DrawBitmap(m_carIdToIconMap[car.carID], br);
+                        m_renderTarget->DrawBitmap(itBmp->second.Get(), br);
                     }
                 }
 
@@ -1618,7 +1675,7 @@ protected:
     void loadPositionIcons()
     {
         if (!m_renderTarget.Get()) return;
-        if (m_posUpIcon || m_posDownIcon || m_posEqualIcon) return;
+        if (m_posUpIcon || m_posDownIcon || m_posEqualIcon || m_pushToTalkIcon) return;
 
         (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (!m_wicFactory.Get()) {
@@ -1644,6 +1701,7 @@ protected:
         m_posUpIcon    = loadPng(L"assets\\icons\\up.png");
         m_posDownIcon  = loadPng(L"assets\\icons\\down.png");
         m_posEqualIcon = loadPng(L"assets\\icons\\equal.png");
+        m_pushToTalkIcon = loadPng(L"assets\\icons\\pushtotalk.png");
     }
 
     void releasePositionIcons()
@@ -1651,6 +1709,7 @@ protected:
         m_posUpIcon.Reset();
         m_posDownIcon.Reset();
         m_posEqualIcon.Reset();
+        m_pushToTalkIcon.Reset();
         m_wicFactory.Reset();
     }
 
@@ -1658,6 +1717,7 @@ protected:
     void loadFooterIcons()
     {
         if (!m_renderTarget.Get()) return;
+        if (m_iconIncidents || m_iconSoF || m_iconTrackTemp || m_iconSessionTime || m_iconLaps) return;
         (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (!m_wicFactory.Get()) {
             (void)CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory));
@@ -1698,7 +1758,8 @@ protected:
     std::vector<std::vector<float>> m_avgL5Times;
     bool m_carBrandIconsLoaded;
     std::map<std::string, IWICFormatConverter*> m_carBrandIconsMap;
-    std::map<int, ID2D1Bitmap*> m_carIdToIconMap;
+    std::map<IWICFormatConverter*, Microsoft::WRL::ComPtr<ID2D1Bitmap>> m_brandConvToBitmap;
+    std::map<int, Microsoft::WRL::ComPtr<ID2D1Bitmap>> m_carIdToIconMap;
     std::set<std::string> notFoundBrands;
 
     // Position change icons
@@ -1706,6 +1767,7 @@ protected:
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posUpIcon;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posDownIcon;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posEqualIcon;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_pushToTalkIcon;
 
     // Footer icons bitmaps
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconIncidents;

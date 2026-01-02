@@ -571,6 +571,7 @@ private:
     bool   m_hasCrossedSFPerCar[IR_MAX_CARS] = { false };
     int    m_lastIncidentCountPerCar[IR_MAX_CARS] = { 0 };
     bool   m_wasInPitStallSelf = false;
+    double m_lastTimingNow = -1.0;
 
 
     void loadPathFromJson()
@@ -724,6 +725,7 @@ private:
             m_lastIncidentCountPerCar[i] = 0;
         }
         m_perCarInitialized = false;
+        m_lastTimingNow = -1.0;
     }
 
     void buildAdjustedSectorStarts()
@@ -876,8 +878,17 @@ private:
     {
         if (m_sectorStartsAdjusted.size() < 2) return;
 
-        const double now = ir_SessionTime.getDouble();
+        const double now = ir_now();
         const int selfIdx = ir_session.driverCarIdx;
+
+        // Replay scrubbing/seek can make time jump backwards. Reset timing state so we
+        // don't produce negative sector times or get stuck.
+        if (m_lastTimingNow >= 0.0 && now + 0.001 < m_lastTimingNow)
+        {
+            resetSectorTiming();
+            return;
+        }
+        m_lastTimingNow = now;
 
         // Initialize per-car state once
         if (!m_perCarInitialized) {

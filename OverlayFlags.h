@@ -44,7 +44,6 @@ protected:
 
 	virtual float2 getDefaultSize()
 	{
-		// Wide but compact (Kapps-like "card")
 		return float2(640, 220);
 	}
 
@@ -59,21 +58,15 @@ protected:
 
 	virtual void onConfigChanged()
 	{
-		// Per-overlay FPS (configurable; default 10)
 		setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
 
-		// Centralized fonts
 		m_text.reset(m_dwriteFactory.Get());
 		createGlobalTextFormat(1.05f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatTop);
-		createGlobalTextFormat(2.10f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatMain);
+		createGlobalTextFormat(1.45f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_textFormatMain);
 
-		// Recreate D2D brushes (render target may change)
 		m_bgBrush.Reset();
 		m_panelBrush.Reset();
 		m_bannerClipLayer.Reset();
-
-		// Per-overlay FPS (configurable; default 10)
-		// (already set above)
 	}
 
 	virtual void onUpdate()
@@ -83,11 +76,9 @@ protected:
 		wchar_t sTop[256] = L"";
 		wchar_t sBottom[256] = L"";
 
-		// Resolve active flag info from iracing bitfield
 		FlagInfo info = resolveActiveFlag();
 		if( !info.active )
 		{
-			// Nothing to show – clear and early out
 			m_renderTarget->BeginDraw();
 			m_renderTarget->Clear( float4(0,0,0,0) );
 			m_renderTarget->EndDraw();
@@ -110,7 +101,6 @@ protected:
 
 		ensureStyleBrushes();
 
-		// Layout (Kapps-like card)
 		{
 			const float W = (float)m_width;
 			const float H = (float)m_height;
@@ -123,7 +113,6 @@ protected:
 			const float cardW = std::max(1.0f, rCard.right - rCard.left);
 			const float cardH = std::max(1.0f, rCard.bottom - rCard.top);
 
-			// Card background gradient
 			{
 				D2D1_ROUNDED_RECT rr = { rCard, corner, corner };
 				if (m_bgBrush) {
@@ -136,7 +125,6 @@ protected:
 				}
 			}
 
-			// Banner (dark panel + colored accent strip)
 			const float bannerH = std::clamp(cardH * 0.22f, 34.0f, 60.0f);
 			D2D1_RECT_F rBanner = {
 				rCard.left + innerPad,
@@ -158,11 +146,9 @@ protected:
 					m_renderTarget->FillRoundedRectangle(&rrBan, m_brush.Get());
 				}
 
-				// Subtle border
 				m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * globalOpacity));
 				m_renderTarget->DrawRoundedRectangle(&rrBan, m_brush.Get(), 1.5f);
 
-				// Banner text: flag name (top text)
 				if (m_textFormatTop) {
 					m_textFormatTop->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
 					m_textFormatTop->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
@@ -183,7 +169,6 @@ protected:
 				);
 			}
 
-			// Main panel: filled with flag color (flat), with subtle border like Kapps cards
 			const float gap = std::clamp(cardH * 0.035f, 8.0f, 14.0f);
 			D2D1_RECT_F rPanel = {
 				rCard.left + innerPad,
@@ -193,7 +178,6 @@ protected:
 			};
 			if (rPanel.bottom > rPanel.top + 20.0f)
 			{
-				// Slightly larger radius for the bottom "flag" panel (requested)
 				const float panelW = std::max(1.0f, rPanel.right - rPanel.left);
 				const float panelH = std::max(1.0f, rPanel.bottom - rPanel.top);
 				float panelCorner = std::clamp(corner * 0.95f, 20.0f, 30.0f);
@@ -210,7 +194,6 @@ protected:
 				m_brush->SetColor(borderCol);
 				m_renderTarget->DrawRoundedRectangle(&rrPanel, m_brush.Get(), 1.5f);
 
-				// Main text: message (bottom text)
 				if (m_textFormatMain) {
 					m_textFormatMain->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
 					m_textFormatMain->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
@@ -242,7 +225,6 @@ private:
 		if (!m_renderTarget) return;
 		if (m_bgBrush && m_panelBrush) return;
 
-		// Card background gradient (same palette as OverlayPit)
 		{
 			D2D1_GRADIENT_STOP stops[3] = {};
 			stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.16f, 0.18f, 0.22f, 0.95f);
@@ -265,7 +247,6 @@ private:
 			}
 		}
 
-		// Inner panel gradient (same palette as OverlayPit)
 		{
 			D2D1_GRADIENT_STOP stops[3] = {};
 			stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.08f, 0.09f, 0.11f, 0.92f);
@@ -384,7 +365,6 @@ protected:
 	TextCache m_text;
 	float m_fontSpacing = getGlobalFontSpacing();
 
-	// Styling brushes (cached; recreated on config change / enable)
 	Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_bgBrush;
 	Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_panelBrush;
 	Microsoft::WRL::ComPtr<ID2D1Layer> m_bannerClipLayer;

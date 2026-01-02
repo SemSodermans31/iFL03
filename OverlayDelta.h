@@ -193,24 +193,25 @@ protected:
 
     float4 getDeltaColor(float delta) const
     {
-        // Color based on trend: green if improving, red if getting worse
         if (m_isDeltaImproving) {
-            return float4(0.0f, 0.9f, 0.2f, 1.0f); // Green (improving/gaining time)
+            return float4(0.0f, 0.9f, 0.2f, 1.0f);
         } else {
-            return float4(1.0f, 0.2f, 0.2f, 1.0f); // Red (getting worse/losing time)
+            return float4(1.0f, 0.2f, 0.2f, 1.0f); 
         }
     }
 
     bool shouldShowDelta() const
     {
         if (StubDataManager::shouldUseStubData()) {
-            return StubDataManager::getStubDeltaValid(); // Show when stub data says delta is valid
+            return StubDataManager::getStubDeltaValid();
         }
 
-        // Must be on track
-        const bool isOnTrack = ir_IsOnTrack.getBool();
-        if (!isOnTrack) {
-            return false;
+        if (!ir_isReplayActive())
+        {
+            const bool isOnTrack = ir_IsOnTrack.getBool();
+            if (!isOnTrack) {
+                return false;
+            }
         }
 
         // Don't show in pits
@@ -241,7 +242,7 @@ protected:
                 deltaValid = ir_LapDeltaToSessionOptimalLap_OK.getBool();
                 break;
             case ReferenceMode::LAST_LAP:
-                deltaValid = ir_LapDeltaToBestLap_OK.getBool(); // Fallback
+                deltaValid = ir_LapDeltaToBestLap_OK.getBool();
                 break;
         }
 
@@ -288,29 +289,22 @@ protected:
         const float4 circleBackground = float4(0.1f, 0.1f, 0.1f, 0.95f);
         const float4 deltaColor = getDeltaColor(delta);
         
-        // Draw main circle background
         m_brush->SetColor(circleBackground);
         D2D1_ELLIPSE circle = { { centerX, centerY }, radius, radius };
         m_renderTarget->FillEllipse(&circle, m_brush.Get());
         
-        // Draw outer ring (scaled thickness)
         m_brush->SetColor(circleOutline);
         m_renderTarget->DrawEllipse(&circle, m_brush.Get(), 2.0f * scale);
         
-        // Draw delta accent ring (progress based on delta magnitude, color based on delta sign)
-        float deltaProgress = std::min(1.0f, fabs(delta) / 2.0f); // Max 2 seconds for full ring
+        float deltaProgress = std::min(1.0f, fabs(delta) / 2.0f);
         if (deltaProgress > 0.1f) {
             drawArcProgress(centerX, centerY, radius - (4.0f * scale), deltaProgress, deltaColor, scale);
         }
-        
-        // Label is cached and drawn via static labels bitmap
-        
-        // Draw delta value in center (scaled positioning)
+                        
         wchar_t deltaBuffer[32];
-        if (fabs(delta) < 0.005f) { // Less than half a hundredth
+        if (fabs(delta) < 0.005f) {
             swprintf_s(deltaBuffer, L"±0.00");
         } else {
-            // Display in hundredths format (+0.48/-0.48)
             swprintf_s(deltaBuffer, L"%+.2f", delta);
         }
         
@@ -329,12 +323,10 @@ protected:
         
         HRCHECK(m_d2dFactory->CreatePathGeometry(&arcGeometry));
         HRCHECK(arcGeometry->Open(&geometrySink));
+
+        float startAngle = -1.5708f;
+        float endAngle = startAngle + (progress * 6.28318f);
         
-        // Calculate arc angles (start from top, go clockwise)
-        float startAngle = -1.5708f; // -90 degrees (top)
-        float endAngle = startAngle + (progress * 6.28318f); // Full circle = 2*PI
-        
-        // Calculate start and end points
         float startX = centerX + cosf(startAngle) * radius;
         float startY = centerY + sinf(startAngle) * radius;
         float endX = centerX + cosf(endAngle) * radius;
@@ -429,7 +421,6 @@ protected:
                 
                 m_brush->SetColor(predictedColor);
                 m_text.render( m_renderTarget.Get(), timeBuffer, m_scaledDeltaFormat.Get(), rightX, rightX + columnWidth, timeY + (timeHeight * 0.6f), m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing * 3.0f );
-                // Predicted label drawn via static labels bitmap
             }
         }
     }

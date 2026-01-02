@@ -67,30 +67,26 @@ protected:
 
     virtual bool hasCustomBackground() { return true; }
 
-    // Taller default to match the new "card" styling (can still be resized freely)
     virtual float2 getDefaultSize() { return float2(320, 320); }
 
     virtual void onUpdate()
     {
-        // Start render with transparent background
         m_renderTarget->BeginDraw();
         m_renderTarget->Clear(float4(0,0,0,0));
 
-        if (!StubDataManager::shouldUseStubData()) {
+        if (!StubDataManager::shouldUseStubData() && !ir_isReplayActive()) {
             if (!ir_IsOnTrack.getBool() || !ir_IsOnTrackCar.getBool()) {
                 m_renderTarget->EndDraw();
                 return;
             }
         }
 
-        // Gather inputs - use static preview data to avoid flicker
         const float lapPct = StubDataManager::shouldUseStubData() ?
             0.9f :
             std::clamp(ir_LapDistPct.getFloat(), 0.0f, 1.0f);
 
         const float trackLenM = ir_session.trackLengthMeters > 1.0f ? ir_session.trackLengthMeters : 4000.0f;
 
-        // Try to get pit entry pct from telemetry if available, else learned fallback
         float pitEntryPct = -1.0f;
         {
             extern irsdkCVar ir_TrackPitEntryPct;
@@ -98,10 +94,8 @@ protected:
             if (v > 0.0f && v <= 1.0f) pitEntryPct = v;
         }
 
-        // Learn pit entry pct by observing first OnPitRoad transition this lap if not provided
         bool onPitRoadNow = StubDataManager::shouldUseStubData() ? false : ir_OnPitRoad.getBool();
         bool inPitStall = StubDataManager::shouldUseStubData() ? false : ir_PlayerCarInPitStall.getBool();
-        // Learn pit stall position the first time we detect being properly in the pit stall
         if (!StubDataManager::shouldUseStubData())
         {
             if (inPitStall && !m_lastInPitStall) {
@@ -141,18 +135,15 @@ protected:
 
         if (inPitStall) {
             pitState = PitState::IN_PIT_STALL;
-            // When parked in our stall, distance-to-target should be zero
             distanceM = 0.0f;
             label = L"Pit Box";
         }
         else if (onPitRoadNow) {
             pitState = PitState::ON_PIT_ROAD;
-            // Distance to our stall if we know it, else progress along pit road from entry
             if (m_learnedPitStallPct >= 0.0f) {
                 float diffPct = 0.0f;
                 if (m_learnedPitStallPct >= lapPct) diffPct = m_learnedPitStallPct - lapPct; else diffPct = (1.0f - lapPct) + m_learnedPitStallPct;
                 distanceM = diffPct * trackLenM;
-                // If we already passed the stall this lap, clamp to zero
                 if (distanceM > pitRoadLengthM) distanceM = 0.0f;
                 label = L"To Pit Box";
             } else {
@@ -171,7 +162,6 @@ protected:
                 diffPct = (1.0f - lapPct) + pitEntryPct;
             }
             distanceM = diffPct * trackLenM;
-            // Before pit entry, always show distance to the pit entry/speed-limit line (even if pit stall is known)
             label = L"Pit Entry";
             pitState = PitState::APPROACHING_ENTRY;
         }
@@ -203,7 +193,6 @@ protected:
 
         ensureStyleBrushes();
 
-        // Layout (Kapps-like card)
         const float W = (float)m_width;
         const float H = (float)m_height;
         const float globalOpacity = getGlobalOpacity();
@@ -399,7 +388,6 @@ protected:
             );
         }
 
-        // Bottom distance-to-pitbox progress bar (inset, Kapps-like)
         D2D1_RECT_F rBar = {
             rCard.left + innerPad,
             rCard.bottom - innerPad - barH,

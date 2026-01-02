@@ -49,7 +49,7 @@ public:
 #endif
 
 protected:
-	virtual float2 getDefaultSize() { return float2(350, 160); }
+	virtual float2 getDefaultSize() { return float2(350, 300); }
 
 	virtual void onEnable()
 	{
@@ -76,7 +76,6 @@ protected:
 		float unused_fontSpacing = g_cfg.getFloat(m_name, "font_spacing", g_cfg.getFloat("Overlay", "font_spacing", 0.30f));
 
 		if (!fontStyle.empty() || fontWeight != 500) {
-			// Use the override version for style and weight
 			int dwriteWeight = fontWeight;
 			std::string dwriteStyle = fontStyle.empty() ? "normal" : fontStyle;
 
@@ -91,7 +90,6 @@ protected:
 
 		setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
 
-		// Recreate D2D brushes (render target may change)
 		m_bgBrush.Reset();
 		m_panelBrush.Reset();
 	}
@@ -101,12 +99,16 @@ protected:
 		m_isValidFuelLap = false;
 		const bool useStub = StubDataManager::shouldUseStubData();
 		m_lapStartRemainingFuel = useStub ? StubDataManager::getStubFuelLevel() : ir_FuelLevel.getFloat();
+		m_prevRemainingFuel = m_lapStartRemainingFuel;
+		m_prevOnPitRoad = false;
+		m_greenLapsSincePit = 0;
+		m_maxFuelUsedLapSession = 0.0f;
+		m_maxFuelUsedLapStint = 0.0f;
+		m_pitHistory.clear();
 
-		// Build cache key based on car+track combination
 		std::string newCacheKey = buildFuelCacheKey();
 		m_cacheSavedThisSession = false;
 
-		// Only clear fuel data if car or track changed, otherwise preserve as filler values
 		if (newCacheKey != m_cacheKey && !m_cacheKey.empty())
 		{
 			m_fuelUsedLastLaps.clear();
@@ -114,7 +116,6 @@ protected:
 
 		m_cacheKey = newCacheKey;
 
-		// If we don't have fuel data, try to seed from cache
 		if (m_fuelUsedLastLaps.empty() && !m_cacheKey.empty())
 		{
 			const float cachedAvgPerLap = g_cfg.getFloat("FuelCache", m_cacheKey, -1.0f);
@@ -126,7 +127,6 @@ protected:
 			}
 		}
 
-		// If still no fuel data and we're in preview mode, seed with stub data
 		if (m_fuelUsedLastLaps.empty() && StubDataManager::shouldUseStubData())
 		{
 			const int numLapsToAvg = g_cfg.getInt(m_name, "fuel_estimate_avg_green_laps", 4);
@@ -146,6 +146,7 @@ protected:
 
 		const bool imperial = isImperialUnits();
 		const float estimateFactor = g_cfg.getFloat(m_name, "fuel_estimate_factor", 1.1f);
+		const float pushEstimateFactor = g_cfg.getFloat(m_name, "fuel_push_estimate_factor", 1.0f);
 		const float reserve = g_cfg.getFloat(m_name, "fuel_reserve_margin", 0.25f);
 		const int targetLap = useStub ? StubDataManager::getStubTargetLap() : g_cfg.getInt(m_name, "fuel_target_lap", 0);
 		const int carIdx = useStub ? 0 : ir_session.driverCarIdx;
@@ -154,6 +155,7 @@ protected:
 
 		const float remainingFuel = useStub ? StubDataManager::getStubFuelLevel() : ir_FuelLevel.getFloat();
 		const float fuelCapacity = ir_session.fuelMaxLtr;
+		const bool onPitRoadNow = useStub ? false : ir_CarIdxOnPitRoad.getBool(carIdx);
 
 		const int prevLap = m_prevCurrentLap;
 		m_prevCurrentLap = currentLap;
@@ -162,7 +164,12 @@ protected:
 			const float usedLastLap = std::max(0.0f, m_lapStartRemainingFuel - remainingFuel);
 			m_lapStartRemainingFuel = remainingFuel;
 			if (m_isValidFuelLap && usedLastLap > 0.0f)
+			{
 				m_fuelUsedLastLaps.push_back(usedLastLap);
+				m_maxFuelUsedLapSession = std::max(m_maxFuelUsedLapSession, usedLastLap);
+				m_maxFuelUsedLapStint = std::max(m_maxFuelUsedLapStint, usedLastLap);
+				m_greenLapsSincePit = std::max(0, m_greenLapsSincePit + 1);
+			}
 
 			const int numLapsToAvg = g_cfg.getInt(m_name, "fuel_estimate_avg_green_laps", 4);
 			while ((int)m_fuelUsedLastLaps.size() > numLapsToAvg)
@@ -171,15 +178,33 @@ protected:
 			m_isValidFuelLap = true;
 		}
 
+		// Pit history: record pit-road entry and reset stint counter/max.
+		if (!m_prevOnPitRoad && onPitRoadNow)
+		{
+			PitEntry e;
+			e.pitLap = currentLap;
+			e.greenLaps = m_greenLapsSincePit;
+			m_pitHistory.push_back(e);
+			while ((int)m_pitHistory.size() > 6)
+				m_pitHistory.pop_front();
+
+			m_greenLapsSincePit = 0;
+			m_maxFuelUsedLapStint = 0.0f;
+		}
+		m_prevOnPitRoad = onPitRoadNow;
+		m_prevRemainingFuel = remainingFuel;
+
 		// Invalidate lap if on pit road or under flags (same spirit as DDU)
 		const int flagStatus = (ir_SessionFlags.getInt() & ((((int)ir_session.sessionType != 0) ? irsdk_oneLapToGreen : 0) | irsdk_yellow | irsdk_yellowWaving | irsdk_red | irsdk_checkered | irsdk_crossed | irsdk_caution | irsdk_cautionWaving | irsdk_disqualify | irsdk_repair));
-		if (flagStatus != 0 || ir_CarIdxOnPitRoad.getBool(carIdx))
+		if (flagStatus != 0 || onPitRoadNow)
 			m_isValidFuelLap = false;
 
 		float avgPerLap = 0.0f;
 		for (float v : m_fuelUsedLastLaps) avgPerLap += v;
 		if (!m_fuelUsedLastLaps.empty()) avgPerLap /= (float)m_fuelUsedLastLaps.size();
 		const float perLapConsEst = avgPerLap * estimateFactor;
+		const float maxPerLap = m_maxFuelUsedLapSession;
+		const float pushPerLapConsEst = maxPerLap * pushEstimateFactor;
 
 		// Persist a fresh average for this car/track combo once we have enough valid laps
 		{
@@ -209,7 +234,6 @@ protected:
 
 		ensureStyleBrushes();
 
-		// Layout (Kapps-like card)
 		const float W = (float)m_width;
 		const float H = (float)m_height;
 		const float minDim = std::max(1.0f, std::min(W, H));
@@ -418,6 +442,20 @@ protected:
 
 		{
 			drawRowBg(y, (rowCnt & 1) != 0);
+			drawLabel(L"Max per lap", y, textCol);
+
+			if (maxPerLap > 0.0f)
+			{
+				float val = maxPerLap; if (imperial) val *= 0.264172f;
+				swprintf(s, _countof(s), imperial ? L"%.2f G" : L"%.2f L", val);
+				drawValue(s, y, textCol);
+			}
+			rowCnt++;
+			y += lineHeight;
+		}
+
+		{
+			drawRowBg(y, (rowCnt & 1) != 0);
 			drawLabel(L"Refuel to finish", y, textCol);
 
 			if (perLapConsEst > 0.0f)
@@ -430,6 +468,31 @@ protected:
 				else
 				{
 					value = (targetLap + 1 - currentLap) * perLapConsEst - (m_lapStartRemainingFuel - reserve);
+				}
+				const bool warn = (value > (useStub ? StubDataManager::getStubPitServiceFuel() : ir_PitSvFuel.getFloat())) || (value > 0 && !(useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat()));
+				const float4 valCol = warn ? warnCol : goodCol;
+				float val = value; if (imperial) val *= 0.264172f;
+				swprintf(s, _countof(s), imperial ? L"%3.2f G" : L"%3.2f L", val);
+				drawValue(s, y, valCol);
+			}
+			rowCnt++;
+			y += lineHeight;
+		}
+
+		{
+			drawRowBg(y, (rowCnt & 1) != 0);
+			drawLabel(L"Push refuel", y, textCol);
+
+			if (pushPerLapConsEst > 0.0f)
+			{
+				float value;
+				if (targetLap == 0)
+				{
+					value = std::max(0.0f, (float)remainingLaps * pushPerLapConsEst - (remainingFuel - reserve));
+				}
+				else
+				{
+					value = (targetLap + 1 - currentLap) * pushPerLapConsEst - (m_lapStartRemainingFuel - reserve);
 				}
 				const bool warn = (value > (useStub ? StubDataManager::getStubPitServiceFuel() : ir_PitSvFuel.getFloat())) || (value > 0 && !(useStub ? StubDataManager::getStubFuelFillAvailable() : ir_dpFuelFill.getFloat()));
 				const float4 valCol = warn ? warnCol : goodCol;
@@ -469,13 +532,6 @@ protected:
 			y += lineHeight;
 		}
 
-		// Empty row for spacing
-		{
-			drawRowBg(y, (rowCnt & 1) != 0);
-			rowCnt++;
-			y += lineHeight;
-		}
-
 		{
 			drawRowBg(y, (rowCnt & 1) != 0);
 
@@ -494,6 +550,47 @@ protected:
 			y += lineHeight;
 		}
 
+		{
+			drawRowBg(y, (rowCnt & 1) != 0);
+
+			const float4 goldCol = float4(1.0f, 0.84f, 0.0f, textCol.w);
+			drawLabel(L"Push laps left", y, goldCol);
+
+			if (pushPerLapConsEst > 0.0f)
+			{
+				const float estLaps = (remainingFuel - reserve) / pushPerLapConsEst;
+				const bool lowFuelWarning = (estLaps <= 2.0f);
+				const float4 lapsCol = lowFuelWarning ? warnCol : goldCol;
+				swprintf(s, _countof(s), L"%.*f", g_cfg.getInt(m_name, "fuel_decimal_places", 2), estLaps);
+				drawValue(s, y, lapsCol);
+			}
+			rowCnt++;
+			y += lineHeight;
+		}
+
+		{
+			drawRowBg(y, (rowCnt & 1) != 0);
+			drawLabel(L"Pits", y, textCol);
+
+			// Show a compact pit history like: "L12(9G) L31(8G) ..."
+			std::wstring pitStr;
+			const int maxShow = 3;
+			const int n = (int)m_pitHistory.size();
+			const int start = std::max(0, n - maxShow);
+			for (int i = start; i < n; ++i)
+			{
+				wchar_t b[64];
+				swprintf(b, _countof(b), L"L%d(%dG)", m_pitHistory[i].pitLap, m_pitHistory[i].greenLaps);
+				if (!pitStr.empty()) pitStr += L" ";
+				pitStr += b;
+			}
+			if (!pitStr.empty())
+				drawValue(pitStr.c_str(), y, textCol);
+
+			rowCnt++;
+			y += lineHeight;
+		}
+
 		m_renderTarget->EndDraw();
 	}
 
@@ -506,10 +603,21 @@ protected:
 	TextCache	m_text;
 
 	int			m_prevCurrentLap = 0;
+	float		m_prevRemainingFuel = 0.0f;
 	float		m_lapStartRemainingFuel = 0.0f;
 	std::deque<float>	m_fuelUsedLastLaps;
 	bool		m_isValidFuelLap = false;
 	float		m_fontSpacing = getGlobalFontSpacing();
+
+	// Worst-case tracking (valid green laps only)
+	float		m_maxFuelUsedLapSession = 0.0f;
+	float		m_maxFuelUsedLapStint = 0.0f;
+
+	// Pit history (pit lap + green-flag laps in-between)
+	struct PitEntry { int pitLap = 0; int greenLaps = 0; };
+	std::deque<PitEntry> m_pitHistory;
+	bool		m_prevOnPitRoad = false;
+	int			m_greenLapsSincePit = 0;
 
 		// Simple per-car+track fuel average cache
 		std::string	m_cacheKey;

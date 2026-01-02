@@ -188,7 +188,7 @@ class OverlayRadar : public Overlay
             }
 
             // Smoothing and sticky timers
-            const float now = ir_SessionTime.getFloat();
+            const float now = ir_nowf();
 
             // Compute frame delta in seconds (used for smoothing and fade animation)
             float dt = 0.0f;

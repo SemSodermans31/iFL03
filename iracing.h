@@ -119,6 +119,11 @@ struct Session
     std::vector<float> sectorStartPct;
 };
 
+// Replay helpers
+bool   ir_isReplayActive();
+double ir_now();
+float  ir_nowf();
+
 extern irsdkCVar ir_SessionTime;    // double[1] Seconds since session start (s)
 extern irsdkCVar ir_SessionTick;    // int[1] Current update number ()
 extern irsdkCVar ir_SessionNum;    // int[1] Session number ()

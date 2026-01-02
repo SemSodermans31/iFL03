@@ -188,6 +188,8 @@ static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus
 
     ir_handleConfigChange();
 
+    const bool replayActive = ir_isReplayActive();
+
     for( Overlay* o : overlays )
     {
         bool overlayEnabled = g_cfg.getBool(o->getName(),"enabled",true);
@@ -195,10 +197,11 @@ static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus
         // Check show_in_menu and show_in_race settings
         bool showInMenu = g_cfg.getBool(o->getName(), "show_in_menu", true);
         bool showInRace = g_cfg.getBool(o->getName(), "show_in_race", true);
+        bool showInReplay = g_cfg.getBool(o->getName(), "show_in_replay", true);
         
         bool connectionAllows = false;
         if (status == ConnectionStatus::DRIVING) {
-            connectionAllows = showInRace;
+            connectionAllows = replayActive ? showInReplay : showInRace;
         } else if (status == ConnectionStatus::CONNECTED) {
             connectionAllows = showInMenu && o->canEnableWhileNotDriving();
         } else if (status == ConnectionStatus::DISCONNECTED) {
@@ -635,6 +638,14 @@ int main()
 
     for( Overlay* o : overlays )
         delete o;
+    overlays.clear();
+
+    // Release car brand icon converters (loadCarBrandIcons() AddRef's them into this map).
+    for (auto& it : carBrandIcons)
+    {
+        if (it.second) it.second->Release();
+    }
+    carBrandIcons.clear();
 
 #ifdef IFL03_USE_CEF
     cefShutdown();

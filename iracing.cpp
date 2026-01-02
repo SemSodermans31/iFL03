@@ -381,6 +381,25 @@ static bool parseYamlStr(const char *yamlStr, const char *path, std::string& des
     return false;
 }
 
+bool ir_isReplayActive()
+{
+    // Session string has an explicit SimMode ("replay"), but it may not be updated yet.
+    // Also consult the live telemetry var so we can be correct immediately when the user
+    // switches into replay playback.
+    return ir_session.isReplay || ir_IsReplayPlaying.getBool();
+}
+
+double ir_now()
+{
+    return ir_isReplayActive() ? ir_ReplaySessionTime.getDouble()
+                               : ir_SessionTime.getDouble();
+}
+
+float ir_nowf()
+{
+    return (float)ir_now();
+}
+
 ConnectionStatus ir_tick()
 {
     irsdkClient& irsdk = irsdkClient::instance();
@@ -808,9 +827,9 @@ ConnectionStatus ir_tick()
             car.lastLapInPits = ir_CarIdxLap.getInt(carIdx);
     }
 
-    // Check for both ir_IsOnTrack and ir_IsOnTrackCar, because I've seen iRacing report true for ir_IsOnTrack 
-    // (for just a short time) even when we're not in the car in a practice session. Checking both does seem
-    // to address that.
+    if (ir_isReplayActive())
+        return ConnectionStatus::DRIVING;
+
     return (ir_IsOnTrack.getBool() && ir_IsOnTrackCar.getBool()) ? ConnectionStatus::DRIVING : ConnectionStatus::CONNECTED;
 }
 
