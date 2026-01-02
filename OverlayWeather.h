@@ -84,6 +84,10 @@ class OverlayWeather : public Overlay
             
             onConfigChanged();
             loadIcons();
+
+            // Recreate D2D brushes (render target may change)
+            m_bgBrush.Reset();
+            m_panelBrush.Reset();
         }
 
         virtual void onDisable()
@@ -91,6 +95,8 @@ class OverlayWeather : public Overlay
             m_text.reset();
             releaseIcons();
             m_wicFactory.Reset();
+            m_bgBrush.Reset();
+            m_panelBrush.Reset();
         }
 
         virtual void onConfigChanged()
@@ -132,12 +138,16 @@ class OverlayWeather : public Overlay
 
             // Per-overlay FPS (configurable; default 10)
             setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
+
+            // Recreate D2D brushes (render target may change)
+            m_bgBrush.Reset();
+            m_panelBrush.Reset();
         }
 
                  virtual void onUpdate()
          {
              // Only update weather data at specified interval to improve performance
-             const double currentTime = ir_SessionTime.getDouble();
+             const double currentTime = ir_now();
              if (currentTime - m_lastWeatherUpdate >= WEATHER_UPDATE_INTERVAL) {
                  m_lastWeatherUpdate = currentTime;
              }
@@ -166,24 +176,59 @@ class OverlayWeather : public Overlay
             m_renderTarget->BeginDraw();
             m_renderTarget->Clear( float4(0,0,0,0) );
 
+            ensureStyleBrushes();
+
             const float titlePadding = std::max(1.5f, 20.0f * m_scaleFactor);   
             const float titleMargin = std::max(1.5f, 20.0f * m_scaleFactor);   
             const float valuePadding = std::max(1.5f, 15.0f * m_scaleFactor);  
             const float iconSize = std::max(6.0f, std::min(300.0f, 42.0f * m_scaleFactor));
             const float iconAdjustment = std::max(1.5f, 18.0f * m_scaleFactor);
 
-            // Helper function to draw section background
+            const float W = (float)m_width;
+            const float H = (float)m_height;
+            const float minDim = std::max(1.0f, std::min(W, H));
+            const float pad = std::clamp(minDim * 0.045f, 8.0f, 18.0f);
+            const float corner = std::clamp(minDim * 0.070f, 10.0f, 26.0f);
+
+            const float bgAlpha = std::clamp(backgroundCol.w, 0.0f, 1.0f);
+
+            {
+                D2D1_RECT_F rCard = { pad, pad, W - pad, H - pad };
+                D2D1_ROUNDED_RECT rr = { rCard, corner, corner };
+                if (m_bgBrush) {
+                    m_bgBrush->SetStartPoint(D2D1_POINT_2F{ rCard.left, rCard.top });
+                    m_bgBrush->SetEndPoint(D2D1_POINT_2F{ rCard.left, rCard.bottom });
+                    m_bgBrush->SetOpacity(0.95f * bgAlpha * globalOpacity);
+                    m_renderTarget->FillRoundedRectangle(&rr, m_bgBrush.Get());
+                } else {
+                    m_brush->SetColor(float4(0.05f, 0.05f, 0.06f, 0.92f * bgAlpha * globalOpacity));
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                }
+            }
+
+            // Helper function to draw section background (inner panels)
             auto drawSectionBackground = [&](const WeatherBox& box) {
-                float4 bgColor = backgroundCol;
-                bgColor.w *= globalOpacity;
-                m_brush->SetColor( bgColor );
-                D2D1_RECT_F bgRect = { box.x0, box.y0, box.x1, box.y1};
-                const float bgCornerRadius = 12 * m_scaleFactor;
-                D2D1_ROUNDED_RECT roundedBg = { bgRect, bgCornerRadius, bgCornerRadius };
-                m_renderTarget->FillRoundedRectangle( &roundedBg, m_brush.Get() );
+                D2D1_RECT_F bgRect = { box.x0, box.y0, box.x1, box.y1 };
+                const float panelCorner = std::clamp(corner * 0.75f, 8.0f, 22.0f);
+                D2D1_ROUNDED_RECT roundedBg = { bgRect, panelCorner, panelCorner };
+
+                if (m_panelBrush) {
+                    m_panelBrush->SetStartPoint(D2D1_POINT_2F{ bgRect.left, bgRect.top });
+                    m_panelBrush->SetEndPoint(D2D1_POINT_2F{ bgRect.left, bgRect.bottom });
+                    m_panelBrush->SetOpacity(0.92f * bgAlpha * globalOpacity);
+                    m_renderTarget->FillRoundedRectangle(&roundedBg, m_panelBrush.Get());
+                } else {
+                    // Fallback: solid background using legacy config color
+                    float4 bgColor = backgroundCol;
+                    bgColor.w *= globalOpacity;
+                    m_brush->SetColor(bgColor);
+                    m_renderTarget->FillRoundedRectangle(&roundedBg, m_brush.Get());
+                }
+
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * bgAlpha * globalOpacity));
+                m_renderTarget->DrawRoundedRectangle(&roundedBg, m_brush.Get(), 1.5f);
             };
 
-            // Rebuild static text/labels bitmap when needed (titles and unit labels)
             if (!m_staticTextBitmap) {
                 buildStaticTextBitmap();
             }
@@ -202,8 +247,6 @@ class OverlayWeather : public Overlay
                 if( imperial )
                     trackTemp = celsiusToFahrenheit( trackTemp );
 
-                // Title - left aligned, larger and bolder with more room from edge
-                // Title is cached in static bitmap
 
                 // Temperature value - larger, centered
                 m_brush->SetColor( trackTempCol );
@@ -388,6 +431,58 @@ class OverlayWeather : public Overlay
         }
 
     private:
+
+        void ensureStyleBrushes()
+        {
+            if (!m_renderTarget) return;
+            if (m_bgBrush && m_panelBrush) return;
+
+            // Card background gradient (same palette as OverlayPit/OverlayFlags)
+            {
+                D2D1_GRADIENT_STOP stops[3] = {};
+                stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.16f, 0.18f, 0.22f, 1.0f);
+                stops[1].position = 0.45f; stops[1].color = D2D1::ColorF(0.06f, 0.07f, 0.09f, 1.0f);
+                stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 1.0f);
+
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+                HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+                    stops,
+                    ARRAYSIZE(stops),
+                    D2D1_GAMMA_2_2,
+                    D2D1_EXTEND_MODE_CLAMP,
+                    stopCollection.GetAddressOf()
+                );
+                if (SUCCEEDED(hr)) {
+                    D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+                    props.startPoint = D2D1_POINT_2F{ 0,0 };
+                    props.endPoint = D2D1_POINT_2F{ 0,1 };
+                    m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_bgBrush.GetAddressOf());
+                }
+            }
+
+            // Inner panel gradient (same palette as OverlayPit/OverlayFlags)
+            {
+                D2D1_GRADIENT_STOP stops[3] = {};
+                stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.08f, 0.09f, 0.11f, 1.0f);
+                stops[1].position = 0.55f; stops[1].color = D2D1::ColorF(0.04f, 0.045f, 0.055f, 1.0f);
+                stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 1.0f);
+
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+                HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+                    stops,
+                    ARRAYSIZE(stops),
+                    D2D1_GAMMA_2_2,
+                    D2D1_EXTEND_MODE_CLAMP,
+                    stopCollection.GetAddressOf()
+                );
+                if (SUCCEEDED(hr)) {
+                    D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+                    props.startPoint = D2D1_POINT_2F{ 0,0 };
+                    props.endPoint = D2D1_POINT_2F{ 0,1 };
+                    m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_panelBrush.GetAddressOf());
+                }
+            }
+        }
 
         void setupWeatherBoxes()
         {
@@ -757,4 +852,8 @@ class OverlayWeather : public Overlay
             rt->EndDraw();
             rt->GetBitmap(&m_staticTextBitmap);
         }
+
+        // Styling brushes (cached; recreated on config change / enable)
+        Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_bgBrush;
+        Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_panelBrush;
 };

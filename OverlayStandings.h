@@ -36,6 +36,7 @@ SOFTWARE.
 #include "Units.h"
 #include "OverlayDebug.h"
 #include "stub_data.h"
+#include "ClassColors.h"
 
 class OverlayStandings : public Overlay
 {
@@ -68,11 +69,9 @@ public:
 
     void setCarBrandIcons(const std::map<std::string, IWICFormatConverter*>& carBrandIconsMap, bool loaded)
     {
-        // Release any previous
-        for (auto& it : m_carIdToIconMap) {
-            if (it.second) it.second->Release();
-        }
+        // Drop any cached bitmaps (they are tied to this overlay's render target)
         m_carIdToIconMap.clear();
+        m_brandConvToBitmap.clear();
         m_carBrandIconsMap = carBrandIconsMap;
         m_carBrandIconsLoaded = loaded;
     }
@@ -109,11 +108,9 @@ protected:
     {
         m_text.reset();
 
-        // Clear car brand bitmap pointers on disable
-        for (auto pair : m_carIdToIconMap) {
-            pair.second->Release();
-        }
+        // Clear car brand bitmap caches on disable
         m_carIdToIconMap.clear();
+        m_brandConvToBitmap.clear();
 
         // Release positions gained icons/factory
         releasePositionIcons();
@@ -209,12 +206,14 @@ protected:
         if (useStubData) {
             StubDataManager::populateSessionCars();
         }
+        const int talkerCarIdx = (!useStubData && ir_RadioTransmitCarIdx.isValid()) ? ir_RadioTransmitCarIdx.getInt() : -1;
         
         // Apply global opacity to colors
         const float globalOpacity = getGlobalOpacity();
 
         // Init array
         std::map<int, classBestLap> bestLapClass;
+        std::set<int> activeClasses;
         int selfPosition = ir_getPosition(ir_session.driverCarIdx);
         bool hasPacecar = false;
         
@@ -225,7 +224,7 @@ protected:
                 const auto& stubCar = stubCars[i];
                 CarInfo ci;
                 ci.carIdx = (int)i;
-                ci.classIdx = (int)(i % 3);
+                ci.classIdx = stubCar.classId;
                 ci.lapCount = stubCar.lapCount;
                 ci.position = stubCar.position;
                 ci.pctAroundLap = 0.1f + (i * 0.08f);
@@ -237,9 +236,10 @@ protected:
                 ci.l5 = stubCar.bestLapTime + 0.2f;
                 ci.pitAge = stubCar.pitAge;
                 ci.hasFastestLap = (stubCar.bestLapTime < 84.4f);
-                ci.positionsChanged = (i % 3) - 1;
+                ci.positionsChanged = (int)((i % 3) - 1);
                 ci.tireCompound = stubCar.tireCompound;
-                
+
+                activeClasses.insert(ci.classIdx);
                 carInfo.push_back(ci);
             }
         } else {
@@ -317,6 +317,7 @@ protected:
 
             ci.l5 = conteo ? total / conteo : 0.0F;
 
+            activeClasses.insert(ci.classIdx);
             carInfo.push_back(ci);
         }
         }
@@ -342,24 +343,22 @@ protected:
             } );
 
         // Compute lap gap to leader and compute delta
-        const bool showAllClasses = g_cfg.getBool( m_name, "show_all_classes", false );
+        const bool isMultiClassSession = activeClasses.size() > 1;
+        const bool showSingleClassHeader = g_cfg.getBool(m_name, "show_class_header_single", false);
+        const bool useMultiClassLayout = isMultiClassSession || showSingleClassHeader;
+
         int classLeader = -1;
         int carsInClass = 0;
         float classLeaderGapToOverall = 0.0f;
         
         if (!useStubData) {
-            // Only do iRacing-specific calculations for real data
-            if (showAllClasses) {
-                carsInClass = (int)carInfo.size();
-            }
             for( int i=0; i<(int)carInfo.size(); ++i )
             {
                 CarInfo&       ci       = carInfo[i];
                 if (ci.classIdx != ciSelf.classIdx)
                     continue;
 
-                if (!showAllClasses)
-                    carsInClass++;
+                carsInClass++;
 
                 if (ci.position == 1) {
                     classLeader = ci.carIdx;
@@ -392,14 +391,10 @@ protected:
                     }
                 }
             }
-            if (showAllClasses) {
-                carsInClass = (int)carInfo.size();
-            } else {
-                for( int i=0; i<(int)carInfo.size(); ++i )
-                {
-                    if (carInfo[i].classIdx == ciSelf.classIdx)
-                        carsInClass++;
-                }
+            for( int i=0; i<(int)carInfo.size(); ++i )
+            {
+                if (carInfo[i].classIdx == ciSelf.classIdx)
+                    carsInClass++;
             }
         }
 
@@ -505,7 +500,7 @@ protected:
 
         // Headers
         clm = m_columns.get( (int)Columns::POSITION );
-        swprintf( s, _countof(s), L"Pos." );
+        swprintf( s, _countof(s), L"Po." );
         m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
 
         clm = m_columns.get( (int)Columns::CAR_NUMBER );
@@ -572,342 +567,986 @@ protected:
         }
 
         // Content
-        
-        // Calculate available space for rows below the column labels
         const float contentStartY = y + lineHeight + 6.0f;
-        int carsToDraw = static_cast<int>((ybottom - contentStartY) / lineHeight) - 1;
-        int carsToSkip;
-        if (carsToDraw >= carsInClass) {
-            numTopDrivers = carsToDraw;
-            carsToSkip = 0;
-        }
-        else {
-            // cars to add ahead = total cars - position
-            numAheadDrivers += std::max((ciSelf.position - carsInClass + numBehindDrivers), 0);
-            numBehindDrivers -= std::min(std::max((ciSelf.position - carsInClass + numBehindDrivers), 0), 2);
-            numTopDrivers += std::max(carsToDraw - (numTopDrivers+numAheadDrivers+numBehindDrivers+2), 0);
-            numBehindDrivers += std::max(carsToDraw - (ciSelf.position + numBehindDrivers), 0);
 
-            if (ciSelf.position < numTopDrivers + numAheadDrivers) {
-                carsToSkip = 0;
-            }
-            else if (ciSelf.position > carsInClass - numBehindDrivers) {
-                carsToSkip = carsInClass - numTopDrivers - numBehindDrivers - numAheadDrivers - 1;
-            }
-            else carsToSkip = 0;
-        }
-        // Compute scroll limits and clamp current scroll position
-        m_maxScrollRow = std::max(0, carsInClass - carsToDraw);
-        if (m_scrollRow > m_maxScrollRow) m_scrollRow = m_maxScrollRow;
-        // Apply scroll offset to the number of cars to skip for rendering
+        if (useMultiClassLayout)
         {
-            const int maxSkip = std::max(0, carsInClass - carsToDraw);
-            carsToSkip = std::clamp(carsToSkip + m_scrollRow, 0, maxSkip);
-        }
-        int drawnCars = 0;
-        int ownClass = showAllClasses ? -1 : (useStubData ? ciSelf.classIdx : ir_PlayerCarClass.getInt()); // When showing all, ignore class filter
-        int selfClassDrivers = 0;
-        bool skippedCars = false;
-        int numSkippedCars = 0;
-        for( int i=0; i<(int)carInfo.size(); ++i )
-        {
-            if (drawnCars > carsToDraw) break;
-
-            y = contentStartY + lineHeight/2 + drawnCars*lineHeight;
-            
-            if (!showAllClasses && carInfo[i].classIdx != ownClass) {
-                continue;
-            }
-
-            selfClassDrivers++;
-
-            // Apply scroll offset: skip the first 'carsToSkip' rows in-class
-            if (selfClassDrivers <= carsToSkip) {
-                continue;
-            }
-
-            if( y+lineHeight/2 > ybottom )
-                break;
-
-            // Focus on the driver
-            if (selfPosition > 0 && selfClassDrivers > numTopDrivers) {
-
-                //if (selfClassDrivers < selfPosition - numAheadDrivers) {
-                if (selfClassDrivers > carsToSkip && selfClassDrivers < selfPosition - numAheadDrivers ) {
-                    if (!skippedCars) {
-                        skippedCars = true;
-                        drawnCars++;
-                    }
-                    continue;
-                }
-                /*if (selfClassDrivers > selfPosition + numBehindDrivers) {
-                    continue;
-                }*/
-            }
-
-            drawnCars++;
-
-            // Alternating line backgrounds
-            if(selfClassDrivers & 1 && alternateLineBgCol.a > 0 )
+            // Multi-class layout: stack one list per class, each with its own header row.
+            struct ClassSummary
             {
-                D2D1_RECT_F r = { 0, y-lineHeight/2, (float)m_width,  y+lineHeight/2 };
-                m_brush->SetColor( alternateLineBgCol );
-                m_renderTarget->FillRectangle( &r, m_brush.Get() );
-            }
+                int                 classId = 0;
+                std::wstring        name;
+                int                 participants = 0;
+                int                 sofSum = 0;
+                int                 sofCount = 0;
+                float               leaderBest = 0.0f;
+                std::vector<int>    carIndices;     // indices into carInfo
+            };
 
-            const CarInfo&  ci  = carInfo[i];
-            const Car&      car = ir_session.cars[ci.carIdx];
+            std::vector<ClassSummary> classSummaries;
+            std::map<int, int> classIdToIndex;
 
-            // Dim color if player is disconnected.
-            // TODO: this isn't 100% accurate, I think, because a car might be "not in world" while the player
-            // is still connected? I haven't been able to find a better way to do this, though.
-            const bool isGone = !car.isSelf && ir_CarIdxTrackSurface.getInt(ci.carIdx) == irsdk_NotInWorld;
-            float4 textCol = car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged?flaggedCol:otherCarCol));
-            if( isGone )
-                textCol.a *= 0.5f;
-
-            // Position
-            if( ci.position > 0 )
+            // Build per-class aggregates
+            for (int i = 0; i < (int)carInfo.size(); ++i)
             {
-                clm = m_columns.get( (int)Columns::POSITION );
-                m_brush->SetColor( textCol );
-                swprintf( s, _countof(s), L"P%d", ci.position );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
-            }
+                const CarInfo& ci = carInfo[i];
+                const Car&     car = ir_session.cars[ci.carIdx];
+                const int      classId = ci.classIdx;
 
-            // Car number
-            {
-                clm = m_columns.get( (int)Columns::CAR_NUMBER );
-                swprintf( s, _countof(s), L"#%S", car.carNumberStr.c_str() );
-                r = { xoff+clm->textL, y-lineHeight/2, xoff+clm->textR, y+lineHeight/2 };
-                rr.rect = { r.left-2, r.top+1, r.right+2, r.bottom-1 };
-                rr.radiusX = 3;
-                rr.radiusY = 3;
-                m_brush->SetColor( textCol );
-                m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
-                m_brush->SetColor( carNumberTextCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
-            }
-
-            // Name
-            {
-                clm = m_columns.get( (int)Columns::NAME );
-                m_brush->SetColor( textCol );
-                std::string displayName = car.teamName;
-                if (!g_cfg.getBool(m_name, "show_full_name", true)) {
-                    // Show only first name
-                    size_t spacePos = displayName.find(' ');
-                    if (spacePos != std::string::npos) {
-                        displayName = displayName.substr(0, spacePos);
-                    }
-                }
-                swprintf( s, _countof(s), L"%S", displayName.c_str() );
-                m_text.render( m_renderTarget.Get(), s, m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing );
-            }
-
-            // Pit age
-            if( !ir_isPreStart() && (ci.pitAge>=0||ir_CarIdxOnPitRoad.getBool(ci.carIdx)) )
-            {
-                if (clm = m_columns.get( (int)Columns::PIT )){
-                    m_brush->SetColor( pitCol );
-                    swprintf( s, _countof(s), L"%d", ci.pitAge );
-                    r = { xoff+clm->textL, y-lineHeight/2+2, xoff+clm->textR, y+lineHeight/2-2 };
-                    if( ir_CarIdxOnPitRoad.getBool(ci.carIdx) ) {
-                        swprintf( s, _countof(s), L"PIT" );
-                        m_renderTarget->FillRectangle( &r, m_brush.Get() );
-                        m_brush->SetColor( float4(0,0,0,1) );
-                    }
-                    else {
-                        swprintf( s, _countof(s), L"%d", ci.pitAge );
-                        m_renderTarget->DrawRectangle( &r, m_brush.Get() );
-                    }
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
-                }
-            }
-
-            // License/SR
-            if (clm = m_columns.get( (int)Columns::LICENSE )) {
-                swprintf( s, _countof(s), L"%C %.1f", car.licenseChar, car.licenseSR );
-                r = { xoff+clm->textL, y-lineHeight/2, xoff+clm->textR, y+lineHeight/2 };
-                rr.rect = { r.left+1, r.top+1, r.right-1, r.bottom-1 };
-                rr.radiusX = 3;
-                rr.radiusY = 3;
-                float4 c = car.licenseCol;
-                c.a = licenseBgAlpha;
-                m_brush->SetColor( c );
-                m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
-                m_brush->SetColor( licenseTextCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
-            }
-
-            // Irating
-            if (clm = m_columns.get((int)Columns::IRATING)) {
-                swprintf( s, _countof(s), L"%.1fk", (float)car.irating/1000.0f );
-                r = { xoff+clm->textL, y-lineHeight/2, xoff+clm->textR, y+lineHeight/2 };
-                rr.rect = { r.left+1, r.top+1, r.right-1, r.bottom-1 };
-                rr.radiusX = 3;
-                rr.radiusY = 3;
-                m_brush->SetColor( iratingBgCol );
-                m_renderTarget->FillRoundedRectangle( &rr, m_brush.Get() );
-                m_brush->SetColor( iratingTextCol );
-                m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing );
-            }
-
-            // Car brand
-            if ( ( clm = m_columns.get((int)Columns::CAR_BRAND) ) && m_carBrandIconsLoaded)
-            {
-                // if this carID doesn't have a brand yet, find it
-                // TODO: Don't create multiple bitmaps if multiple cars use the same icon
-                // This would help if many cars load the 00Error 
-                if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end()) {
-                     m_renderTarget->CreateBitmapFromWicBitmap( findCarBrandIcon(car.carName, m_carBrandIconsMap), nullptr, &m_carIdToIconMap[car.carID]);
-                }
-
-                if (m_carIdToIconMap[car.carID] != 0) {
-                    // Make it a rectangle of lineHeight width and lineHeight height
-                    D2D1_RECT_F r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textL + lineHeight, y + lineHeight / 2 };
-                    m_renderTarget->DrawBitmap(m_carIdToIconMap[car.carID], r);
-                }
-            
-            }
-
-            // Positions gained
-            if (clm = m_columns.get((int)Columns::POSITIONS_GAINED)) {
-                // Backdrop: full-opacity white rounded rectangle
-                r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
-                rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
-                rr.radiusX = 3;
-                rr.radiusY = 3;
-                m_brush->SetColor(float4(1, 1, 1, 1));
-                m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
-
-                // Choose icon per delta
-                const int delta = ci.positionsChanged;
-                ID2D1Bitmap* icon = nullptr;
-                if (delta > 0)      icon = m_posUpIcon.Get();
-                else if (delta < 0) icon = m_posDownIcon.Get();
-                else                icon = m_posEqualIcon.Get();
-
-                // Icon at left
-                const float iconPad  = 4.0f;
-                const float iconSize = std::max(0.0f, lineHeight - 6.0f);
-                if (icon) {
-                    D2D1_RECT_F ir = { r.left + iconPad, y - iconSize * 0.5f, r.left + iconPad + iconSize, y + iconSize * 0.5f };
-                    m_renderTarget->DrawBitmap(icon, &ir);
-                }
-
-                // Number in black, right aligned
-                m_brush->SetColor(float4(0, 0, 0, 1));
-                swprintf(s, _countof(s), L"%d", abs(delta));
-                const float textL = r.left + iconPad + (icon ? iconSize + 2.0f : 0.0f);
-                m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right - 15.0f, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
-            }
-
-            // Tire compound
-            if (clm = m_columns.get((int)Columns::TIRE_COMPOUND))
-            {
-                int compound = ci.tireCompound;
-                if (compound < 0 && car.tireCompound >= 0)
-                    compound = car.tireCompound;
-                if (compound < 0 && ir_CarIdxTireCompound.isValid())
-                    compound = ir_CarIdxTireCompound.getInt(ci.carIdx);
-                const std::string compoundText = tireCompoundToString(compound);
-                m_brush->SetColor(textCol);
-                m_text.render(m_renderTarget.Get(), toWide(compoundText).c_str(), m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
-            }
-
-            // Gap
-            if (ci.lapGap || ci.gap)
-            {
-                if (clm = m_columns.get((int)Columns::GAP)) {
-                    if (ci.lapGap < 0)
-                        swprintf(s, _countof(s), L"%d L", ci.lapGap);
-                    else
-                        swprintf(s, _countof(s), L"%.01f", ci.gap);
-                    m_brush->SetColor(textCol);
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
-                }
-            }
-
-            // Best
-            if (clm = m_columns.get( (int)Columns::BEST )) {
-                str.clear();
-                if( ci.best > 0 )
-                    str = formatLaptime( ci.best );
-                m_brush->SetColor( ci.hasFastestLap ? fastestLapCol : textCol);
-                m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
-            }
-
-            // Last
-            if (clm = m_columns.get((int)Columns::LAST))
-            {
-                str.clear();
-                if( ci.last > 0 )
-                    str = formatLaptime( ci.last );
-                m_brush->SetColor(textCol);
-                m_text.render( m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff+clm->textL, xoff+clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing );
-            }
-
-            // Delta
-            if (clm = m_columns.get((int)Columns::DELTA))
-            {
-                if (ci.delta)
+                int summaryIdx;
+                auto it = classIdToIndex.find(classId);
+                if (it == classIdToIndex.end())
                 {
-                    swprintf(s, _countof(s), L"%.01f", abs(ci.delta));
-                    if (ci.delta > 0)
-                        m_brush->SetColor(deltaPosCol);
-                    else
-                        m_brush->SetColor(deltaNegCol);
-                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
-                }
-            }
+                    ClassSummary summary;
+                    summary.classId = classId;
 
-            // Average 5 laps
-            if (clm = m_columns.get((int)Columns::L5))
-            {
-                str.clear();
-                if (ci.l5 > 0 && selfPosition > 0) {
-                    str = formatLaptime(ci.l5);
-                    if (ci.l5 >= ciSelf.l5)
-                        m_brush->SetColor(deltaPosCol);
-                    else
-                        m_brush->SetColor(deltaNegCol);
+                    std::string classNameStr = car.carClassShortName;
+                    if (classNameStr.empty())
+                        classNameStr = std::format("Class {}", classId);
+
+                    summary.name = toWide(classNameStr);
+                    classSummaries.push_back(summary);
+                    summaryIdx = (int)classSummaries.size() - 1;
+                    classIdToIndex.emplace(classId, summaryIdx);
                 }
                 else
+                {
+                    summaryIdx = it->second;
+                }
+
+                ClassSummary& summary = classSummaries[summaryIdx];
+                summary.participants++;
+                if (car.irating > 0)
+                {
+                    summary.sofSum += car.irating;
+                    summary.sofCount++;
+                }
+                if (ci.best > 0.0f && (summary.leaderBest <= 0.0f || ci.best < summary.leaderBest))
+                {
+                    summary.leaderBest = ci.best;
+                }
+                summary.carIndices.push_back(i);
+            }
+
+            // Finalize per-class data: average SoF and sort cars by class position
+            for (auto& summary : classSummaries)
+            {
+                if (summary.sofCount > 0)
+                    summary.sofSum = summary.sofSum / summary.sofCount; // reuse sofSum as averaged SoF
+
+                std::sort(summary.carIndices.begin(), summary.carIndices.end(),
+                    [&](int aIndex, int bIndex)
+                    {
+                        const CarInfo& a = carInfo[aIndex];
+                        const CarInfo& b = carInfo[bIndex];
+                        const int ap = a.position <= 0 ? INT_MAX : a.position;
+                        const int bp = b.position <= 0 ? INT_MAX : b.position;
+                        return ap < bp;
+                    });
+            }
+
+            // Sort classes: self class first, then by leader lap time (fastest first)
+            const int selfClassId = ciSelf.classIdx;
+            std::sort(classSummaries.begin(), classSummaries.end(),
+                [&](const ClassSummary& a, const ClassSummary& b)
+                {
+                    if (a.classId == selfClassId && b.classId != selfClassId) return true;
+                    if (b.classId == selfClassId && a.classId != selfClassId) return false;
+                    const float aBest = (a.leaderBest > 0.0f) ? a.leaderBest : FLT_MAX;
+                    const float bBest = (b.leaderBest > 0.0f) ? b.leaderBest : FLT_MAX;
+                    return aBest < bBest;
+                });
+
+            struct RenderRow
+            {
+                bool    isHeader = false;
+                int     classSummaryIndex = -1;
+                int     carInfoIndex = -1;    // -1 for header or spacer
+                int     rowIndexInClass = 0;  // 1-based for driver rows, 0 for headers, -1 for spacer rows
+            };
+
+            std::vector<RenderRow> rows;
+            rows.reserve(carInfo.size() + (int)classSummaries.size() * 2);
+
+            // Build a flattened row list: [Header, drivers..., spacer] per class
+            for (int c = 0; c < (int)classSummaries.size(); ++c)
+            {
+                const ClassSummary& summary = classSummaries[c];
+                if (summary.participants <= 0)
+                    continue;
+
+                RenderRow header;
+                header.isHeader = true;
+                header.classSummaryIndex = c;
+                rows.push_back(header);
+
+                int rowIdxInClass = 0;
+                for (int carIndex : summary.carIndices)
+                {
+                    RenderRow row;
+                    row.isHeader = false;
+                    row.classSummaryIndex = c;
+                    row.carInfoIndex = carIndex;
+                    row.rowIndexInClass = ++rowIdxInClass;
+                    rows.push_back(row);
+                }
+
+                // Spacer row between classes (blank line)
+                RenderRow spacer;
+                spacer.isHeader = false;
+                spacer.classSummaryIndex = c;
+                spacer.carInfoIndex = -1;
+                spacer.rowIndexInClass = -1;
+                rows.push_back(spacer);
+            }
+
+            // Drop trailing spacer, if any
+            while (!rows.empty() && rows.back().carInfoIndex == -1 && !rows.back().isHeader)
+                rows.pop_back();
+
+            const float availableH = ybottom - contentStartY;
+            const int visibleRows = std::max(0, (int)(availableH / lineHeight));
+            const int totalRows = (int)rows.size();
+
+            m_maxScrollRow = std::max(0, totalRows - visibleRows);
+            if (m_scrollRow > m_maxScrollRow) m_scrollRow = m_maxScrollRow;
+            if (m_scrollRow < 0) m_scrollRow = 0;
+
+            const int firstRow = std::min(std::max(0, m_scrollRow), std::max(0, totalRows));
+            const int lastRow = std::min(totalRows, firstRow + visibleRows);
+
+            int drawnRows = 0;
+            float extraHeaderPadY = 4.0f;
+            for (int ri = firstRow; ri < lastRow; ++ri)
+            {
+                const RenderRow& row = rows[ri];
+                const float rowY = contentStartY + lineHeight * 0.5f + (float)drawnRows * lineHeight + extraHeaderPadY;
+                ++drawnRows;
+
+                // Stop when we run out of vertical space (accounts for extra header padding)
+                if (rowY + lineHeight * 0.5f > ybottom)
+                    break;
+
+                if (row.isHeader)
+                {
+                    const ClassSummary& summary = classSummaries[row.classSummaryIndex];
+
+                    // Header background tinted with class color (shared across overlays)
+                    D2D1_RECT_F hr = { 0.0f, rowY - lineHeight / 2, (float)m_width, rowY + lineHeight / 2 };
+                    float4 bgCol = ClassColors::get(summary.classId);
+                    if (bgCol.a <= 0.0f) bgCol.a = 1.0f;
+                    bgCol.a *= globalOpacity;
+                    m_brush->SetColor(bgCol);
+                    m_renderTarget->FillRectangle(&hr, m_brush.Get());
+
+                    // Class name label with lighter variant of class color
+                    {
+                        const float4 pillBgCol = ClassColors::getLight(summary.classId);
+                        const float  pillPadX  = 15.0f; 
+
+                        const float textW = computeTextExtent(summary.name.c_str(), m_dwriteFactory.Get(),
+                                                              m_textFormat.Get(), m_fontSpacing).x;
+                        const float pillW = textW + pillPadX * 2.0f;
+                        const float pillH = lineHeight; 
+
+                        // Align pill with the left border of the overlay (x = 0)
+                        D2D1_RECT_F nameRect = {
+                            0.0f,
+                            rowY - pillH * 0.5f,
+                            pillW,
+                            rowY + pillH * 0.5f
+                        };
+
+                        // Shape: square left edge + pill-shaped right edge
+                        m_brush->SetColor(pillBgCol);
+                        const float rCap = pillH * 0.5f; // pill radius on the right side
+
+                        // If the label is too narrow for a pill cap, fall back to small rounded corners.
+                        if (pillW <= (rCap * 2.0f + 1.0f))
+                        {
+                            rr.rect = nameRect;
+                            rr.radiusX = 3.0f;
+                            rr.radiusY = 3.0f;
+                            m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        }
+                        else
+                        {
+                            // Left/center rectangle (no rounding on the left edge, and no fill into the right rounding region)
+                            D2D1_RECT_F baseRect = nameRect;
+                            baseRect.right = nameRect.right - rCap;
+                            m_renderTarget->FillRectangle(&baseRect, m_brush.Get());
+
+                            // Right cap: a rounded rectangle of width 2*rCap, gives a pill-shaped right end
+                            D2D1_ROUNDED_RECT capRR = {};
+                            capRR.rect = { nameRect.right - 2.0f * rCap, nameRect.top, nameRect.right, nameRect.bottom };
+                            capRR.radiusX = rCap;
+                            capRR.radiusY = rCap;
+                            m_renderTarget->FillRoundedRectangle(&capRR, m_brush.Get());
+                        }
+
+                        // Text centered within symmetric padding, using dark class color
+                        m_brush->SetColor(ClassColors::getDark(summary.classId));
+                        m_text.render(m_renderTarget.Get(), summary.name.c_str(), m_textFormat.Get(),
+                                      nameRect.left + pillPadX, nameRect.right - pillPadX, rowY,
+                                      m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
+
+                    // SoF (center)
+                    if (g_cfg.getBool(m_name, "show_SoF", true))
+                    {
+                        const int sof = summary.sofSum > 0 ? summary.sofSum : 0;
+                        wchar_t sofBuf[64];
+                        swprintf(sofBuf, _countof(sofBuf), L"SoF %d", sof);
+                        m_brush->SetColor(float4(1, 1, 1, 1));
+                        m_text.render(m_renderTarget.Get(), sofBuf, m_textFormatSmall.Get(),
+                                      xoff + (float)m_width * 0.35f, xoff + (float)m_width * 0.7f,
+                                      rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
+
+                    // Participant count (right)
+                    wchar_t cntBuf[64];
+                    swprintf(cntBuf, _countof(cntBuf), L"%d cars", summary.participants);
+                    m_brush->SetColor(float4(1, 1, 1, 1));
+                    m_text.render(m_renderTarget.Get(), cntBuf, m_textFormatSmall.Get(),
+                                  (float)m_width - 160.0f, (float)m_width - 10.0f,
+                                  rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+
+                    // Extra padding below the class header (small, not a whole extra row)
+                    extraHeaderPadY += 4.0f;
+                    continue;
+                }
+
+                // Spacer row: skip drawing
+                if (row.carInfoIndex < 0 || row.rowIndexInClass <= 0)
+                    continue;
+
+                const CarInfo&  ci  = carInfo[row.carInfoIndex];
+                const Car&      car = ir_session.cars[ci.carIdx];
+                const bool      isTalking = (talkerCarIdx >= 0 && talkerCarIdx == ci.carIdx);
+
+                // Alternating line backgrounds (within class)
+                if ((row.rowIndexInClass & 1) && alternateLineBgCol.a > 0)
+                {
+                    D2D1_RECT_F br = { 0, rowY - lineHeight / 2, (float)m_width, rowY + lineHeight / 2 };
+                    m_brush->SetColor(alternateLineBgCol);
+                    m_renderTarget->FillRectangle(&br, m_brush.Get());
+                }
+
+                // Dim color if player is disconnected.
+                const bool isGone = !car.isSelf && ir_CarIdxTrackSurface.getInt(ci.carIdx) == irsdk_NotInWorld;
+                float4 textCol = car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged ? flaggedCol : otherCarCol));
+                if (isGone)
+                    textCol.a *= 0.5f;
+
+                // Position
+                if (ci.position > 0)
+                {
+                    clm = m_columns.get((int)Columns::POSITION);
+                    // White label: square left edge + pill-shaped right edge (same as class-name label)
+                    {
+                        const float inset = 1.0f;
+                        // Use full column width (text + borders) to make the white background wider
+                        const float prL = xoff + (clm->textL - clm->borderL);
+                        const float prR = xoff + (clm->textR + clm->borderR);
+                        D2D1_RECT_F pr = { prL, rowY - lineHeight / 2, prR, rowY + lineHeight / 2 };
+                        D2D1_RECT_F rrRect = { pr.left + inset, pr.top + inset, pr.right - inset, pr.bottom - inset };
+                        const float h = rrRect.bottom - rrRect.top;
+                        const float rCap = h * 0.5f;
+
+                        // Fully opaque white (do not apply globalOpacity) to avoid seeing the shape beneath
+                        float4 posBg = float4(1, 1, 1, 1);
+                        m_brush->SetColor(posBg);
+
+                        const float w = rrRect.right - rrRect.left;
+                        if (w <= (rCap * 2.0f + 1.0f))
+                        {
+                            rr.rect = rrRect;
+                            rr.radiusX = 3.0f;
+                            rr.radiusY = 3.0f;
+                            m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        }
+                        else
+                        {
+                            D2D1_RECT_F baseRect = rrRect;
+                            baseRect.right = rrRect.right - rCap;
+                            m_renderTarget->FillRectangle(&baseRect, m_brush.Get());
+
+                            D2D1_ROUNDED_RECT capRR = {};
+                            capRR.rect = { rrRect.right - 2.0f * rCap, rrRect.top, rrRect.right, rrRect.bottom };
+                            capRR.radiusX = rCap;
+                            capRR.radiusY = rCap;
+                            m_renderTarget->FillRoundedRectangle(&capRR, m_brush.Get());
+                        }
+                    }
+                    m_brush->SetColor(float4(0, 0, 0, 1));
+                    swprintf(s, _countof(s), L"P%d", ci.position);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Car number
+                {
+                    clm = m_columns.get((int)Columns::CAR_NUMBER);
+                    // While driver is transmitting on voice, replace the car-number badge with the push-to-talk icon.
+                    if (isTalking && m_pushToTalkIcon)
+                    {
+                        const float cellL = xoff + clm->textL;
+                        const float cellR = xoff + clm->textR;
+                        const float cellW = cellR - cellL;
+                        const float iconSize = std::max(0.0f, std::min(lineHeight - 6.0f, cellW));
+                        const float cx = (cellL + cellR) * 0.5f;
+                        D2D1_RECT_F ir = { cx - iconSize * 0.5f, rowY - iconSize * 0.5f, cx + iconSize * 0.5f, rowY + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(m_pushToTalkIcon.Get(), &ir);
+                    }
+                    else
+                    {
+                        swprintf(s, _countof(s), L"#%S", car.carNumberStr.c_str());
+                        r = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textR, rowY + lineHeight / 2 };
+                        rr.rect = { r.left - 2, r.top + 1, r.right + 2, r.bottom - 1 };
+                        rr.radiusX = 3;
+                        rr.radiusY = 3;
+                        // Use class base color for number background (matches header base color)
+                        float4 numBg = ClassColors::get(ci.classIdx);
+                        numBg.a *= globalOpacity;
+                        if (isGone) numBg.a *= 0.5f;
+                        m_brush->SetColor(numBg);
+                        m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        // Left accent strip using class light color
+                        {
+                            float4 stripCol = ClassColors::getLight(ci.classIdx);
+                            stripCol.a = numBg.a;
+                            m_brush->SetColor(stripCol);
+                            const float stripW = 3.0f;
+                            D2D1_RECT_F strip = { rr.rect.left + 1.0f, rr.rect.top + 1.0f, rr.rect.left + 1.0f + stripW, rr.rect.bottom - 1.0f };
+                            m_renderTarget->FillRectangle(&strip, m_brush.Get());
+                        }
+                        m_brush->SetColor(float4(1, 1, 1, 1));
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
+                }
+
+                // Name
+                {
+                    clm = m_columns.get((int)Columns::NAME);
                     m_brush->SetColor(textCol);
-                
-                m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                    std::string displayName = car.teamName;
+                    if (!g_cfg.getBool(m_name, "show_full_name", true)) {
+                        // Show only first name
+                        size_t spacePos = displayName.find(' ');
+                        if (spacePos != std::string::npos) {
+                            displayName = displayName.substr(0, spacePos);
+                        }
+                    }
+                    swprintf(s, _countof(s), L"%S", displayName.c_str());
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                }
+
+                // Pit age
+                if (!ir_isPreStart() && (ci.pitAge >= 0 || ir_CarIdxOnPitRoad.getBool(ci.carIdx)))
+                {
+                    if (clm = m_columns.get((int)Columns::PIT)) {
+                        m_brush->SetColor(pitCol);
+                        swprintf(s, _countof(s), L"%d", ci.pitAge);
+                        r = { xoff + clm->textL, rowY - lineHeight / 2 + 2, xoff + clm->textR, rowY + lineHeight / 2 - 2 };
+                        if (ir_CarIdxOnPitRoad.getBool(ci.carIdx)) {
+                            swprintf(s, _countof(s), L"PIT");
+                            m_renderTarget->FillRectangle(&r, m_brush.Get());
+                            m_brush->SetColor(float4(0, 0, 0, 1));
+                        }
+                        else {
+                            swprintf(s, _countof(s), L"%d", ci.pitAge);
+                            m_renderTarget->DrawRectangle(&r, m_brush.Get());
+                        }
+                        m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
+                }
+
+                // License/SR
+                if (clm = m_columns.get((int)Columns::LICENSE)) {
+                    swprintf(s, _countof(s), L"%C %.1f", car.licenseChar, car.licenseSR);
+                    r = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textR, rowY + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    float4 c = car.licenseCol;
+                    c.a = licenseBgAlpha;
+                    m_brush->SetColor(c);
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                    m_brush->SetColor(licenseTextCol);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Irating
+                if (clm = m_columns.get((int)Columns::IRATING)) {
+                    swprintf(s, _countof(s), L"%.1fk", (float)car.irating / 1000.0f);
+                    r = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textR, rowY + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    m_brush->SetColor(iratingBgCol);
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                    m_brush->SetColor(iratingTextCol);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Car brand
+                if ((clm = m_columns.get((int)Columns::CAR_BRAND)) && m_carBrandIconsLoaded)
+                {
+                    if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end())
+                    {
+                        // Cache by *brand converter* first (dedupe across different carIDs using same manufacturer icon),
+                        // then map carID -> bitmap for fast lookup during rendering.
+                        IWICFormatConverter* conv = findCarBrandIcon(car.carName, m_carBrandIconsMap);
+                        if (conv)
+                        {
+                            auto& brandBmp = m_brandConvToBitmap[conv];
+                            if (!brandBmp)
+                            {
+                                (void)m_renderTarget->CreateBitmapFromWicBitmap(conv, nullptr, &brandBmp);
+                            }
+                            if (brandBmp)
+                            {
+                                m_carIdToIconMap[car.carID] = brandBmp;
+                            }
+                        }
+                    }
+
+                    const auto itBmp = m_carIdToIconMap.find(car.carID);
+                    if (itBmp != m_carIdToIconMap.end() && itBmp->second) {
+                        D2D1_RECT_F br = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textL + lineHeight, rowY + lineHeight / 2 };
+                        m_renderTarget->DrawBitmap(itBmp->second.Get(), br);
+                    }
+                }
+
+                // Positions gained
+                if (clm = m_columns.get((int)Columns::POSITIONS_GAINED)) {
+                    r = { xoff + clm->textL, rowY - lineHeight / 2, xoff + clm->textR, rowY + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    m_brush->SetColor(float4(1, 1, 1, 1));
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+
+                    const int delta = ci.positionsChanged;
+                    ID2D1Bitmap* icon = nullptr;
+                    if (delta > 0)      icon = m_posUpIcon.Get();
+                    else if (delta < 0) icon = m_posDownIcon.Get();
+                    else                icon = m_posEqualIcon.Get();
+
+                    const float iconPad = 4.0f;
+                    const float iconSize = std::max(0.0f, lineHeight - 6.0f);
+                    if (icon) {
+                        D2D1_RECT_F ir = { r.left + iconPad, rowY - iconSize * 0.5f, r.left + iconPad + iconSize, rowY + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(icon, &ir);
+                    }
+
+                    m_brush->SetColor(float4(0, 0, 0, 1));
+                    swprintf(s, _countof(s), L"%d", abs(delta));
+                    const float textL = r.left + iconPad + (icon ? iconSize + 2.0f : 0.0f);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right - 15.0f, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                }
+
+                // Tire compound
+                if (clm = m_columns.get((int)Columns::TIRE_COMPOUND))
+                {
+                    int compound = ci.tireCompound;
+                    if (compound < 0 && car.tireCompound >= 0)
+                        compound = car.tireCompound;
+                    if (compound < 0 && ir_CarIdxTireCompound.isValid())
+                        compound = ir_CarIdxTireCompound.getInt(ci.carIdx);
+                    const std::string compoundText = tireCompoundToString(compound);
+                    m_brush->SetColor(textCol);
+                    m_text.render(m_renderTarget.Get(), toWide(compoundText).c_str(), m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Gap
+                if (ci.lapGap || ci.gap)
+                {
+                    if (clm = m_columns.get((int)Columns::GAP)) {
+                        if (ci.lapGap < 0)
+                            swprintf(s, _countof(s), L"%d L", ci.lapGap);
+                        else
+                            swprintf(s, _countof(s), L"%.01f", ci.gap);
+                        m_brush->SetColor(textCol);
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    }
+                }
+
+                // Best
+                if (clm = m_columns.get((int)Columns::BEST)) {
+                    str.clear();
+                    if (ci.best > 0)
+                        str = formatLaptime(ci.best);
+                    m_brush->SetColor(ci.hasFastestLap ? fastestLapCol : textCol);
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+
+                // Last
+                if (clm = m_columns.get((int)Columns::LAST))
+                {
+                    str.clear();
+                    if (ci.last > 0)
+                        str = formatLaptime(ci.last);
+                    m_brush->SetColor(textCol);
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+
+                // Delta
+                if (clm = m_columns.get((int)Columns::DELTA))
+                {
+                    if (ci.delta)
+                    {
+                        swprintf(s, _countof(s), L"%.01f", abs(ci.delta));
+                        if (ci.delta > 0)
+                            m_brush->SetColor(deltaPosCol);
+                        else
+                            m_brush->SetColor(deltaNegCol);
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                    }
+                }
+
+                // Average 5 laps
+                if (clm = m_columns.get((int)Columns::L5))
+                {
+                    str.clear();
+                    if (ci.l5 > 0 && selfPosition > 0) {
+                        str = formatLaptime(ci.l5);
+                        if (ci.l5 >= ciSelf.l5)
+                            m_brush->SetColor(deltaPosCol);
+                        else
+                            m_brush->SetColor(deltaNegCol);
+                    }
+                    else
+                        m_brush->SetColor(textCol);
+
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, rowY, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+            }
+
+            // Scrollbar for multi-class layout
+            if (totalRows > visibleRows && visibleRows > 0)
+            {
+                const float trackLeft  = (float)m_width - 6.0f;
+                const float trackRight = (float)m_width - 3.0f;
+                const float trackTop   = 2 * yoff + lineHeight;
+                const float trackBot   = ybottom;
+                const float trackH     = std::max(0.0f, trackBot - trackTop);
+                const float ratio      = (float)visibleRows / (float)totalRows;
+                const float thumbH     = std::max(12.0f, trackH * ratio);
+                const float maxThumbTravel = std::max(0.0f, trackH - thumbH);
+                const float scrollRatio = (m_maxScrollRow > 0) ? ((float)m_scrollRow / (float)m_maxScrollRow) : 0.0f;
+                const float thumbTop  = trackTop + maxThumbTravel * scrollRatio;
+                const float thumbBot  = thumbTop + thumbH;
+
+                float4 trackCol = headerCol; trackCol.a *= 0.20f * globalOpacity;
+                float4 thumbCol = headerCol; thumbCol.a *= 0.45f * globalOpacity;
+
+                D2D1_RECT_F track = { trackLeft, trackTop, trackRight, trackBot };
+                D2D1_RECT_F thumb = { trackLeft, thumbTop, trackRight, thumbBot };
+                m_brush->SetColor(trackCol);
+                m_renderTarget->FillRectangle(&track, m_brush.Get());
+                m_brush->SetColor(thumbCol);
+                m_renderTarget->FillRectangle(&thumb, m_brush.Get());
             }
         }
-
-        // Calculate scrollbar variables
-        const int totalRows = carsInClass;
-        const int visibleRows = carsToDraw;
-
-        // Scrollbar
-        if( totalRows > visibleRows && visibleRows > 0 )
+        else
         {
-            const float trackLeft  = (float)m_width - 6.0f;
-            const float trackRight = (float)m_width - 3.0f;
-            const float trackTop   = 2*yoff + lineHeight;
-            const float trackBot   = ybottom;
-            const float trackH     = std::max( 0.0f, trackBot - trackTop );
-            const float ratio      = (float)visibleRows / (float)totalRows;
-            const float thumbH     = std::max( 12.0f, trackH * ratio );
-            const float maxThumbTravel = std::max( 0.0f, trackH - thumbH );
-            const float scrollRatio = (m_maxScrollRow>0) ? ((float)m_scrollRow / (float)m_maxScrollRow) : 0.0f;
-            const float thumbTop  = trackTop + maxThumbTravel * scrollRatio;
-            const float thumbBot  = thumbTop + thumbH;
+            // Original single-class layout (only the driver's class)
+            int carsToDraw = static_cast<int>((ybottom - contentStartY) / lineHeight) - 1;
+            int carsToSkip;
+            if (carsToDraw >= carsInClass) {
+                numTopDrivers = carsToDraw;
+                carsToSkip = 0;
+            }
+            else {
+                // cars to add ahead = total cars - position
+                numAheadDrivers += std::max((ciSelf.position - carsInClass + numBehindDrivers), 0);
+                numBehindDrivers -= std::min(std::max((ciSelf.position - carsInClass + numBehindDrivers), 0), 2);
+                numTopDrivers += std::max(carsToDraw - (numTopDrivers + numAheadDrivers + numBehindDrivers + 2), 0);
+                numBehindDrivers += std::max(carsToDraw - (ciSelf.position + numBehindDrivers), 0);
 
-            float4 trackCol = headerCol; trackCol.a *= 0.20f * globalOpacity;
-            float4 thumbCol = headerCol; thumbCol.a *= 0.45f * globalOpacity;
+                if (ciSelf.position < numTopDrivers + numAheadDrivers) {
+                    carsToSkip = 0;
+                }
+                else if (ciSelf.position > carsInClass - numBehindDrivers) {
+                    carsToSkip = carsInClass - numTopDrivers - numBehindDrivers - numAheadDrivers - 1;
+                }
+                else carsToSkip = 0;
+            }
+            // Compute scroll limits and clamp current scroll position
+            m_maxScrollRow = std::max(0, carsInClass - carsToDraw);
+            if (m_scrollRow > m_maxScrollRow) m_scrollRow = m_maxScrollRow;
+            // Apply scroll offset to the number of cars to skip for rendering
+            {
+                const int maxSkip = std::max(0, carsInClass - carsToDraw);
+                carsToSkip = std::clamp(carsToSkip + m_scrollRow, 0, maxSkip);
+            }
+            int drawnCars = 0;
+            int ownClass = useStubData ? ciSelf.classIdx : ir_PlayerCarClass.getInt();
+            int selfClassDrivers = 0;
+            bool skippedCars = false;
+            int numSkippedCars = 0;
+            for (int i = 0; i < (int)carInfo.size(); ++i)
+            {
+                if (drawnCars > carsToDraw) break;
 
-            D2D1_RECT_F track = { trackLeft, trackTop, trackRight, trackBot };
-            D2D1_RECT_F thumb = { trackLeft, thumbTop, trackRight, thumbBot };
-            m_brush->SetColor( trackCol );
-            m_renderTarget->FillRectangle( &track, m_brush.Get() );
-            m_brush->SetColor( thumbCol );
-            m_renderTarget->FillRectangle( &thumb, m_brush.Get() );
+                y = contentStartY + lineHeight / 2 + drawnCars * lineHeight;
+
+                if (carInfo[i].classIdx != ownClass) {
+                    continue;
+                }
+
+                selfClassDrivers++;
+
+                // Apply scroll offset: skip the first 'carsToSkip' rows in-class
+                if (selfClassDrivers <= carsToSkip) {
+                    continue;
+                }
+
+                if (y + lineHeight / 2 > ybottom)
+                    break;
+
+                // Focus on the driver
+                if (selfPosition > 0 && selfClassDrivers > numTopDrivers) {
+
+                    if (selfClassDrivers > carsToSkip && selfClassDrivers < selfPosition - numAheadDrivers) {
+                        if (!skippedCars) {
+                            skippedCars = true;
+                            drawnCars++;
+                        }
+                        continue;
+                    }
+                }
+
+                drawnCars++;
+
+                // Alternating line backgrounds
+                if (selfClassDrivers & 1 && alternateLineBgCol.a > 0)
+                {
+                    D2D1_RECT_F r = { 0, y - lineHeight / 2, (float)m_width,  y + lineHeight / 2 };
+                    m_brush->SetColor(alternateLineBgCol);
+                    m_renderTarget->FillRectangle(&r, m_brush.Get());
+                }
+
+                const CarInfo&  ci = carInfo[i];
+                const Car&      car = ir_session.cars[ci.carIdx];
+                const bool      isTalking = (talkerCarIdx >= 0 && talkerCarIdx == ci.carIdx);
+
+                // Dim color if player is disconnected.
+                const bool isGone = !car.isSelf && ir_CarIdxTrackSurface.getInt(ci.carIdx) == irsdk_NotInWorld;
+                float4 textCol = car.isSelf ? selfCol : (car.isBuddy ? buddyCol : (car.isFlagged ? flaggedCol : otherCarCol));
+                if (isGone)
+                    textCol.a *= 0.5f;
+
+                // Position
+                if (ci.position > 0)
+                {
+                    clm = m_columns.get((int)Columns::POSITION);
+                    // White label: square left edge + pill-shaped right edge (same as class-name label)
+                    {
+                        const float inset = 1.0f;
+                        // Use full column width (text + borders) to make the white background wider
+                        const float prL = xoff + (clm->textL - clm->borderL);
+                        const float prR = xoff + (clm->textR + clm->borderR);
+                        D2D1_RECT_F pr = { prL, y - lineHeight / 2, prR, y + lineHeight / 2 };
+                        D2D1_RECT_F rrRect = { pr.left + inset, pr.top + inset, pr.right - inset, pr.bottom - inset };
+                        const float h = rrRect.bottom - rrRect.top;
+                        const float rCap = h * 0.5f;
+
+                        // Fully opaque white (do not apply globalOpacity) to avoid seeing the shape beneath
+                        float4 posBg = float4(1, 1, 1, 1);
+                        m_brush->SetColor(posBg);
+
+                        const float w = rrRect.right - rrRect.left;
+                        if (w <= (rCap * 2.0f + 1.0f))
+                        {
+                            rr.rect = rrRect;
+                            rr.radiusX = 3.0f;
+                            rr.radiusY = 3.0f;
+                            m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        }
+                        else
+                        {
+                            D2D1_RECT_F baseRect = rrRect;
+                            baseRect.right = rrRect.right - rCap;
+                            m_renderTarget->FillRectangle(&baseRect, m_brush.Get());
+
+                            D2D1_ROUNDED_RECT capRR = {};
+                            capRR.rect = { rrRect.right - 2.0f * rCap, rrRect.top, rrRect.right, rrRect.bottom };
+                            capRR.radiusX = rCap;
+                            capRR.radiusY = rCap;
+                            m_renderTarget->FillRoundedRectangle(&capRR, m_brush.Get());
+                        }
+                    }
+                    m_brush->SetColor(float4(0, 0, 0, 1));
+                    swprintf(s, _countof(s), L"P%d", ci.position);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Car number
+                {
+                    clm = m_columns.get((int)Columns::CAR_NUMBER);
+                    // While driver is transmitting on voice, replace the car-number badge with the push-to-talk icon.
+                    if (isTalking && m_pushToTalkIcon)
+                    {
+                        const float cellL = xoff + clm->textL;
+                        const float cellR = xoff + clm->textR;
+                        const float cellW = cellR - cellL;
+                        const float iconSize = std::max(0.0f, std::min(lineHeight - 6.0f, cellW));
+                        const float cx = (cellL + cellR) * 0.5f;
+                        D2D1_RECT_F ir = { cx - iconSize * 0.5f, y - iconSize * 0.5f, cx + iconSize * 0.5f, y + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(m_pushToTalkIcon.Get(), &ir);
+                    }
+                    else
+                    {
+                        swprintf(s, _countof(s), L"#%S", car.carNumberStr.c_str());
+                        r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                        rr.rect = { r.left - 2, r.top + 1, r.right + 2, r.bottom - 1 };
+                        rr.radiusX = 3;
+                        rr.radiusY = 3;
+                        // Use class base color for number background (matches header base color)
+                        float4 numBg = ClassColors::get(ci.classIdx);
+                        numBg.a *= globalOpacity;
+                        if (isGone) numBg.a *= 0.5f;
+                        m_brush->SetColor(numBg);
+                        m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                        // Left accent strip using class light color
+                        {
+                            float4 stripCol = ClassColors::getLight(ci.classIdx);
+                            stripCol.a = numBg.a;
+                            m_brush->SetColor(stripCol);
+                            const float stripW = 3.0f;
+                            D2D1_RECT_F strip = { rr.rect.left + 1.0f, rr.rect.top + 1.0f, rr.rect.left + 1.0f + stripW, rr.rect.bottom - 1.0f };
+                            m_renderTarget->FillRectangle(&strip, m_brush.Get());
+                        }
+                        m_brush->SetColor(float4(1, 1, 1, 1));
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
+                }
+
+                // Name
+                {
+                    clm = m_columns.get((int)Columns::NAME);
+                    m_brush->SetColor(textCol);
+                    std::string displayName = car.teamName;
+                    if (!g_cfg.getBool(m_name, "show_full_name", true)) {
+                        // Show only first name
+                        size_t spacePos = displayName.find(' ');
+                        if (spacePos != std::string::npos) {
+                            displayName = displayName.substr(0, spacePos);
+                        }
+                    }
+                    swprintf(s, _countof(s), L"%S", displayName.c_str());
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_LEADING, m_fontSpacing);
+                }
+
+                // Pit age
+                if (!ir_isPreStart() && (ci.pitAge >= 0 || ir_CarIdxOnPitRoad.getBool(ci.carIdx)))
+                {
+                    if (clm = m_columns.get((int)Columns::PIT)) {
+                        m_brush->SetColor(pitCol);
+                        swprintf(s, _countof(s), L"%d", ci.pitAge);
+                        r = { xoff + clm->textL, y - lineHeight / 2 + 2, xoff + clm->textR, y + lineHeight / 2 - 2 };
+                        if (ir_CarIdxOnPitRoad.getBool(ci.carIdx)) {
+                            swprintf(s, _countof(s), L"PIT");
+                            m_renderTarget->FillRectangle(&r, m_brush.Get());
+                            m_brush->SetColor(float4(0, 0, 0, 1));
+                        }
+                        else {
+                            swprintf(s, _countof(s), L"%d", ci.pitAge);
+                            m_renderTarget->DrawRectangle(&r, m_brush.Get());
+                        }
+                        m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                    }
+                }
+
+                // License/SR
+                if (clm = m_columns.get((int)Columns::LICENSE)) {
+                    swprintf(s, _countof(s), L"%C %.1f", car.licenseChar, car.licenseSR);
+                    r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    float4 c = car.licenseCol;
+                    c.a = licenseBgAlpha;
+                    m_brush->SetColor(c);
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                    m_brush->SetColor(licenseTextCol);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Irating
+                if (clm = m_columns.get((int)Columns::IRATING)) {
+                    swprintf(s, _countof(s), L"%.1fk", (float)car.irating / 1000.0f);
+                    r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    m_brush->SetColor(iratingBgCol);
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                    m_brush->SetColor(iratingTextCol);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Car brand
+                if ((clm = m_columns.get((int)Columns::CAR_BRAND)) && m_carBrandIconsLoaded)
+                {
+                    if (m_carIdToIconMap.find(car.carID) == m_carIdToIconMap.end())
+                    {
+                        IWICFormatConverter* conv = findCarBrandIcon(car.carName, m_carBrandIconsMap);
+                        if (conv)
+                        {
+                            auto& brandBmp = m_brandConvToBitmap[conv];
+                            if (!brandBmp)
+                            {
+                                (void)m_renderTarget->CreateBitmapFromWicBitmap(conv, nullptr, &brandBmp);
+                            }
+                            if (brandBmp)
+                            {
+                                m_carIdToIconMap[car.carID] = brandBmp;
+                            }
+                        }
+                    }
+
+                    const auto itBmp = m_carIdToIconMap.find(car.carID);
+                    if (itBmp != m_carIdToIconMap.end() && itBmp->second) {
+                        D2D1_RECT_F br = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textL + lineHeight, y + lineHeight / 2 };
+                        m_renderTarget->DrawBitmap(itBmp->second.Get(), br);
+                    }
+                }
+
+                // Positions gained
+                if (clm = m_columns.get((int)Columns::POSITIONS_GAINED)) {
+                    r = { xoff + clm->textL, y - lineHeight / 2, xoff + clm->textR, y + lineHeight / 2 };
+                    rr.rect = { r.left + 1, r.top + 1, r.right - 1, r.bottom - 1 };
+                    rr.radiusX = 3;
+                    rr.radiusY = 3;
+                    m_brush->SetColor(float4(1, 1, 1, 1));
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+
+                    const int delta = ci.positionsChanged;
+                    ID2D1Bitmap* icon = nullptr;
+                    if (delta > 0)      icon = m_posUpIcon.Get();
+                    else if (delta < 0) icon = m_posDownIcon.Get();
+                    else                icon = m_posEqualIcon.Get();
+
+                    const float iconPad = 4.0f;
+                    const float iconSize = std::max(0.0f, lineHeight - 6.0f);
+                    if (icon) {
+                        D2D1_RECT_F ir = { r.left + iconPad, y - iconSize * 0.5f, r.left + iconPad + iconSize, y + iconSize * 0.5f };
+                        m_renderTarget->DrawBitmap(icon, &ir);
+                    }
+
+                    m_brush->SetColor(float4(0, 0, 0, 1));
+                    swprintf(s, _countof(s), L"%d", abs(delta));
+                    const float textL = r.left + iconPad + (icon ? iconSize + 2.0f : 0.0f);
+                    m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), textL, r.right - 15.0f, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                }
+
+                // Tire compound
+                if (clm = m_columns.get((int)Columns::TIRE_COMPOUND))
+                {
+                    int compound = ci.tireCompound;
+                    if (compound < 0 && car.tireCompound >= 0)
+                        compound = car.tireCompound;
+                    if (compound < 0 && ir_CarIdxTireCompound.isValid())
+                        compound = ir_CarIdxTireCompound.getInt(ci.carIdx);
+                    const std::string compoundText = tireCompoundToString(compound);
+                    m_brush->SetColor(textCol);
+                    m_text.render(m_renderTarget.Get(), toWide(compoundText).c_str(), m_textFormatSmall.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, m_fontSpacing);
+                }
+
+                // Gap
+                if (ci.lapGap || ci.gap)
+                {
+                    if (clm = m_columns.get((int)Columns::GAP)) {
+                        if (ci.lapGap < 0)
+                            swprintf(s, _countof(s), L"%d L", ci.lapGap);
+                        else
+                            swprintf(s, _countof(s), L"%.01f", ci.gap);
+                        m_brush->SetColor(textCol);
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING);
+                    }
+                }
+
+                // Best
+                if (clm = m_columns.get((int)Columns::BEST)) {
+                    str.clear();
+                    if (ci.best > 0)
+                        str = formatLaptime(ci.best);
+                    m_brush->SetColor(ci.hasFastestLap ? fastestLapCol : textCol);
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+
+                // Last
+                if (clm = m_columns.get((int)Columns::LAST))
+                {
+                    str.clear();
+                    if (ci.last > 0)
+                        str = formatLaptime(ci.last);
+                    m_brush->SetColor(textCol);
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+
+                // Delta
+                if (clm = m_columns.get((int)Columns::DELTA))
+                {
+                    if (ci.delta)
+                    {
+                        swprintf(s, _countof(s), L"%.01f", abs(ci.delta));
+                        if (ci.delta > 0)
+                            m_brush->SetColor(deltaPosCol);
+                        else
+                            m_brush->SetColor(deltaNegCol);
+                        m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                    }
+                }
+
+                // Average 5 laps
+                if (clm = m_columns.get((int)Columns::L5))
+                {
+                    str.clear();
+                    if (ci.l5 > 0 && selfPosition > 0) {
+                        str = formatLaptime(ci.l5);
+                        if (ci.l5 >= ciSelf.l5)
+                            m_brush->SetColor(deltaPosCol);
+                        else
+                            m_brush->SetColor(deltaNegCol);
+                    }
+                    else
+                        m_brush->SetColor(textCol);
+
+                    m_text.render(m_renderTarget.Get(), toWide(str).c_str(), m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);
+                }
+            }
+
+            // Scrollbar as before for single-class layout
+            const int totalRows = carsInClass;
+            const int visibleRows = carsToDraw;
+
+            if (totalRows > visibleRows && visibleRows > 0)
+            {
+                const float trackLeft = (float)m_width - 6.0f;
+                const float trackRight = (float)m_width - 3.0f;
+                const float trackTop = 2 * yoff + lineHeight;
+                const float trackBot = ybottom;
+                const float trackH = std::max(0.0f, trackBot - trackTop);
+                const float ratio = (float)visibleRows / (float)totalRows;
+                const float thumbH = std::max(12.0f, trackH * ratio);
+                const float maxThumbTravel = std::max(0.0f, trackH - thumbH);
+                const float scrollRatio = (m_maxScrollRow > 0) ? ((float)m_scrollRow / (float)m_maxScrollRow) : 0.0f;
+                const float thumbTop = trackTop + maxThumbTravel * scrollRatio;
+                const float thumbBot = thumbTop + thumbH;
+
+                float4 trackCol = headerCol; trackCol.a *= 0.20f * globalOpacity;
+                float4 thumbCol = headerCol; thumbCol.a *= 0.45f * globalOpacity;
+
+                D2D1_RECT_F track = { trackLeft, trackTop, trackRight, trackBot };
+                D2D1_RECT_F thumb = { trackLeft, thumbTop, trackRight, thumbBot };
+                m_brush->SetColor(trackCol);
+                m_renderTarget->FillRectangle(&track, m_brush.Get());
+                m_brush->SetColor(thumbCol);
+                m_renderTarget->FillRectangle(&thumb, m_brush.Get());
+            }
         }
         
         // Footer: left (session time), right (track temp + laps)
@@ -1036,7 +1675,7 @@ protected:
     void loadPositionIcons()
     {
         if (!m_renderTarget.Get()) return;
-        if (m_posUpIcon || m_posDownIcon || m_posEqualIcon) return;
+        if (m_posUpIcon || m_posDownIcon || m_posEqualIcon || m_pushToTalkIcon) return;
 
         (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (!m_wicFactory.Get()) {
@@ -1062,6 +1701,7 @@ protected:
         m_posUpIcon    = loadPng(L"assets\\icons\\up.png");
         m_posDownIcon  = loadPng(L"assets\\icons\\down.png");
         m_posEqualIcon = loadPng(L"assets\\icons\\equal.png");
+        m_pushToTalkIcon = loadPng(L"assets\\icons\\pushtotalk.png");
     }
 
     void releasePositionIcons()
@@ -1069,6 +1709,7 @@ protected:
         m_posUpIcon.Reset();
         m_posDownIcon.Reset();
         m_posEqualIcon.Reset();
+        m_pushToTalkIcon.Reset();
         m_wicFactory.Reset();
     }
 
@@ -1076,6 +1717,7 @@ protected:
     void loadFooterIcons()
     {
         if (!m_renderTarget.Get()) return;
+        if (m_iconIncidents || m_iconSoF || m_iconTrackTemp || m_iconSessionTime || m_iconLaps) return;
         (void)CoInitializeEx(nullptr, COINIT_MULTITHREADED);
         if (!m_wicFactory.Get()) {
             (void)CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&m_wicFactory));
@@ -1116,7 +1758,8 @@ protected:
     std::vector<std::vector<float>> m_avgL5Times;
     bool m_carBrandIconsLoaded;
     std::map<std::string, IWICFormatConverter*> m_carBrandIconsMap;
-    std::map<int, ID2D1Bitmap*> m_carIdToIconMap;
+    std::map<IWICFormatConverter*, Microsoft::WRL::ComPtr<ID2D1Bitmap>> m_brandConvToBitmap;
+    std::map<int, Microsoft::WRL::ComPtr<ID2D1Bitmap>> m_carIdToIconMap;
     std::set<std::string> notFoundBrands;
 
     // Position change icons
@@ -1124,6 +1767,7 @@ protected:
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posUpIcon;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posDownIcon;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_posEqualIcon;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_pushToTalkIcon;
 
     // Footer icons bitmaps
     Microsoft::WRL::ComPtr<ID2D1Bitmap> m_iconIncidents;

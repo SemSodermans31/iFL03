@@ -2,6 +2,38 @@
 let currentState = {};
 let selectedOverlay = null;
 
+function getShowOverlaysHelp() {
+	const v = currentState?.config?.General?.show_overlays_help;
+	return v !== false;
+}
+
+function applyOverlaysHelpVisibility() {
+	const section = document.getElementById('overlays-help-section');
+	const content = document.getElementById('overlays-help-content');
+	const btn = document.getElementById('btn-toggle-overlays-help');
+	if (!section || !content || !btn) return;
+
+	const show = getShowOverlaysHelp();
+	section.classList.toggle('hidden', !show);
+	btn.textContent = 'Hide';
+}
+
+function setShowOverlaysHelp(show) {
+	// Update local state for immediate UI response
+	currentState.config = currentState.config || {};
+	currentState.config.General = currentState.config.General || {};
+	currentState.config.General.show_overlays_help = !!show;
+
+	applyOverlaysHelpVisibility();
+
+	// Persist to config.json via backend
+	sendCommand('setConfigBool', {
+		component: 'General',
+		key: 'show_overlays_help',
+		value: !!show
+	});
+}
+
 // Overlay configuration mapping
 const overlayConfig = {
 	'standings': {
@@ -68,6 +100,11 @@ const overlayConfig = {
 		name: 'Pit Entry',
 		configKey: 'OverlayPit',
 		description: 'Distance to pitlane entry'
+	},
+	'traffic': {
+		name: 'Traffic',
+		configKey: 'OverlayTraffic',
+		description: 'Faster-class warning popup (multiclass)'
 	}
 };
 
@@ -90,6 +127,15 @@ function setupEventListeners() {
 			selectOverlay(overlayKey);
 		});
 	});
+
+	// Toggle "How do I use the overlays?" help section
+	const helpBtn = document.getElementById('btn-toggle-overlays-help');
+	if (helpBtn) {
+		helpBtn.addEventListener('click', function() {
+			// One-way: Overlays page can only hide this section.
+			setShowOverlaysHelp(false);
+		});
+	}
 
 	// Enabled toggle
 	const overlayToggle = document.getElementById('overlay-toggle');
@@ -598,6 +644,7 @@ function updateOverlaySettings(overlayKey) {
 		const defaults = {
 			OverlayInputs: 30,
 			OverlayPit: 30,
+			OverlayTraffic: 15,
 			OverlayDelta: 15,
 			OverlayTrack: 15,
 			OverlayDDU: 10,
@@ -697,6 +744,9 @@ function requestState() {
 function updateUI() {
 	// Update connection status
 	updateConnectionStatus(currentState.connectionStatus);
+
+	// Apply help section visibility from persisted config
+	applyOverlaysHelpVisibility();
 
 	// Update overlay states in grid
 	Object.keys(overlayConfig).forEach(overlayKey => {

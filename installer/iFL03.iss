@@ -57,7 +57,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
-Source: "..\\x64\\Release\\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\\x64\\Release\\*"; DestDir: "{app}"; Excludes: "config.json;config_*.json"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\\assets\\*"; DestDir: "{app}\\assets"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "..\\logs.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 

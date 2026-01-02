@@ -1,10 +1,10 @@
-# iFL03 — modern iRacing overlays with a CEF settings UI <!-- omit in toc -->
+# iFL03 — modern iRacing overlays with intuitive UI <!-- omit in toc -->
 
-iFL03 is a lightweight, modern overlay suite for iRacing with a built‑in Chromium (CEF) UI. It brings a polished visual style, sensible defaults, and powerful customization while staying intuitive for the user.
+iFL03 is a lightweight, modern overlay suite for iRacing. It offers a nice visual style, and a lot of customization while staying intuitive for the user.
 
-This is a continuation of L. E. Spalt’s excellent iRon project. Many of the core ideas, rendering scaffolding, and the overall approach to simple, dependency‑light overlays originate there. The CEF UI and new overlays are built on that foundation.
+This is a continuation of L. E. Spalt’s iRon project. Many of the core ideas, rendering scaffolding, and the overall approach to simple, dependency‑light overlays originate there. I have then greatly expanded the project to feature things I thought were missing.
 
-Acknowledgement: Huge thanks to lespalt for the original work. iFL03’s CEF GUI and overlays are built upon that base. See Credits & License below.
+So all in all a huge thanks to lespalt for the original work. iFL03 and its overlays are built upon that base. See Credits & License below.
 
 ![Overview](assets/readmeimg/index.png)
 
@@ -39,27 +39,13 @@ Acknowledgement: Huge thanks to lespalt for the original work. iFL03’s CEF GUI
 ## Where to Download
 
 - Grab binaries from this repository’s Releases page.
-- Or build from source (see below).
+- Or visit my [website](https://semsodermans31.github.io/iFL03/)
 
 ---
 
-## What’s New in iFL03
+## What iFL03 contains
 
-Alongside the original overlays, iFL03 adds several new overlays and many quality‑of‑life upgrades:
-
-- New overlays
-  - Delta: Circular delta with trend‑aware coloring and predicted lap time.
-  - Flags: Clean, high‑contrast flag callouts with two‑band design.
-  - Weather: Track temp, wetness bar, precipitation/air temp, and a wind compass relative to car.
-  - Track Map: Scaled track rendering with start/finish markers and cars for most tracks.
-  - Radar: Proximity radar with 8 m/2 m guides and sticky alerts.
-- Enhanced original overlays
-  - Relative: Optional minimap, license or SR, iRating, pit age, last lap, average of last 5 laps, positions gained, class colors, buddy highlighting, scrollable list, optional iRating prediction in races.
-  - Standings: Class‑aware grid with fastest‑lap highlighting, car brand icons, deltas/gaps, average of last 5 laps, configurable top/ahead/behind visibility, scroll bar.
-  - DDU: Fuel calculator refinements, P1 last, delta vs session best, shift light behavior, temperatures, brake bias, incident count, RPM lights, etc.
-  - Inputs: Dual graph plus vertical bars (clutch/brake/throttle), steering ring or image wheel (Moza KS / RS v2), on‑wheel speed/gear.
-- Preview mode: Populate overlays with stub data even when disconnected to place layouts.
-- Global opacity: All overlays respect a global opacity for easy blending with broadcasts/streams.
+The application contains many useful overlays that most people cannot go without, requesting a now overlay or feature can be done via the issues tab in GitHub or via the [Discord](https://discord.gg/D6FGc9vA) Channel.
 
 ---
 
@@ -69,7 +55,7 @@ Alongside the original overlays, iFL03 adds several new overlays and many qualit
 
 ### Relative
 
-Competitor list centered on your car with rich context:
+Competitor list centered on your car with many features:
 - Position, car number, driver name
 - License or SR, iRating (k notation)
 - Pit age (laps since last stop) with PIT indicator when on pit road
@@ -92,6 +78,7 @@ Full‑field view with class awareness and a compact, readable grid:
 - Average of last 5 laps (L5) color‑coded vs your own L5
 - Configurable number of “top”, “ahead” and “behind” rows and auto scroll bar
 - SoF, track temp, session end and laps summary footer
+- Multiclass Banners that differ per class
 
 ![standings](assets/readmeimg/standings.png)
 
@@ -173,6 +160,14 @@ Proximity radar with readable distance cues:
 
 ![radar](assets/readmeimg/radar.png)
 
+### Traffic
+
+Modern display to inform the user of different class vehicles behind them.
+- shows the class, car number and brandname
+- also displays distance behind in time and meters or feet
+
+![traffic](assets/readmeimg/traffic.png)
+
 ### Cover
 
 Plain rectangle that can hide distracting in‑car dashes (e.g., next‑gen stock car). Useful for broadcasts and focused driving.
@@ -190,7 +185,9 @@ Displays live fueldata in a comprehensive view. Able to edit the value for extra
 ![fuel](assets/readmeimg/fuel.png)
 
 ## Pitlane
-Displays handy information when driving into the pitlane will be updated in the future.
+Displays handy information when driving into the pitlane.
+- On pit entry/exit, it tells you when to engage pitlimiter
+- In pitlane it shows speed and distance to pitbox
 
 ![pitlane](assets/readmeimg/pit.png)
 
@@ -201,7 +198,6 @@ Displays handy information when driving into the pitlane will be updated in the 
 - Preview Mode: In the settings in the GUI toggle the switch on.
 - Hotkeys: Overlays can be toggled at runtime (see overlays menu for hotkey combination). Hotkeys are configurable.
 - Live config: Most colors, fonts, sizes and behavior can be tuned in the generated config.json if you wish to totally customize your experience, this requires a bit of technical knowhow :P. Edits are applied live when you save.
-- Global opacity: Each overlay’s colors are automatically multiplied by a global opacity setting.
 
 ---
 
@@ -246,7 +242,7 @@ If you prefer, all settings remain available via config.json without opening the
 
 ## Bug reports and feature requests
 
-Please open an issue in this repository. Repro steps and logs/screenshots help a lot. PRs welcome.
+Please open an issue in this repository. Reproduced steps and logs/screenshots help a lot. PRs welcome.
 
 ---
 

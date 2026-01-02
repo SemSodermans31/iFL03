@@ -31,6 +31,7 @@ SOFTWARE.
 #include "iracing.h"
 #include "Units.h"
 #include "Config.h"
+#include "ClassColors.h"
 #include "util.h"
 #include "stub_data.h"
 
@@ -61,12 +62,12 @@ class OverlayTire : public Overlay
             float r  = 0;   // radius
             float w  = 0;   // arc thickness
             std::wstring label; // FR/FL/RR/RL
+            D2D1_RECT_F tile = {}; // per-tire card rect
         };
 
         virtual float2 getDefaultSize()
         {
-            // Wide, short bar for 4 gauges in a row; a bit taller to allow advanced bars
-            return float2(600, 190);
+            return float2(640, 240);
         }
 
         virtual void onEnable()
@@ -77,46 +78,26 @@ class OverlayTire : public Overlay
         virtual void onDisable()
         {
             m_text.reset();
-            m_backgroundBitmap.Reset();
-            m_backgroundTarget.Reset();
+            m_bgBrush.Reset();
+            m_panelBrush.Reset();
+            m_lastStyleRenderTarget = nullptr;
         }
 
         virtual void onConfigChanged()
         {
             m_text.reset(m_dwriteFactory.Get());
-            createGlobalTextFormat(0.7f, m_tfSmall);
-            createGlobalTextFormat(1.0f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfMediumBold);
-            createGlobalTextFormat(1.4f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfTitle);
+
+            createGlobalTextFormat(0.85f, m_tfSmall);
+            createGlobalTextFormat(1.05f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfMediumBold);
+            createGlobalTextFormat(1.25f, (int)DWRITE_FONT_WEIGHT_BOLD, "", m_tfTitle);
 
             // Target FPS (moderate, tire data changes slowly)
             setTargetFPS(g_cfg.getInt(m_name, "target_fps", 10));
 
-            // Create cached background bitmap with rounded corners
-            {
-                m_renderTarget->CreateCompatibleRenderTarget(&m_backgroundTarget);
-                m_backgroundTarget->BeginDraw();
-                m_backgroundTarget->Clear(float4(0, 0, 0, 0)); // Transparent background first
-
-                // Draw rounded rectangle background
-                const float cornerRadius = g_cfg.getFloat(m_name, "corner_radius", 6.0f);
-                const float4 bgColor = g_cfg.getFloat4(m_name, "global_background_col", float4(0, 0, 0, 0.8f));
-                const float w = (float)m_width;
-                const float h = (float)m_height;
-
-                Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> bgBrush;
-                m_backgroundTarget->CreateSolidColorBrush(bgColor, &bgBrush);
-
-                D2D1_ROUNDED_RECT rr;
-                rr.rect = D2D1::RectF(0.5f, 0.5f, w - 0.5f, h - 0.5f);
-                rr.radiusX = cornerRadius;
-                rr.radiusY = cornerRadius;
-
-                m_backgroundTarget->FillRoundedRectangle(&rr, bgBrush.Get());
-                m_backgroundTarget->EndDraw();
-                m_backgroundTarget->GetBitmap(&m_backgroundBitmap);
-            }
-
-            layoutGauges();
+            // Recreate D2D brushes (render target may change)
+            m_bgBrush.Reset();
+            m_panelBrush.Reset();
+            m_lastStyleRenderTarget = nullptr;
         }
 
         virtual bool hasCustomBackground() const { return true; }
@@ -144,14 +125,20 @@ class OverlayTire : public Overlay
                 return;
             }
 
-            const float4 textCol   = g_cfg.getFloat4(m_name, "text_col",   float4(1,1,1,0.9f));
-            const float4 goodCol   = g_cfg.getFloat4(m_name, "good_col",   float4(0.0f,0.8f,0.0f,0.85f));
-            const float4 warnCol   = g_cfg.getFloat4(m_name, "warn_col",   float4(1.0f,0.7f,0.0f,0.9f));
-            const float4 badCol    = g_cfg.getFloat4(m_name, "bad_col",    float4(0.9f,0.2f,0.2f,0.9f));
-            const float4 outlineCol= g_cfg.getFloat4(m_name, "outline_col",float4(0.7f,0.7f,0.7f,0.9f));
+            const float globalOpacity = getGlobalOpacity();
 
-            // Foreground elements (text, gauges) should NOT be affected by global opacity
-            const float4 finalTextCol = textCol;
+            // Default palette aligned with ClassColors (still configurable)
+            float4 textCol    = g_cfg.getFloat4(m_name, "text_col",    float4(0.95f, 0.95f, 0.98f, 0.92f));
+            float4 goodCol    = g_cfg.getFloat4(m_name, "good_col",    ClassColors::get(3)); // green
+            float4 warnCol    = g_cfg.getFloat4(m_name, "warn_col",    ClassColors::get(1)); // yellow-ish
+            float4 badCol     = g_cfg.getFloat4(m_name, "bad_col",     ClassColors::get(0)); // red-ish
+            float4 outlineCol = g_cfg.getFloat4(m_name, "outline_col", float4(0.80f, 0.82f, 0.86f, 0.28f));
+
+            textCol.a    *= globalOpacity;
+            goodCol.a    *= globalOpacity;
+            warnCol.a    *= globalOpacity;
+            badCol.a     *= globalOpacity;
+            outlineCol.a *= globalOpacity;
 
             // Track laps on tire using TiresUsed counters and completed laps
             const int lapCompleted = ir_LapCompleted.getInt();
@@ -169,41 +156,121 @@ class OverlayTire : public Overlay
             }
 
             m_renderTarget->BeginDraw();
+            m_renderTarget->Clear(float4(0, 0, 0, 0));
 
-            // Draw cached background with global opacity applied ONLY to background
-            m_renderTarget->DrawBitmap(
-                m_backgroundBitmap.Get(),
-                nullptr,
-                getGlobalOpacity(),
-                D2D1_BITMAP_INTERPOLATION_MODE_LINEAR,
-                nullptr
-            );
+            ensureStyleBrushes();
 
-            // Draw title
-            m_brush->SetColor(finalTextCol);
-            m_text.render(m_renderTarget.Get(), L"Pitwall Tire Wear", m_tfTitle.Get(),
-                         0, (float)m_width, 25.0f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            const float W = (float)m_width;
+            const float H = (float)m_height;
+            const float minDim = std::max(1.0f, std::min(W, H));
+            const float pad = std::clamp(minDim * 0.045f, 8.0f, 18.0f);
+            const float innerPad = std::clamp(minDim * 0.045f, 10.0f, 20.0f);
+            const float corner = std::clamp(minDim * 0.070f, 10.0f, 26.0f);
 
-            // Draw each gauge
-            drawTireGauge(m_gFR, finalTextCol, goodCol, warnCol, badCol, outlineCol,
+            D2D1_RECT_F rCard = { pad, pad, W - pad, H - pad };
+            const float cardH = std::max(1.0f, rCard.bottom - rCard.top);
+
+            // Card background gradient
+            {
+                D2D1_ROUNDED_RECT rr = { rCard, corner, corner };
+                if (m_bgBrush) {
+                    m_bgBrush->SetStartPoint(D2D1_POINT_2F{ rCard.left, rCard.top });
+                    m_bgBrush->SetEndPoint(D2D1_POINT_2F{ rCard.left, rCard.bottom });
+                    m_renderTarget->FillRoundedRectangle(&rr, m_bgBrush.Get());
+                } else {
+                    m_brush->SetColor(float4(0.05f, 0.05f, 0.06f, 0.92f * globalOpacity));
+                    m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                }
+            }
+
+            // Header/banner (dark panel)
+            const float bannerH = std::clamp(cardH * 0.20f, 34.0f, 60.0f);
+            D2D1_RECT_F rBanner = {
+                rCard.left + innerPad,
+                rCard.top + innerPad,
+                rCard.right - innerPad,
+                rCard.top + innerPad + bannerH
+            };
+            const float bannerRadius = bannerH * 0.22f;
+            {
+                D2D1_ROUNDED_RECT rrBan = { rBanner, bannerRadius, bannerRadius };
+                if (m_panelBrush) {
+                    m_panelBrush->SetStartPoint(D2D1_POINT_2F{ rBanner.left, rBanner.top });
+                    m_panelBrush->SetEndPoint(D2D1_POINT_2F{ rBanner.left, rBanner.bottom });
+                    m_renderTarget->FillRoundedRectangle(&rrBan, m_panelBrush.Get());
+                } else {
+                    m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.88f * globalOpacity));
+                    m_renderTarget->FillRoundedRectangle(&rrBan, m_brush.Get());
+                }
+
+                // Subtle border
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * globalOpacity));
+                m_renderTarget->DrawRoundedRectangle(&rrBan, m_brush.Get(), 1.5f);
+
+                // Title
+                if (m_tfTitle) {
+                    m_tfTitle->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                    m_tfTitle->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+                }
+                m_brush->SetColor(textCol);
+                m_text.render(
+                    m_renderTarget.Get(),
+                    L"TIRES",
+                    m_tfTitle.Get(),
+                    rBanner.left,
+                    rBanner.right,
+                    (rBanner.top + rBanner.bottom) * 0.5f,
+                    m_brush.Get(),
+                    DWRITE_TEXT_ALIGNMENT_CENTER,
+                    getGlobalFontSpacing()
+                );
+            }
+
+            // Gauge panel area (rest of card)
+            const float gap = std::clamp(cardH * 0.035f, 8.0f, 14.0f);
+            D2D1_RECT_F rGaugePanel = {
+                rCard.left + innerPad,
+                rBanner.bottom + gap,
+                rCard.right - innerPad,
+                rCard.bottom - innerPad
+            };
+            {
+                const float panelCorner = std::clamp(corner * 0.75f, 8.0f, 22.0f);
+                D2D1_ROUNDED_RECT rrPanel = { rGaugePanel, panelCorner, panelCorner };
+                if (m_panelBrush) {
+                    m_panelBrush->SetStartPoint(D2D1_POINT_2F{ rGaugePanel.left, rGaugePanel.top });
+                    m_panelBrush->SetEndPoint(D2D1_POINT_2F{ rGaugePanel.left, rGaugePanel.bottom });
+                    m_renderTarget->FillRoundedRectangle(&rrPanel, m_panelBrush.Get());
+                } else {
+                    m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.88f * globalOpacity));
+                    m_renderTarget->FillRoundedRectangle(&rrPanel, m_brush.Get());
+                }
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.12f * globalOpacity));
+                m_renderTarget->DrawRoundedRectangle(&rrPanel, m_brush.Get(), 1.5f);
+            }
+
+            layoutGauges(rGaugePanel);
+
+            // Draw each gauge (functionality unchanged)
+            drawTireGauge(m_gFR, textCol, goodCol, warnCol, badCol, outlineCol,
                           /*wear*/ min3(ir_RFwearL.getFloat(), ir_RFwearM.getFloat(), ir_RFwearR.getFloat()),
                           /*tempC*/ avg3(ir_RFtempCL.getFloat(), ir_RFtempCM.getFloat(), ir_RFtempCR.getFloat()),
                           /*pressKPa*/ ir_RFcoldPressure.getFloat(),
                           /*laps*/ m_lapsOnRF);
 
-            drawTireGauge(m_gFL, finalTextCol, goodCol, warnCol, badCol, outlineCol,
+            drawTireGauge(m_gFL, textCol, goodCol, warnCol, badCol, outlineCol,
                           min3(ir_LFwearL.getFloat(), ir_LFwearM.getFloat(), ir_LFwearR.getFloat()),
                           avg3(ir_LFtempCL.getFloat(), ir_LFtempCM.getFloat(), ir_LFtempCR.getFloat()),
                           ir_LFcoldPressure.getFloat(),
                           m_lapsOnLF);
 
-            drawTireGauge(m_gRR, finalTextCol, goodCol, warnCol, badCol, outlineCol,
+            drawTireGauge(m_gRR, textCol, goodCol, warnCol, badCol, outlineCol,
                           min3(ir_RRwearL.getFloat(), ir_RRwearM.getFloat(), ir_RRwearR.getFloat()),
                           avg3(ir_RRtempCL.getFloat(), ir_RRtempCM.getFloat(), ir_RRtempCR.getFloat()),
                           ir_RRcoldPressure.getFloat(),
                           m_lapsOnRR);
 
-            drawTireGauge(m_gRL, finalTextCol, goodCol, warnCol, badCol, outlineCol,
+            drawTireGauge(m_gRL, textCol, goodCol, warnCol, badCol, outlineCol,
                           min3(ir_LRwearL.getFloat(), ir_LRwearM.getFloat(), ir_LRwearR.getFloat()),
                           avg3(ir_LRtempCL.getFloat(), ir_LRtempCM.getFloat(), ir_LRtempCR.getFloat()),
                           ir_LRcoldPressure.getFloat(),
@@ -212,22 +279,29 @@ class OverlayTire : public Overlay
             m_renderTarget->EndDraw();
         }
 
-        void layoutGauges()
+        void layoutGauges(const D2D1_RECT_F& rArea)
         {
-            const float w = (float)m_width;
-            const float h = (float)m_height;
-            const float margin = 12.0f;
-            const float gaugeWidth = (w - margin*5) / 4.0f;
-            const float radius = std::min(gaugeWidth*0.45f, h*0.36f);
-            const float thickness = std::max(4.0f, radius * 0.18f);
-            const float titleHeight = 25.0f + 15.0f; 
-            const float availableHeight = h - titleHeight - margin;
-            const float cy = titleHeight + availableHeight * 0.60f; 
+            const float w = std::max(1.0f, rArea.right - rArea.left);
+            const float h = std::max(1.0f, rArea.bottom - rArea.top);
+            const float margin = std::clamp(std::min(w, h) * 0.06f, 10.0f, 18.0f);
+            const float tileW = (w - margin * 5) / 4.0f;
+            const float tileH = std::max(1.0f, h - margin * 2);
 
-            auto make = [&](int idx, const wchar_t* name){
-                Gauge g; g.w = thickness; g.r = radius; g.cy = cy; g.label = name;
-                const float cx = margin + gaugeWidth * (idx + 0.5f) + margin * idx;
-                g.cx = cx;
+            // Keep legacy center/radius available for the carcass visualization (advanced mode)
+            const float radius = std::min(tileW * 0.40f, tileH * 0.32f);
+            const float thickness = std::max(4.0f, radius * 0.18f);
+
+            auto make = [&](int idx, const wchar_t* name) {
+                Gauge g;
+                const float l = rArea.left + margin + tileW * idx + margin * idx;
+                const float t = rArea.top + margin;
+                g.tile = { l, t, l + tileW, t + tileH };
+
+                g.w = thickness;
+                g.r = radius;
+                g.cx = (g.tile.left + g.tile.right) * 0.5f;
+                g.cy = g.tile.top + tileH * 0.62f;
+                g.label = name;
                 return g;
             };
 
@@ -284,34 +358,132 @@ class OverlayTire : public Overlay
             // Colors by health thresholds
             const float4 healthCol = (health >= 70.0f) ? goodCol : (health >= 40.0f ? warnCol : badCol);
 
-            
-            auto deg2rad = [](float d){ return d * (3.14159265358979323846f/180.0f); };
-            drawArcStroke(g.cx, g.cy, g.r, g.w, deg2rad(180.0f), deg2rad(360.0f), outlineCol);
+            const D2D1_RECT_F rt = g.tile;
+            const float tileW = std::max(1.0f, rt.right - rt.left);
+            const float tileH = std::max(1.0f, rt.bottom - rt.top);
+            const float pad = std::clamp(std::min(tileW, tileH) * 0.08f, 8.0f, 14.0f);
+            const float corner = std::clamp(std::min(tileW, tileH) * 0.14f, 10.0f, 22.0f);
 
-            
-            const float start = (3.14159265358979323846f);
-            const float end   = (3.14159265358979323846f) + (3.14159265358979323846f) * (std::clamp(health,0.0f,100.0f)/100.0f);
-            drawArcStroke(g.cx, g.cy, g.r, g.w, start, end, healthCol);
+            // Tile background + border
+            {
+                D2D1_ROUNDED_RECT rr = { rt, corner, corner };
+                m_brush->SetColor(float4(0.05f, 0.055f, 0.07f, 0.55f * getGlobalOpacity()));
+                m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.14f * getGlobalOpacity()));
+                m_renderTarget->DrawRoundedRectangle(&rr, m_brush.Get(), 1.5f);
+            }
 
-            
-            m_brush->SetColor(textCol);
-            m_text.render(m_renderTarget.Get(), g.label.c_str(), m_tfSmall.Get(), g.cx - g.r, g.cx + g.r, g.cy - g.r - 20, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            // Label pill
+            const float pillH = std::clamp(tileH * 0.16f, 22.0f, 30.0f);
+            const float pillR = pillH * 0.5f;
+            D2D1_RECT_F rPill = {
+                rt.left + pad,
+                rt.top + pad * 0.75f,
+                rt.right - pad,
+                rt.top + pad * 0.75f + pillH
+            };
+            {
+                D2D1_ROUNDED_RECT rrP = { rPill, pillR, pillR };
+                m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.70f * getGlobalOpacity()));
+                m_renderTarget->FillRoundedRectangle(&rrP, m_brush.Get());
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.16f * getGlobalOpacity()));
+                m_renderTarget->DrawRoundedRectangle(&rrP, m_brush.Get(), 1.0f);
 
-            // Center numeric: temperature (with extra padding when advanced mode is enabled)
-            const bool advancedMode = g_cfg.getBool(m_name, "advanced_mode", true);
-            const float tempVerticalOffset = advancedMode ? g.w * 3.5f : g.w * 0.2f; 
+                m_brush->SetColor(textCol);
+                m_text.render(
+                    m_renderTarget.Get(),
+                    g.label.c_str(),
+                    m_tfSmall.Get(),
+                    rPill.left,
+                    rPill.right,
+                    (rPill.top + rPill.bottom) * 0.5f,
+                    m_brush.Get(),
+                    DWRITE_TEXT_ALIGNMENT_CENTER,
+                    getGlobalFontSpacing()
+                );
+            }
 
+            // Main temperature (big)
+            const float yTemp = rPill.bottom + tileH * 0.28f;
             wchar_t s[64];
             swprintf(s, _countof(s), L"%d\x00B0", (int)(temp + 0.5f));
-            m_text.render(m_renderTarget.Get(), s, m_tfMediumBold.Get(), g.cx - g.r*0.9f, g.cx + g.r*0.9f, g.cy + tempVerticalOffset, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+            m_brush->SetColor(textCol);
+            m_text.render(
+                m_renderTarget.Get(),
+                s,
+                m_tfMediumBold.Get(),
+                rt.left + pad,
+                rt.right - pad,
+                yTemp,
+                m_brush.Get(),
+                DWRITE_TEXT_ALIGNMENT_CENTER,
+                getGlobalFontSpacing()
+            );
 
-            // Bottom row: pressure + laps (with more bottom padding)
+            // Secondary line: pressure + laps
             wchar_t sb[64];
             if (showPsi)
-                swprintf(sb, _countof(sb), L"PSI %d  L% d", (int)(pressure + 0.5f), lapsOnTire);
+                swprintf(sb, _countof(sb), L"PSI %d   L%d", (int)(pressure + 0.5f), lapsOnTire);
             else
-                swprintf(sb, _countof(sb), L"BAR %.1f  L% d", pressure, lapsOnTire);
-            m_text.render(m_renderTarget.Get(), sb, m_tfSmall.Get(), g.cx - g.r, g.cx + g.r, g.cy + tempVerticalOffset * 2.0f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER);
+                swprintf(sb, _countof(sb), L"BAR %.1f   L%d", pressure, lapsOnTire);
+            const float ySub = yTemp + tileH * 0.18f;
+            m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * 0.90f));
+            m_text.render(
+                m_renderTarget.Get(),
+                sb,
+                m_tfSmall.Get(),
+                rt.left + pad,
+                rt.right - pad,
+                ySub,
+                m_brush.Get(),
+                DWRITE_TEXT_ALIGNMENT_CENTER,
+                getGlobalFontSpacing()
+            );
+
+            const float barH = std::clamp(tileH * 0.10f, 10.0f, 14.0f);
+            D2D1_RECT_F rBar = {
+                rt.left + pad,
+                rt.bottom - pad - barH,
+                rt.right - pad,
+                rt.bottom - pad
+            };
+            if (rBar.bottom > rBar.top + 4.0f)
+            {
+                const float barCorner = std::clamp(barH * 0.5f, 5.0f, 10.0f);
+                D2D1_ROUNDED_RECT rrBg = { rBar, barCorner, barCorner };
+
+                // Background + border
+                m_brush->SetColor(float4(0.02f, 0.02f, 0.03f, 0.70f * getGlobalOpacity()));
+                m_renderTarget->FillRoundedRectangle(&rrBg, m_brush.Get());
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * getGlobalOpacity()));
+                m_renderTarget->DrawRoundedRectangle(&rrBg, m_brush.Get(), 1.0f);
+
+                // Fill
+                const float t = std::clamp(health / 100.0f, 0.0f, 1.0f);
+                const float fillW = (rBar.right - rBar.left) * t;
+                if (fillW > 1.0f) {
+                    D2D1_RECT_F rFill = { rBar.left, rBar.top, rBar.left + fillW, rBar.bottom };
+                    D2D1_ROUNDED_RECT rrFill = { rFill, barCorner, barCorner };
+                    m_brush->SetColor(healthCol);
+                    m_renderTarget->FillRoundedRectangle(&rrFill, m_brush.Get());
+                }
+
+                // Percent label above bar
+                wchar_t hp[32];
+                swprintf(hp, _countof(hp), L"%d%%", (int)(health + 0.5f));
+                m_brush->SetColor(float4(textCol.x, textCol.y, textCol.z, textCol.w * 0.85f));
+                m_text.render(
+                    m_renderTarget.Get(),
+                    hp,
+                    m_tfSmall.Get(),
+                    rBar.left,
+                    rBar.right,
+                    rBar.top - barH * 0.70f,
+                    m_brush.Get(),
+                    DWRITE_TEXT_ALIGNMENT_CENTER,
+                    getGlobalFontSpacing()
+                );
+            }
 
             // Advanced carcass visualization
             if (g_cfg.getBool(m_name, "advanced_mode", true))
@@ -344,57 +516,53 @@ class OverlayTire : public Overlay
             {
                 c = float4(0.90f, 0.20f, 0.20f, 0.90f);
             }
-            // Foreground temperature bars should ignore global opacity
+            // Apply global opacity consistently with the rest of the overlay
+            c.w *= getGlobalOpacity();
             return c;
         }
 
         void drawCarcassBars(const Gauge& g, float tempCavg)
         {
-            // Individual carcass temps per tire
             float cl=0, cm=0, cr=0;
             if (g.label == L"FR") { cl = ir_RFtempCL.getFloat(); cm = ir_RFtempCM.getFloat(); cr = ir_RFtempCR.getFloat(); }
             else if (g.label == L"FL") { cl = ir_LFtempCL.getFloat(); cm = ir_LFtempCM.getFloat(); cr = ir_LFtempCR.getFloat(); }
             else if (g.label == L"RR") { cl = ir_RRtempCL.getFloat(); cm = ir_RRtempCM.getFloat(); cr = ir_RRtempCR.getFloat(); }
             else if (g.label == L"RL") { cl = ir_LRtempCL.getFloat(); cm = ir_LRtempCM.getFloat(); cr = ir_LRtempCR.getFloat(); }
 
-            const float totalWidth = g.r * 0.65f;
-            const float centerX = g.cx;
-            
-            // Vertical position
-            const float baseY = g.cy - g.r * 0.1f;
+            const D2D1_RECT_F rt = g.tile;
+            const float tileW = std::max(1.0f, rt.right - rt.left);
+            const float tileH = std::max(1.0f, rt.bottom - rt.top);
+            const float pad = std::clamp(std::min(tileW, tileH) * 0.08f, 8.0f, 14.0f);
 
-            // Middle section
-            const float midWidth = totalWidth * 0.4f;
-            const float midHeight = g.w * 5.0f;        
+            const float stripH = std::clamp(tileH * 0.10f, 10.0f, 14.0f);
+            const float y = rt.top + pad * 0.75f + std::clamp(tileH * 0.16f, 22.0f, 30.0f) + tileH * 0.10f;
+            D2D1_RECT_F rStrip = { rt.left + pad, y - stripH * 0.5f, rt.right - pad, y + stripH * 0.5f };
 
-            // Left and right sections
-            const float sideWidth = totalWidth * 0.2f;
-            const float sideHeight = g.w * 5.0f;
-            const float uniformRadius = sideWidth * 0.3f;
+            const float totalW = std::max(1.0f, rStrip.right - rStrip.left);
+            const float gap = std::clamp(totalW * 0.03f, 3.0f, 6.0f);
+            const float midW = totalW * 0.42f;
+            const float sideW = (totalW - midW - gap * 2.0f) * 0.5f;
+            const float r = std::clamp(stripH * 0.45f, 4.0f, 10.0f);
 
-            // Draw middle section
-            m_brush->SetColor(tempToColorC(cm));
-            D2D1_RECT_F midRect = {
-                centerX - midWidth/2, baseY - midHeight/2,
-                centerX + midWidth/2, baseY + midHeight/2
-            };
-            m_renderTarget->FillRectangle(&midRect, m_brush.Get());
+            D2D1_RECT_F rL = { rStrip.left, rStrip.top, rStrip.left + sideW, rStrip.bottom };
+            D2D1_RECT_F rM = { rL.right + gap, rStrip.top, rL.right + gap + midW, rStrip.bottom };
+            D2D1_RECT_F rR = { rM.right + gap, rStrip.top, rStrip.right, rStrip.bottom };
 
-            // Draw left section
+            {
+                D2D1_ROUNDED_RECT rrBg = { rStrip, r, r };
+                m_brush->SetColor(float4(0.02f, 0.02f, 0.03f, 0.55f * getGlobalOpacity()));
+                m_renderTarget->FillRoundedRectangle(&rrBg, m_brush.Get());
+                m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.14f * getGlobalOpacity()));
+                m_renderTarget->DrawRoundedRectangle(&rrBg, m_brush.Get(), 1.0f);
+            }
+
+            // Fill each segment
             m_brush->SetColor(tempToColorC(cl));
-            D2D1_ROUNDED_RECT leftRect = {
-                D2D1::RectF(centerX - totalWidth/2, baseY - sideHeight/2, centerX - totalWidth/2 + sideWidth, baseY + sideHeight/2),
-                uniformRadius, uniformRadius
-            };
-            m_renderTarget->FillRoundedRectangle(&leftRect, m_brush.Get());
-
-            // Draw right section
+            { D2D1_ROUNDED_RECT rr = { rL, r, r }; m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get()); }
+            m_brush->SetColor(tempToColorC(cm));
+            { D2D1_ROUNDED_RECT rr = { rM, r, r }; m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get()); }
             m_brush->SetColor(tempToColorC(cr));
-            D2D1_ROUNDED_RECT rightRect = {
-                D2D1::RectF(centerX + totalWidth/2 - sideWidth, baseY - sideHeight/2, centerX + totalWidth/2, baseY + sideHeight/2),
-                uniformRadius, uniformRadius
-            };
-            m_renderTarget->FillRoundedRectangle(&rightRect, m_brush.Get());
+            { D2D1_ROUNDED_RECT rr = { rR, r, r }; m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get()); }
         }
 
     protected:
@@ -402,8 +570,10 @@ class OverlayTire : public Overlay
         Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_tfMediumBold;
         Microsoft::WRL::ComPtr<IDWriteTextFormat>  m_tfTitle;
 
-        Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> m_backgroundTarget;
-        Microsoft::WRL::ComPtr<ID2D1Bitmap> m_backgroundBitmap;
+        // Styling brushes (cached; recreated on config change / enable; also reset when render target changes)
+        Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_bgBrush;
+        Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_panelBrush;
+        ID2D1RenderTarget* m_lastStyleRenderTarget = nullptr;
 
         Gauge m_gFR, m_gFL, m_gRR, m_gRL;
         TextCache m_text;
@@ -414,5 +584,66 @@ class OverlayTire : public Overlay
         int m_lastRRTiresUsed = 0;
         int m_prevCompletedLap = 0;
         int m_lapsOnLF = 0, m_lapsOnRF = 0, m_lapsOnLR = 0, m_lapsOnRR = 0;
+
+    private:
+        void ensureStyleBrushes()
+        {
+            if (!m_renderTarget) return;
+
+            // Handle render-target recreation (e.g., during live resize)
+            if (m_lastStyleRenderTarget != m_renderTarget.Get()) {
+                m_bgBrush.Reset();
+                m_panelBrush.Reset();
+                m_lastStyleRenderTarget = m_renderTarget.Get();
+            }
+
+            if (m_bgBrush && m_panelBrush) return;
+
+            // Card background gradient (same palette as OverlayPit / OverlayFlags)
+            {
+                D2D1_GRADIENT_STOP stops[3] = {};
+                stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.16f, 0.18f, 0.22f, 0.95f);
+                stops[1].position = 0.45f; stops[1].color = D2D1::ColorF(0.06f, 0.07f, 0.09f, 0.95f);
+                stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.95f);
+
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+                HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+                    stops,
+                    ARRAYSIZE(stops),
+                    D2D1_GAMMA_2_2,
+                    D2D1_EXTEND_MODE_CLAMP,
+                    stopCollection.GetAddressOf()
+                );
+                if (SUCCEEDED(hr)) {
+                    D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+                    props.startPoint = D2D1_POINT_2F{ 0,0 };
+                    props.endPoint = D2D1_POINT_2F{ 0,1 };
+                    (void)m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_bgBrush.GetAddressOf());
+                }
+            }
+
+            // Inner panel gradient (same palette as OverlayPit / OverlayFlags)
+            {
+                D2D1_GRADIENT_STOP stops[3] = {};
+                stops[0].position = 0.0f;  stops[0].color = D2D1::ColorF(0.08f, 0.09f, 0.11f, 0.92f);
+                stops[1].position = 0.55f; stops[1].color = D2D1::ColorF(0.04f, 0.045f, 0.055f, 0.92f);
+                stops[2].position = 1.0f;  stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.92f);
+
+                Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+                HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+                    stops,
+                    ARRAYSIZE(stops),
+                    D2D1_GAMMA_2_2,
+                    D2D1_EXTEND_MODE_CLAMP,
+                    stopCollection.GetAddressOf()
+                );
+                if (SUCCEEDED(hr)) {
+                    D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+                    props.startPoint = D2D1_POINT_2F{ 0,0 };
+                    props.endPoint = D2D1_POINT_2F{ 0,1 };
+                    (void)m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_panelBrush.GetAddressOf());
+                }
+            }
+        }
 };
 

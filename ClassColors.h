@@ -37,22 +37,47 @@ namespace ClassColors
     inline float4 get(int classId)
     {
         static const float4 kColors[] = {
-            float4(0.80f, 0.20f, 0.20f, 1.00f), // 0 - Red
-            float4(0.20f, 0.80f, 0.20f, 1.00f), // 1 - Green
-            float4(0.80f, 0.20f, 0.80f, 1.00f), // 2 - Magenta
-            float4(0.80f, 0.50f, 0.20f, 1.00f), // 3 - Orange
-            float4(0.20f, 0.80f, 0.80f, 1.00f), // 4 - Cyan
-            float4(0.80f, 0.80f, 0.20f, 1.00f), // 5 - Yellow
-            float4(0.50f, 0.20f, 0.80f, 1.00f), // 6 - Purple
-            float4(0.20f, 0.50f, 0.80f, 1.00f), // 7 - Blue-gray
-            float4(0.80f, 0.40f, 0.60f, 1.00f), // 8 - Pink
-            float4(0.40f, 0.80f, 0.40f, 1.00f), // 9 - Light green
+            float4(0.63f, 0.24f, 0.35f, 1.00f), // 0 - #a03c5a
+            float4(0.69f, 0.60f, 0.06f, 1.00f), // 1 - #b1990e
+            float4(0.09f, 0.45f, 0.57f, 1.00f), // 2 - #187492
+            float4(0.09f, 0.58f, 0.30f, 1.00f), // 3 - #18934c
+            float4(0.09f, 0.14f, 0.58f, 1.00f), // 4 - #182493
         };
         const int count = (int)(sizeof(kColors)/sizeof(kColors[0]));
         if (count == 0) return float4(1,1,1,1);
         const int idx = classId >= 0 ? (classId % count) : 0;
         return kColors[idx];
     }
+
+    // Lighter variants for labels/badges, kept in sync with primary palette
+    inline float4 getLight(int classId)
+    {
+        static const float4 kLight[] = {
+            float4(1.0f, 0.345f, 0.533f, 1.0f), // 0 - #ff5888
+            float4(1.0f, 0.855f, 0.349f, 1.0f), // 1 - #ffda59
+            float4(0.200f, 0.808f, 1.0f, 1.0f), // 2 - #33ceff
+            float4(0.278f, 1.0f, 0.584f, 1.0f), // 3 - #47ff95
+            float4(0.369f, 0.431f, 1.0f, 1.0f)  // 4 - #5e6eff
+        };
+        const int count = (int)(sizeof(kLight)/sizeof(kLight[0]));
+        if (count == 0) return float4(1,1,1,1);
+        const int idx = classId >= 0 ? (classId % count) : 0;
+        return kLight[idx];
+    }
+
+    // Darker variants for text, kept in sync with primary palette
+    inline float4 getDark(int classId)
+    {
+        static const float4 kDark[] = {
+            float4(0.314f, 0.106f, 0.169f, 1.0f), // 0 - #501b2b
+            float4(0.349f, 0.298f, 0.122f, 1.0f), // 1 - #594c1f
+            float4(0.063f, 0.255f, 0.318f, 1.0f), // 2 - #104151
+            float4(0.082f, 0.294f, 0.173f, 1.0f), // 3 - #154b2c
+            float4(0.102f, 0.125f, 0.329f, 1.0f)  // 4 - #1a2054
+        };
+        const int count = (int)(sizeof(kDark)/sizeof(kDark[0]));
+        if (count == 0) return float4(1,1,1,1);
+        const int idx = classId >= 0 ? (classId % count) : 0;
+        return kDark[idx];
+    }
 }
-
-

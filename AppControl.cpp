@@ -206,7 +206,8 @@ std::string app_get_state_json()
 	// Get available car configs
 	std::vector<std::string> availableCarConfigs = g_cfg.getAvailableCarConfigs();
 	
-	char buf[16384];
+	// NOTE: This JSON has grown over time; keep buffer comfortably large.
+	char buf[32768];
 	
 	// Helper to escape string values for JSON
 	auto escapeJson = [](const std::string& str) -> std::string {
@@ -282,21 +283,25 @@ std::string app_get_state_json()
         "\"currentCar\":\"%s\",\"currentCarConfig\":\"%s\",\"availableCarConfigs\":%s,"
         "\"ghostTelemetry\":{\"files\":[%s],\"selected\":\"%s\"},"
         "\"overlays\":{"
-        "\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayFuel\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s,\"OverlayDelta\":%s,\"OverlayRadar\":%s,\"OverlayTrack\":%s,\"OverlayTire\":%s,\"OverlayPit\":%s},"
-        "\"config\":{\"General\":{\"units\":\"%s\",\"performance_mode_30hz\":%s,\"launch_at_startup\":%s,\"buddies\":[%s],\"flagged\":[%s]},"
-        "\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_all_classes\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s,\"show_SoF\":%s,\"show_laps\":%s,\"show_session_end\":%s,\"show_track_temp\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayFuel\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"fuel_estimate_factor\":%.2f,\"fuel_reserve_margin\":%.2f,\"fuel_target_lap\":%d,\"fuel_decimal_places\":%d,\"fuel_estimate_avg_green_laps\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"steering_wheel\":\"%s\",\"left_side\":%s,\"show_steering_line\":%s,\"show_steering_wheel\":%s,\"show_ghost_data\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"minimap_enabled\":%s,\"minimap_is_relative\":%s,\"show_ir_pred\":%s,\"show_irating\":%s,\"show_last\":%s,\"show_license\":%s,\"show_pit_age\":%s,\"show_sr\":%s,\"show_positions_gained\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_weather_type\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-		"\"OverlayFlags\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"preview_flag\":\"%s\",\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-		"\"OverlayDelta\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"reference_mode\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-		"\"OverlayRadar\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_background\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_other_cars\":%s,\"dark_mode\":%s,\"reverse_direction\":%s,\"show_sector_lines\":%s,\"color_sectors\":%s,\"track_width\":%.1f,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayTire\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_only_in_pitlane\":%s,\"advanced_mode\":%s,\"pressure_use_psi\":%s,\"temp_cool_c\":%.1f,\"temp_opt_c\":%.1f,\"temp_hot_c\":%.1f,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
-        "\"OverlayPit\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d}"
+        "\"OverlayStandings\":%s,\"OverlayDDU\":%s,\"OverlayFuel\":%s,\"OverlayInputs\":%s,\"OverlayRelative\":%s,\"OverlayCover\":%s,\"OverlayWeather\":%s,\"OverlayFlags\":%s,\"OverlayDelta\":%s,\"OverlayRadar\":%s,\"OverlayTrack\":%s,\"OverlayTire\":%s,\"OverlayPit\":%s,\"OverlayTraffic\":%s},"
+        "\"config\":{\"General\":{\"units\":\"%s\",\"performance_mode_30hz\":%s,\"launch_at_startup\":%s,\"show_overlays_help\":%s,\"buddies\":[%s],\"flagged\":[%s]},"
+        "\"OverlayStandings\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"show_class_header_single\":%s,\"show_pit\":%s,\"show_license\":%s,\"show_irating\":%s,\"show_car_brand\":%s,\"show_positions_gained\":%s,\"show_gap\":%s,\"show_best\":%s,\"show_lap_time\":%s,\"show_delta\":%s,\"show_L5\":%s,\"show_SoF\":%s,\"show_laps\":%s,\"show_session_end\":%s,\"show_track_temp\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+		"\"OverlayDDU\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayFuel\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"fuel_estimate_factor\":%.2f,\"fuel_reserve_margin\":%.2f,\"fuel_target_lap\":%d,\"fuel_decimal_places\":%d,\"fuel_estimate_avg_green_laps\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayInputs\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"steering_wheel\":\"%s\",\"left_side\":%s,\"show_steering_line\":%s,\"show_steering_wheel\":%s,\"show_ghost_data\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayRelative\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"minimap_enabled\":%s,\"minimap_is_relative\":%s,\"show_ir_pred\":%s,\"show_irating\":%s,\"show_last\":%s,\"show_license\":%s,\"show_pit_age\":%s,\"show_sr\":%s,\"show_positions_gained\":%s,\"show_tire_compound\":%s,\"show_full_name\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+		"\"OverlayCover\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+		"\"OverlayWeather\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"preview_weather_type\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+		"\"OverlayFlags\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"preview_flag\":\"%s\",\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+		"\"OverlayDelta\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"reference_mode\":%d,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+		"\"OverlayRadar\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"show_background\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayTrack\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"show_other_cars\":%s,\"dark_mode\":%s,\"reverse_direction\":%s,\"show_sector_lines\":%s,\"color_sectors\":%s,\"track_width\":%.1f,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayTire\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"show_only_in_pitlane\":%s,\"advanced_mode\":%s,\"pressure_use_psi\":%s,\"temp_cool_c\":%.1f,\"temp_opt_c\":%.1f,\"temp_hot_c\":%.1f,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayPit\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d},"
+        "\"OverlayTraffic\":{\"enabled\":%s,\"toggle_hotkey\":\"%s\",\"opacity\":%d,\"target_fps\":%d,\"show_in_menu\":%s,\"show_in_race\":%s,\"show_in_replay\":%s,"
+            "\"require_different_class\":%s,\"ignore_cars_on_pit_road\":%s,\"hide_if_self_on_pit_road\":%s,\"show_distance_m\":%s,"
+            "\"warn_gap_seconds\":%.2f,\"urgent_gap_seconds\":%.2f,\"hold_seconds\":%.2f,\"faster_class_laptime_margin_s\":%.2f,"
+            "\"font\":\"%s\",\"font_size\":%.2f,\"font_spacing\":%.2f,\"font_style\":\"%s\",\"font_weight\":%d}"
         "}}",
 		(s_uiEdit && *s_uiEdit) ? "true":"false",
 		boolStr(preview_mode_get()),
@@ -319,9 +324,11 @@ std::string app_get_state_json()
         boolStr(g_cfg.getBool("OverlayTrack","enabled",true)),
         boolStr(g_cfg.getBool("OverlayTire","enabled",true)),
         boolStr(g_cfg.getBool("OverlayPit","enabled",true)),
+        boolStr(g_cfg.getBool("OverlayTraffic","enabled",true)),
 		escapeJson(g_cfg.getString("General","units","metric")).c_str(),
 		boolStr(g_cfg.getBool("General","performance_mode_30hz",false)),
         launchAtStartup ? "true" : "false",
+        boolStr(g_cfg.getBool("General","show_overlays_help", true)),
         buddiesJson.c_str(),
         flaggedJson.c_str(),
 		// OverlayStandings config
@@ -331,7 +338,8 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayStandings","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayStandings","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_in_race",true)),
-		boolStr(g_cfg.getBool("OverlayStandings","show_all_classes",false)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_in_replay",true)),
+		boolStr(g_cfg.getBool("OverlayStandings","show_class_header_single",false)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_pit",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_license",true)),
 		boolStr(g_cfg.getBool("OverlayStandings","show_irating",true)),
@@ -361,6 +369,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayDDU","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayDDU","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayDDU","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayDDU","show_in_replay",true)),
 		escapeJson(g_cfg.getString("OverlayDDU","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayDDU","font_size", 16.0f),
 		g_cfg.getFloat("OverlayDDU","font_spacing", 0.30f),
@@ -373,6 +382,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayFuel","target_fps",10),
         boolStr(g_cfg.getBool("OverlayFuel","show_in_menu",true)),
         boolStr(g_cfg.getBool("OverlayFuel","show_in_race",true)),
+        boolStr(g_cfg.getBool("OverlayFuel","show_in_replay",true)),
         g_cfg.getFloat("OverlayFuel","fuel_estimate_factor",1.1f),
         g_cfg.getFloat("OverlayFuel","fuel_reserve_margin",0.25f),
         g_cfg.getInt("OverlayFuel","fuel_target_lap",0),
@@ -391,6 +401,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayInputs","target_fps",30),
 		boolStr(g_cfg.getBool("OverlayInputs","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayInputs","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayInputs","show_in_replay",true)),
 		escapeJson(g_cfg.getString("OverlayInputs","steering_wheel","builtin")).c_str(),
 		boolStr(g_cfg.getBool("OverlayInputs","left_side",false)),
 		boolStr(g_cfg.getBool("OverlayInputs","show_steering_line",false)),
@@ -408,6 +419,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayRelative","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayRelative","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayRelative","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayRelative","show_in_replay",true)),
 		boolStr(g_cfg.getBool("OverlayRelative","minimap_enabled",true)),
 		boolStr(g_cfg.getBool("OverlayRelative","minimap_is_relative",true)),
 		boolStr(g_cfg.getBool("OverlayRelative","show_ir_pred",false)),
@@ -432,6 +444,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayCover","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayCover","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayCover","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayCover","show_in_replay",true)),
 		escapeJson(g_cfg.getString("OverlayCover","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayCover","font_size", 16.0f),
 		g_cfg.getFloat("OverlayCover","font_spacing", 0.30f),
@@ -444,6 +457,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayWeather","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayWeather","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayWeather","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayWeather","show_in_replay",true)),
 		g_cfg.getInt("OverlayWeather","preview_weather_type",1),
 		escapeJson(g_cfg.getString("OverlayWeather","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayWeather","font_size", 16.0f),
@@ -457,6 +471,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayFlags","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayFlags","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayFlags","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayFlags","show_in_replay",true)),
 		escapeJson(g_cfg.getString("OverlayFlags","preview_flag","none")).c_str(),
 		escapeJson(g_cfg.getString("OverlayFlags","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayFlags","font_size", 16.0f),
@@ -470,6 +485,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayDelta","target_fps",15),
 		boolStr(g_cfg.getBool("OverlayDelta","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayDelta","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayDelta","show_in_replay",true)),
 		g_cfg.getInt("OverlayDelta","reference_mode",1),
 		escapeJson(g_cfg.getString("OverlayDelta","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayDelta","font_size", 16.0f),
@@ -483,6 +499,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayRadar","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayRadar","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayRadar","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayRadar","show_in_replay",true)),
 		boolStr(g_cfg.getBool("OverlayRadar","show_background",true)),
 		escapeJson(g_cfg.getString("OverlayRadar","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayRadar","font_size", 16.0f),
@@ -496,6 +513,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayTrack","target_fps",15),
 		boolStr(g_cfg.getBool("OverlayTrack","show_in_menu",true)),
 		boolStr(g_cfg.getBool("OverlayTrack","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayTrack","show_in_replay",true)),
 		boolStr(g_cfg.getBool("OverlayTrack","show_other_cars",false)),
 		boolStr(g_cfg.getBool("OverlayTrack","dark_mode",false)),
 		boolStr(g_cfg.getBool("OverlayTrack","reverse_direction",false)),
@@ -514,6 +532,7 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayTire","target_fps",10),
 		boolStr(g_cfg.getBool("OverlayTire","show_in_menu",false)),
 		boolStr(g_cfg.getBool("OverlayTire","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayTire","show_in_replay",true)),
 		boolStr(g_cfg.getBool("OverlayTire","show_only_in_pitlane",false)),
 		boolStr(g_cfg.getBool("OverlayTire","advanced_mode",true)),
 		boolStr(g_cfg.getBool("OverlayTire","pressure_use_psi",true)),
@@ -532,11 +551,33 @@ std::string app_get_state_json()
 		g_cfg.getInt("OverlayPit","target_fps",30),
         boolStr(g_cfg.getBool("OverlayPit","show_in_menu",true)),
         boolStr(g_cfg.getBool("OverlayPit","show_in_race",true)),
+        boolStr(g_cfg.getBool("OverlayPit","show_in_replay",true)),
 		escapeJson(g_cfg.getString("OverlayPit","font","Poppins")).c_str(),
 		g_cfg.getFloat("OverlayPit","font_size", 16.0f),
 		g_cfg.getFloat("OverlayPit","font_spacing", 0.30f),
 		escapeJson(g_cfg.getString("OverlayPit","font_style","normal")).c_str(),
-		g_cfg.getInt("OverlayPit","font_weight", 500)
+		g_cfg.getInt("OverlayPit","font_weight", 500),
+		// OverlayTraffic config
+		boolStr(g_cfg.getBool("OverlayTraffic","enabled",true)),
+		escapeJson(g_cfg.getString("OverlayTraffic","toggle_hotkey","ctrl+shift+4")).c_str(),
+		g_cfg.getInt("OverlayTraffic","opacity",100),
+		g_cfg.getInt("OverlayTraffic","target_fps",15),
+		boolStr(g_cfg.getBool("OverlayTraffic","show_in_menu",true)),
+		boolStr(g_cfg.getBool("OverlayTraffic","show_in_race",true)),
+		boolStr(g_cfg.getBool("OverlayTraffic","show_in_replay",true)),
+		boolStr(g_cfg.getBool("OverlayTraffic","require_different_class",true)),
+		boolStr(g_cfg.getBool("OverlayTraffic","ignore_cars_on_pit_road",true)),
+		boolStr(g_cfg.getBool("OverlayTraffic","hide_if_self_on_pit_road",true)),
+		boolStr(g_cfg.getBool("OverlayTraffic","show_distance_m",true)),
+		g_cfg.getFloat("OverlayTraffic","warn_gap_seconds",2.5f),
+		g_cfg.getFloat("OverlayTraffic","urgent_gap_seconds",1.2f),
+		g_cfg.getFloat("OverlayTraffic","hold_seconds",1.25f),
+		g_cfg.getFloat("OverlayTraffic","faster_class_laptime_margin_s",1.0f),
+		escapeJson(g_cfg.getString("OverlayTraffic","font","Poppins")).c_str(),
+		g_cfg.getFloat("OverlayTraffic","font_size", 16.0f),
+		g_cfg.getFloat("OverlayTraffic","font_spacing", 0.30f),
+		escapeJson(g_cfg.getString("OverlayTraffic","font_style","normal")).c_str(),
+		g_cfg.getInt("OverlayTraffic","font_weight", 500)
 	);
 	return std::string(buf);
 }

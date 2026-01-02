@@ -736,25 +736,6 @@ class OverlayDDU : public Overlay
                 swprintf( s, _countof(s), L"%d", (int)(rr+0.5f) );
                 m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), m_boxTires.x0+m_boxTires.w/2, m_boxTires.x1-20, m_boxTires.y0+m_boxTires.h*2.0f/3.0f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
                 m_brush->SetColor( textCol );
-                
-                /* TODO: why doesn't iracing report 255 here in an AI session where we DO have unlimited tire sets??
-
-                // Left available
-                int avail = ir_LeftTireSetsAvailable.getInt();
-                if( avail < 255 )
-                {
-                    swprintf( s, _countof(s), L"%d", avail );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), m_boxTires.x0, m_boxTires.x0+m_boxTires.w/4, m_boxTires.y0+m_boxTires.h*0.5f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
-                }
-
-                // Right available
-                avail = ir_RightTireSetsAvailable.getInt();
-                if( avail < 255 )
-                {
-                    swprintf( s, _countof(s), L"%d", avail );
-                    m_text.render( m_renderTarget.Get(), s, m_textFormatSmall.Get(), m_boxTires.x0+m_boxTires.w*3.0f/4.0f, m_boxTires.x1, m_boxTires.y0+m_boxTires.h*0.5f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER );
-                }
-                */
 
                 m_brush->SetColor( textCol );
             }
@@ -779,7 +760,7 @@ class OverlayDDU : public Overlay
 
             // Session
             {                   
-                const double sessionTime = remainingSessionTime>=0 ? remainingSessionTime : ir_SessionTime.getDouble();
+                const double sessionTime = remainingSessionTime>=0 ? remainingSessionTime : ir_now();
 
                 const int    hours = int( sessionTime / 3600.0 );
                 const int    mins  = int( sessionTime / 60.0 ) % 60;

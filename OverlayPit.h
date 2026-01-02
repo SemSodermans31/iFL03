@@ -27,6 +27,7 @@ SOFTWARE.
 #include "Overlay.h"
 #include "iracing.h"
 #include "Config.h"
+#include "ClassColors.h"
 #include "Units.h"
 #include "preview_mode.h"
 #include "stub_data.h"
@@ -44,6 +45,8 @@ protected:
     {
         onConfigChanged();
         m_text.reset(m_dwriteFactory.Get());
+        m_bgBrush.Reset();
+        m_panelBrush.Reset();
     }
 
     virtual void onConfigChanged()
@@ -51,6 +54,9 @@ protected:
         // Default to 30Hz like other light telemetry overlays
         setTargetFPS(g_cfg.getInt(m_name, "target_fps", 30));
         m_text.reset(m_dwriteFactory.Get());
+        // Recreate D2D brushes (render target may change)
+        m_bgBrush.Reset();
+        m_panelBrush.Reset();
     }
 
     virtual void onSessionChanged()
@@ -61,29 +67,26 @@ protected:
 
     virtual bool hasCustomBackground() { return true; }
 
-    virtual float2 getDefaultSize() { return float2(360, 110); }
+    virtual float2 getDefaultSize() { return float2(320, 320); }
 
     virtual void onUpdate()
     {
-        // Start render with transparent background
         m_renderTarget->BeginDraw();
         m_renderTarget->Clear(float4(0,0,0,0));
 
-        if (!StubDataManager::shouldUseStubData()) {
+        if (!StubDataManager::shouldUseStubData() && !ir_isReplayActive()) {
             if (!ir_IsOnTrack.getBool() || !ir_IsOnTrackCar.getBool()) {
                 m_renderTarget->EndDraw();
                 return;
             }
         }
 
-        // Gather inputs - use static preview data to avoid flicker
         const float lapPct = StubDataManager::shouldUseStubData() ?
             0.9f :
             std::clamp(ir_LapDistPct.getFloat(), 0.0f, 1.0f);
 
         const float trackLenM = ir_session.trackLengthMeters > 1.0f ? ir_session.trackLengthMeters : 4000.0f;
 
-        // Try to get pit entry pct from telemetry if available, else learned fallback
         float pitEntryPct = -1.0f;
         {
             extern irsdkCVar ir_TrackPitEntryPct;
@@ -91,10 +94,8 @@ protected:
             if (v > 0.0f && v <= 1.0f) pitEntryPct = v;
         }
 
-        // Learn pit entry pct by observing first OnPitRoad transition this lap if not provided
         bool onPitRoadNow = StubDataManager::shouldUseStubData() ? false : ir_OnPitRoad.getBool();
         bool inPitStall = StubDataManager::shouldUseStubData() ? false : ir_PlayerCarInPitStall.getBool();
-        // Learn pit stall position the first time we detect being properly in the pit stall
         if (!StubDataManager::shouldUseStubData())
         {
             if (inPitStall && !m_lastInPitStall) {
@@ -134,18 +135,15 @@ protected:
 
         if (inPitStall) {
             pitState = PitState::IN_PIT_STALL;
-            // When parked in our stall, distance-to-target should be zero
             distanceM = 0.0f;
             label = L"Pit Box";
         }
         else if (onPitRoadNow) {
             pitState = PitState::ON_PIT_ROAD;
-            // Distance to our stall if we know it, else progress along pit road from entry
             if (m_learnedPitStallPct >= 0.0f) {
                 float diffPct = 0.0f;
                 if (m_learnedPitStallPct >= lapPct) diffPct = m_learnedPitStallPct - lapPct; else diffPct = (1.0f - lapPct) + m_learnedPitStallPct;
                 distanceM = diffPct * trackLenM;
-                // If we already passed the stall this lap, clamp to zero
                 if (distanceM > pitRoadLengthM) distanceM = 0.0f;
                 label = L"To Pit Box";
             } else {
@@ -164,13 +162,7 @@ protected:
                 diffPct = (1.0f - lapPct) + pitEntryPct;
             }
             distanceM = diffPct * trackLenM;
-            // If we know our stall pct, show distance to stall directly
-            if (m_learnedPitStallPct >= 0.0f) {
-                float dp = 0.0f;
-                if (m_learnedPitStallPct >= lapPct) dp = m_learnedPitStallPct - lapPct; else dp = (1.0f - lapPct) + m_learnedPitStallPct;
-                distanceM = dp * trackLenM;
-            }
-            label = L"Pit Box";
+            label = L"Pit Entry";
             pitState = PitState::APPROACHING_ENTRY;
         }
 
@@ -199,10 +191,19 @@ protected:
             return;
         }
 
-        // Layout
+        ensureStyleBrushes();
+
         const float W = (float)m_width;
         const float H = (float)m_height;
-        const float barH = 26.0f;
+        const float globalOpacity = getGlobalOpacity();
+        const float minDim = std::max(1.0f, std::min(W, H));
+        const float pad = std::clamp(minDim * 0.045f, 8.0f, 18.0f);
+        const float innerPad = std::clamp(minDim * 0.045f, 10.0f, 20.0f);
+        const float corner = std::clamp(minDim * 0.070f, 10.0f, 26.0f);
+
+        D2D1_RECT_F rCard = { pad, pad, W - pad, H - pad };
+        const float cardW = std::max(1.0f, rCard.right - rCard.left);
+        const float cardH = std::max(1.0f, rCard.bottom - rCard.top);
 
         // Numeric value for progress bar
         wchar_t buf[64];
@@ -213,18 +214,20 @@ protected:
         createGlobalTextFormat(1.0f, tfValue);
         if (tfValue) tfValue->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
 
-        // Color based on state and distance
-        float4 col = float4(0.2f, 0.6f, 1.0f, 1.0f);
-        if (pitState == PitState::APPROACHING_ENTRY) {
-            if (displayVal < warn50) col = float4(1.0f, 0.2f, 0.2f, 1.0f);
-            else if (displayVal < warn100) col = float4(1.0f, 0.65f, 0.0f, 1.0f);
-        } else if (pitState == PitState::ON_PIT_ROAD) {
-            col = float4(0.2f, 0.8f, 0.2f, 1.0f);
+        // Accent colors (use the shared palette)
+        const float4 colBlue  = ClassColors::self();
+        const float4 colGreen = ClassColors::get(3);
+        const float4 colRed   = ClassColors::get(0);
+
+        // Color based on state (flat single-tone for the bar)
+        float4 col = colBlue;
+        if (pitState == PitState::ON_PIT_ROAD) {
+            col = colGreen;
         } else if (pitState == PitState::IN_PIT_STALL) {
-            col = float4(0.2f, 0.6f, 1.0f, 1.0f);
+            col = colBlue;
         }
 
-        // Top pitlimiter banner (rectangular, no rounded corners, dark border)
+        // Top pitlimiter banner state (keep logic as-is)
         bool limiterOn = false;
         if (!StubDataManager::shouldUseStubData()) {
             const int engWarn = ir_EngineWarnings.getInt();
@@ -233,165 +236,275 @@ protected:
             limiterOn = true;
         }
         const bool flash = !limiterOn && ((GetTickCount()/350)%2==0);
-        const float bannerH = 28.0f;
-        const float bannerTop = 0.0f; // Start at very top, no padding
-        const float bannerBottom = bannerTop + bannerH;
 
-        if (bannerBottom < H)
+        // No drop shadow (per request)
+
+        // Card background gradient (no outer grey borderline per request)
         {
-            D2D1_RECT_F rrBan = { 0.0f, bannerTop, W, bannerBottom };
-            float4 banCol = limiterOn ? float4(0.0f,0.6f,0.0f,0.95f) : float4(0.7f,0.0f,0.0f, flash?0.95f:0.65f);
-            float4 borderCol = limiterOn ? float4(0.0f,0.4f,0.0f,1.0f) : float4(0.5f,0.0f,0.0f,1.0f);
-
-            m_brush->SetColor(banCol);
-            m_renderTarget->FillRectangle(&rrBan, m_brush.Get());
-
-            // 3.0f dark border
-            m_brush->SetColor(borderCol);
-            m_renderTarget->DrawRectangle(&rrBan, m_brush.Get(), 3.0f);
-
-            Microsoft::WRL::ComPtr<IDWriteTextFormat> tfBan;
-            createGlobalTextFormat(0.9f, tfBan);
-            if (tfBan) tfBan->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-            m_brush->SetColor(float4(1,1,1,0.95f));
-            m_text.render(m_renderTarget.Get(), limiterOn?L"PIT LIMITER ON":L"PIT LIMITER OFF", tfBan.Get(), 0.0f, W, bannerTop + bannerH*0.6f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, getGlobalFontSpacing());
+            D2D1_ROUNDED_RECT rr = { rCard, corner, corner };
+            if (m_bgBrush) {
+                // Background gradient points follow the card
+                m_bgBrush->SetStartPoint(D2D1_POINT_2F{ rCard.left, rCard.top });
+                m_bgBrush->SetEndPoint(D2D1_POINT_2F{ rCard.left, rCard.bottom });
+                m_renderTarget->FillRoundedRectangle(&rr, m_bgBrush.Get());
+            } else {
+                // Fallback (should be rare): solid background
+                m_brush->SetColor(float4(0.05f, 0.05f, 0.06f, 0.92f * globalOpacity));
+                m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
+            }
         }
 
-        // Middle LED panel: digital 'PE' warning when entering/exiting pit road
+        // Banner geometry
+        const float bannerH = std::clamp(cardH * 0.18f, 32.0f, 56.0f);
+        D2D1_RECT_F rBanner = {
+            rCard.left + innerPad,
+            rCard.top + innerPad,
+            rCard.right - innerPad,
+            rCard.top + innerPad + bannerH
+        };
+        const float bannerRadius = bannerH * 0.22f;
+
+        // Banner fill + border + gloss highlight
+        {
+            // Flat single-tone banner color (green/blue) per request
+            // Use ClassColors palette (green when ON, red when OFF)
+            float4 banCol = limiterOn ? float4(colGreen.x, colGreen.y, colGreen.z, 0.95f)
+                                      : float4(colRed.x,   colRed.y,   colRed.z,   flash ? 0.95f : 0.65f);
+            banCol.w *= globalOpacity;
+            m_brush->SetColor(banCol);
+            D2D1_ROUNDED_RECT rrBan = { rBanner, bannerRadius, bannerRadius };
+            m_renderTarget->FillRoundedRectangle(&rrBan, m_brush.Get());
+
+            Microsoft::WRL::ComPtr<IDWriteTextFormat> tfBan;
+            createGlobalTextFormat(0.95f, (int)DWRITE_FONT_WEIGHT_BOLD, "", tfBan);
+            if (tfBan) {
+                tfBan->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                tfBan->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            }
+            m_brush->SetColor(float4(1, 1, 1, 0.95f * globalOpacity));
+            m_text.render(
+                m_renderTarget.Get(),
+                limiterOn ? L"PIT LIMITER ON" : L"PIT LIMITER OFF",
+                tfBan.Get(),
+                rBanner.left,
+                rBanner.right,
+                (rBanner.top + rBanner.bottom) * 0.5f,
+                m_brush.Get(),
+                DWRITE_TEXT_ALIGNMENT_CENTER,
+                getGlobalFontSpacing()
+            );
+        }
+
+        // Middle "panel": big 'PE' indicator (same showEvent timing as before)
         const DWORD now = GetTickCount();
         const bool showEvent = StubDataManager::shouldUseStubData() ?
             true : // Always show in preview mode
             (now - m_stateChangeTick) < 3000;
-        const float panelTop = bannerBottom;
-        const float panelSize = std::min(W, H - panelTop - barH); 
-        const float panelLeft = (W - panelSize) * 0.5f;
-        if (panelSize > 20.0f)
-        {
-            // Panel background
-            m_brush->SetColor(float4(0.05f,0.05f,0.05f,0.85f));
-            D2D1_RECT_F pr = { panelLeft, panelTop, panelLeft+panelSize, panelTop+panelSize };
-            m_renderTarget->FillRectangle(&pr, m_brush.Get());
 
-            // LED grid - 20x20 with layered structure
-            const int leds = 20; // 20x20 grid
-            const float cell = panelSize / (float)leds;
-            const float radius = cell * 0.32f;
-            for (int y=0; y<leds; ++y)
-            {
-                for (int x=0; x<leds; ++x)
-                {
-                    // Rings:
-                    // ring0 (outermost 20x20) and ring1 (18x18): yellow
-                    // ring2 (16x16): gray
-                    const bool ring0 = (x==0 || y==0 || x==leds-1 || y==leds-1);
-                    const bool ring1 = (x==1 || y==1 || x==leds-2 || y==leds-2);
-                    const bool ring2 = (x==2 || y==2 || x==leds-3 || y==leds-3);
-
-                    float4 dotCol = float4(0.45f,0.45f,0.45f,0.35f);
-
-                    if (ring0 || ring1)
-                    {
-                        dotCol = float4(0.95f,0.85f,0.1f, showEvent?1.0f:0.6f);
-                    }
-                    else if (ring2)
-                    {}
-                    else if (showEvent)
-                    {
-                        // Center 14x14 area for letters: indices 3..16 (inclusive)
-                        if (x>=3 && x<=16 && y>=3 && y<=16)
-                        {
-                            const int gx = x - 3; // 0..13
-                            const int gy = y - 3; // 0..13
-                            bool on = false;
-
-                            if (gx >= 0 && gx <= 5)
-                            {
-                                // Left vertical stroke (2 px)
-                                if (gx <= 1) on = (gy >= 0 && gy <= 13);
-                                // Top horizontal stroke (2 px)
-                                if (gy <= 1) on = on || (gx >= 2 && gx <= 5);
-                                // Middle horizontal stroke (2 px)
-                                if (gy >= 6 && gy <= 7) on = on || (gx >= 2 && gx <= 5);
-                                // Right vertical (top half) (2 px)
-                                if (gx >= 4 && gx <= 5 && gy > 1 && gy < 6) on = true;
-                            }
-
-                            // 'E' on right: columns 8..13, 2-pixel strokes
-                            if (gx >= 8 && gx <= 13)
-                            {
-                                // Left vertical stroke (2 px)
-                                if (gx <= 9) on = on || (gy >= 0 && gy <= 13);
-                                // Top horizontal stroke (2 px)
-                                if (gy <= 1) on = on || (gx >= 10 && gx <= 13);
-                                // Middle horizontal stroke (2 px)
-                                if (gy >= 6 && gy <= 7) on = on || (gx >= 10 && gx <= 13);
-                                // Bottom horizontal stroke (2 px)
-                                if (gy >= 12 && gy <= 13) on = on || (gx >= 10 && gx <= 13);
-                            }
-
-                            if (on)
-                                dotCol = float4(0.95f,0.95f,0.95f,1.0f);
-                        }
-                    }
-
-                    m_brush->SetColor(dotCol);
-                    const float cx = panelLeft + x*cell + cell*0.5f;
-                    const float cy = panelTop + y*cell + cell*0.5f;
-                    D2D1_ELLIPSE e = { {cx, cy}, radius, radius };
-                    m_renderTarget->FillEllipse(&e, m_brush.Get());
-                }
-            }
+        // Panel rect
+        const float barH = std::clamp(cardH * 0.11f, 22.0f, 34.0f);
+        const float gap = std::clamp(cardH * 0.035f, 8.0f, 14.0f);
+        D2D1_RECT_F rPanel = {
+            rCard.left + innerPad,
+            rBanner.bottom + gap,
+            rCard.right - innerPad,
+            rCard.bottom - innerPad - barH - gap
+        };
+        if (rPanel.bottom < rPanel.top + 24.0f) {
+            // Not enough vertical space; collapse panel into remaining area above the bar
+            rPanel.bottom = rPanel.top + 24.0f;
         }
 
-        // Bottom distance-to-pitbox progress bar (rectangular with white border)
-        const float barTop = panelTop + panelSize;
-        const float barBottom = barTop + barH;
-
-        if (barBottom <= H)
+        // Panel background gradient + border
         {
-            D2D1_RECT_F rrBg = { 0.0f, barTop, W, barBottom };
+            const float panelCorner = std::clamp(corner * 0.75f, 8.0f, 22.0f);
+            D2D1_ROUNDED_RECT rrPanel = { rPanel, panelCorner, panelCorner };
+            if (m_panelBrush) {
+                m_panelBrush->SetStartPoint(D2D1_POINT_2F{ rPanel.left, rPanel.top });
+                m_panelBrush->SetEndPoint(D2D1_POINT_2F{ rPanel.left, rPanel.bottom });
+                m_renderTarget->FillRoundedRectangle(&rrPanel, m_panelBrush.Get());
+            } else {
+                m_brush->SetColor(float4(0.03f, 0.03f, 0.04f, 0.88f * globalOpacity));
+                m_renderTarget->FillRoundedRectangle(&rrPanel, m_brush.Get());
+            }
 
-            // Semi-transparent background
-            m_brush->SetColor(float4(0.1f, 0.1f, 0.1f, 0.6f));
-            m_renderTarget->FillRectangle(&rrBg, m_brush.Get());
+            m_brush->SetColor(float4(0.9f, 0.9f, 0.95f, 0.18f * globalOpacity));
+            m_renderTarget->DrawRoundedRectangle(&rrPanel, m_brush.Get(), 1.5f);
+        }
 
-            // White border
-            m_brush->SetColor(float4(1.0f, 1.0f, 1.0f, 1.0f));
-            m_renderTarget->DrawRectangle(&rrBg, m_brush.Get(), 1.0f);
+        // Center panel text:
+        // - Outside pit lane: show PIT ENTRY (or PIT EXIT for a short time after exit)
+        // - Inside pit lane: show current speed
+        {
+            const bool inPitLane = onPitRoadNow || inPitStall;
 
-            // Fill amount based on pit state (distance-to-target)
+            std::wstring centerText;
+            float textScale = 2.6f;
+
+            if (inPitLane)
+            {
+                // Speed (ir_Speed is m/s)
+                const float speedMps = StubDataManager::shouldUseStubData()
+                    ? StubDataManager::getStubSpeed()
+                    : ir_Speed.getFloat();
+
+                float speed = speedMps;
+                const wchar_t* unit = L"m/s";
+                if (imperial) { speed = speedMps * 2.23694f; unit = L"mph"; }
+                else { speed = speedMps * 3.6f; unit = L"km/h"; }
+
+                wchar_t sSpeed[64];
+                swprintf_s(sSpeed, L"%d %s", (int)std::round(std::max(0.0f, speed)), unit);
+                centerText = sSpeed;
+                textScale = 2.2f;
+            }
+            else
+            {
+                // Outside pit lane: show PIT EXIT briefly after exit, otherwise PIT ENTRY
+                if (showEvent && m_lastEvent == LastEvent::ExitedPitRoad) centerText = L"PIT EXIT";
+                else centerText = L"PIT ENTRY";
+                textScale = 2.6f;
+            }
+
+            Microsoft::WRL::ComPtr<IDWriteTextFormat> tfBig;
+            createGlobalTextFormat(textScale, (int)DWRITE_FONT_WEIGHT_BOLD, "", tfBig);
+            if (tfBig) {
+                tfBig->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                tfBig->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            }
+
+            // Keep it bright/consistent; event timing only affects which text is shown (outside) and flashing (banner)
+            m_brush->SetColor(float4(0.95f, 0.95f, 0.98f, 0.92f * globalOpacity));
+            m_text.render(
+                m_renderTarget.Get(),
+                centerText.c_str(),
+                tfBig.Get(),
+                rPanel.left,
+                rPanel.right,
+                (rPanel.top + rPanel.bottom) * 0.5f,
+                m_brush.Get(),
+                DWRITE_TEXT_ALIGNMENT_CENTER,
+                getGlobalFontSpacing()
+            );
+        }
+
+        D2D1_RECT_F rBar = {
+            rCard.left + innerPad,
+            rCard.bottom - innerPad - barH,
+            rCard.right - innerPad,
+            rCard.bottom - innerPad
+        };
+        if (rBar.bottom > rBar.top + 8.0f)
+        {
+            const float barCorner = std::clamp(barH * 0.22f, 4.0f, 10.0f);
+            D2D1_ROUNDED_RECT rrBg = { rBar, barCorner, barCorner };
+
+            // Bar background
+            m_brush->SetColor(float4(0.04f, 0.05f, 0.06f, 0.70f * globalOpacity));
+            m_renderTarget->FillRoundedRectangle(&rrBg, m_brush.Get());
+
+            // Bar border
+            m_brush->SetColor(float4(0.80f, 0.82f, 0.86f, 0.28f * globalOpacity));
+            m_renderTarget->DrawRoundedRectangle(&rrBg, m_brush.Get(), 1.5f);
+
+            // Fill amount based on pit state (distance-to-target) - unchanged logic
             float progress = 0.0f;
             const float cap = imperial ? 1000.0f : 300.0f;
 
             if (pitState == PitState::APPROACHING_ENTRY) {
-                // For approaching: more filled = closer to pits
                 progress = 1.0f - std::min(1.0f, std::max(0.0f, displayVal / cap));
             } else if (pitState == PitState::ON_PIT_ROAD) {
-                // For on pit road: show progress along pit road (0-100%)
                 progress = std::min(1.0f, distanceM / pitRoadLengthM);
             } else if (pitState == PitState::IN_PIT_STALL) {
-                // For in pit stall: show as mostly filled
                 progress = 1.0f;
             }
 
             if (progress > 0.0f) {
-                float fillW = W * progress;
-                D2D1_RECT_F rrFill = { 0.0f, barTop, fillW, barBottom };
-                m_brush->SetColor(col);
-                m_renderTarget->FillRectangle(&rrFill, m_brush.Get());
+                float fillW = (rBar.right - rBar.left) * progress;
+                D2D1_RECT_F rFill = { rBar.left, rBar.top, rBar.left + fillW, rBar.bottom };
+                D2D1_ROUNDED_RECT rrFill = { rFill, barCorner, barCorner };
+
+                // Flat single-tone fill (no gradient/gloss)
+                m_brush->SetColor(float4(col.x, col.y, col.z, 0.95f * globalOpacity));
+                m_renderTarget->FillRoundedRectangle(&rrFill, m_brush.Get());
             }
 
-            // Center the numeric text in the bar
-            m_brush->SetColor(float4(1,1,1,0.9f));
-            m_text.render(m_renderTarget.Get(), buf, tfValue.Get(), 0.0f, W, barTop + barH*0.5f, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_CENTER, getGlobalFontSpacing());
+            // Distance text INSIDE the bar (centered), like the old design
+            if (tfValue) {
+                tfValue->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
+                tfValue->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_CENTER);
+            }
+            m_brush->SetColor(float4(1, 1, 1, 0.92f * globalOpacity));
+            m_text.render(
+                m_renderTarget.Get(),
+                buf,
+                tfValue.Get(),
+                rBar.left,
+                rBar.right,
+                (rBar.top + rBar.bottom) * 0.5f,
+                m_brush.Get(),
+                DWRITE_TEXT_ALIGNMENT_CENTER,
+                getGlobalFontSpacing()
+            );
         }
-
-        // No extra dots; the LED panel and banner indicate state now
 
         m_renderTarget->EndDraw();
     }
 
 private:
+    void ensureStyleBrushes()
+    {
+        if (!m_renderTarget) return;
+        if (m_bgBrush && m_panelBrush) return;
+
+        // Card background gradient
+        {
+            D2D1_GRADIENT_STOP stops[3] = {};
+            stops[0].position = 0.0f; stops[0].color = D2D1::ColorF(0.16f, 0.18f, 0.22f, 0.95f);
+            stops[1].position = 0.45f; stops[1].color = D2D1::ColorF(0.06f, 0.07f, 0.09f, 0.95f);
+            stops[2].position = 1.0f; stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.95f);
+
+            Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+            HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+                stops,
+                ARRAYSIZE(stops),
+                D2D1_GAMMA_2_2,
+                D2D1_EXTEND_MODE_CLAMP,
+                stopCollection.GetAddressOf()
+            );
+            if (SUCCEEDED(hr)) {
+                D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+                props.startPoint = D2D1_POINT_2F{ 0,0 };
+                props.endPoint = D2D1_POINT_2F{ 0,1 };
+                m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_bgBrush.GetAddressOf());
+            }
+        }
+
+        // Inner panel gradient
+        {
+            D2D1_GRADIENT_STOP stops[3] = {};
+            stops[0].position = 0.0f; stops[0].color = D2D1::ColorF(0.08f, 0.09f, 0.11f, 0.92f);
+            stops[1].position = 0.55f; stops[1].color = D2D1::ColorF(0.04f, 0.045f, 0.055f, 0.92f);
+            stops[2].position = 1.0f; stops[2].color = D2D1::ColorF(0.02f, 0.02f, 0.03f, 0.92f);
+
+            Microsoft::WRL::ComPtr<ID2D1GradientStopCollection> stopCollection;
+            HRESULT hr = m_renderTarget->CreateGradientStopCollection(
+                stops,
+                ARRAYSIZE(stops),
+                D2D1_GAMMA_2_2,
+                D2D1_EXTEND_MODE_CLAMP,
+                stopCollection.GetAddressOf()
+            );
+            if (SUCCEEDED(hr)) {
+                D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES props = {};
+                props.startPoint = D2D1_POINT_2F{ 0,0 };
+                props.endPoint = D2D1_POINT_2F{ 0,1 };
+                m_renderTarget->CreateLinearGradientBrush(props, stopCollection.Get(), m_panelBrush.GetAddressOf());
+            }
+        }
+
+    }
+
     // Runtime-learned fallback if telemetry does not expose pit entry pct
     float m_learnedPitEntryPct = -1.0f;
     float m_learnedPitStallPct = -1.0f;
@@ -403,6 +516,8 @@ private:
     LastEvent m_lastEvent = LastEvent::None;
 
     TextCache m_text;
+
+    // Styling brushes (cached; recreated on config change / enable)
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_bgBrush;
+    Microsoft::WRL::ComPtr<ID2D1LinearGradientBrush> m_panelBrush;
 };
-
-

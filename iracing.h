@@ -74,6 +74,7 @@ struct Car
     std::string     classColStr;
     float4          classCol = float4(0, 0, 0, 1);
     int             classId = 0;
+    std::string     carClassShortName;   // e.g. "GT3", "LMP1", "GTE"
     int             irating = 0;
     int             isSelf = 0;
     int             isPaceCar = 0;
@@ -117,6 +118,11 @@ struct Session
     float           trackLengthMeters = 0.0f; 
     std::vector<float> sectorStartPct;
 };
+
+// Replay helpers
+bool   ir_isReplayActive();
+double ir_now();
+float  ir_nowf();
 
 extern irsdkCVar ir_SessionTime;    // double[1] Seconds since session start (s)
 extern irsdkCVar ir_SessionTick;    // int[1] Current update number ()

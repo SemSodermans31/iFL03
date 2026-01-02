@@ -55,6 +55,7 @@ class OverlayRadar : public Overlay
             m_frontYellowUntil = 0.0f;
             m_rearYellowUntil  = 0.0f;
             m_lastSessionTime = -1.0f;
+            m_radarOpacity = 0.1f;
         }
 
         virtual void onConfigChanged()
@@ -187,8 +188,17 @@ class OverlayRadar : public Overlay
             }
 
             // Smoothing and sticky timers
-            const float now = ir_SessionTime.getFloat();
-            
+            const float now = ir_nowf();
+
+            // Compute frame delta in seconds (used for smoothing and fade animation)
+            float dt = 0.0f;
+            if (m_lastSessionTime >= 0.0f)
+            {
+                dt = now - m_lastSessionTime;
+                if (dt < 0.0f) dt = 0.0f;
+                if (dt > 0.5f) dt = 0.5f;
+            }
+
             if (m_lastSessionTime >= 0.0f && now + 0.001f < m_lastSessionTime)
             {
                 m_frontDistSm = 1e9f;
@@ -210,14 +220,44 @@ class OverlayRadar : public Overlay
             const float cy = size.y * 0.5f;
             const float radius = std::min(size.x, size.y) * 0.5f - 2.0f;
 
+            // Determine whether any opponents are close enough to influence visibility
+            const float fadeTriggerRange = m_yellowRangeM + 2.0f; // Start fade-in slightly before yellow zone
+            const bool hasOpponentsInFadeRange =
+                (m_frontDistSm <= fadeTriggerRange || m_rearDistSm <= fadeTriggerRange || hasLeft || hasRight);
+
+            // Animate radar-specific opacity between 0.1 (idle) and 1.0 (active) based on nearby opponents
+            const float minRadarOpacity = 0.1f;
+            const float maxRadarOpacity = 1.0f;
+            const float targetOpacity = hasOpponentsInFadeRange ? maxRadarOpacity : minRadarOpacity;
+            if (dt > 0.0f)
+            {
+                // Use faster fade-in and slightly slower fade-out for responsiveness
+                const float fadeInRate  = 5.0f; // per second
+                const float fadeOutRate = 3.0f; // per second
+                const float rate = (targetOpacity > m_radarOpacity) ? fadeInRate : fadeOutRate;
+                const float maxStep = rate * dt;
+                float delta = targetOpacity - m_radarOpacity;
+                if (fabsf(delta) <= maxStep) m_radarOpacity = targetOpacity;
+                else                          m_radarOpacity += (delta > 0.0f ? maxStep : -maxStep);
+            }
+            else
+            {
+                m_radarOpacity = targetOpacity;
+            }
+            if (m_radarOpacity < minRadarOpacity) m_radarOpacity = minRadarOpacity;
+            if (m_radarOpacity > maxRadarOpacity) m_radarOpacity = maxRadarOpacity;
+
+            const float effectiveOpacity = globalOpacity * m_radarOpacity;
+
             // Colors
-            const float4 bgCol        = g_cfg.getFloat4(m_name, "bg_col", float4(0,0,0,0.35f));
+            float4 bgCol        = g_cfg.getFloat4(m_name, "bg_col", float4(0,0,0,0.35f));
             const float4 selfCol      = g_cfg.getFloat4(m_name, "self_col", float4(1,1,1,0.95f));
             const float4 redColRaw    = g_cfg.getFloat4(m_name, "red_col", float4(0.95f,0.2f,0.2f,0.8f));
             const float4 yellowColRaw = g_cfg.getFloat4(m_name, "yellow_col", float4(0.95f,0.8f,0.2f,0.7f));
 
-            float4 redCol = redColRaw; redCol.w *= globalOpacity;
-            float4 yellowCol = yellowColRaw; yellowCol.w *= globalOpacity;
+            float4 redCol = redColRaw;    redCol.w    *= effectiveOpacity;
+            float4 yellowCol = yellowColRaw; yellowCol.w *= effectiveOpacity;
+            bgCol.w *= effectiveOpacity;
 
             m_renderTarget->BeginDraw();
             m_renderTarget->Clear(float4(0,0,0,0));
@@ -229,10 +269,8 @@ class OverlayRadar : public Overlay
                 m_renderTarget->FillEllipse(&e, m_brush.Get());
             }
 
-            
             const bool hasOpponentsInRange = (m_frontDistSm <= m_yellowRangeM || m_rearDistSm <= m_yellowRangeM);
-            
-            
+
             bool frontYellowInst = hasOpponentsInRange && (m_frontDistSm <= m_yellowRangeM && m_frontDistSm > m_redRangeM);
             bool frontRedInst    = hasOpponentsInRange && (m_frontDistSm <= m_redRangeM);
             bool rearYellowInst  = hasOpponentsInRange && (m_rearDistSm  <= m_yellowRangeM && m_rearDistSm  > m_redRangeM);
@@ -271,7 +309,7 @@ class OverlayRadar : public Overlay
             };
 
             // Draw guide lines with fading opacity
-            const float4 guideLineCol = float4(1.0f, 1.0f, 1.0f, 0.5f * globalOpacity);
+            const float4 guideLineCol = float4(1.0f, 1.0f, 1.0f, 0.5f * effectiveOpacity);
             
             // Vertical line: guide at yellow range
             const float frontLineY = cy - halfL - (m_yellowRangeM * pxPerM);
@@ -395,7 +433,7 @@ class OverlayRadar : public Overlay
                 D2D1_ROUNDED_RECT rr;
                 rr.rect = { cx - w*0.5f, cy - h*0.5f, cx + w*0.5f, cy + h*0.5f };
                 rr.radiusX = 3; rr.radiusY = 3;
-                float4 sc = selfCol; sc.w *= getGlobalOpacity();
+                float4 sc = selfCol; sc.w *= effectiveOpacity;
                 m_brush->SetColor(sc);
                 m_renderTarget->FillRoundedRectangle(&rr, m_brush.Get());
             }
@@ -413,6 +451,7 @@ class OverlayRadar : public Overlay
             m_frontYellowUntil = 0.0f;
             m_rearYellowUntil  = 0.0f;
             m_lastSessionTime = -1.0f;
+            m_radarOpacity = 0.1f;
         }
 
         virtual float2 getDefaultSize()
@@ -445,4 +484,7 @@ class OverlayRadar : public Overlay
 
         // Session transition tracking
         float m_lastSessionTime = -1.0f;
+
+        // Animated radar opacity (0.1 when idle, 1.0 when opponents are nearby)
+        float m_radarOpacity = 0.1f;
 };
