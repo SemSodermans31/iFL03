@@ -65,7 +65,7 @@ struct Car
     int             carNumber = 0;
     std::string     carNumberStr;
     std::string     carName;
-    int             carID;
+    int             carID = 0;
     std::string     licenseStr;
     char            licenseChar = 'R';
     float           licenseSR = 0;
@@ -93,7 +93,7 @@ struct Car
 struct Session
 {
     SessionType     sessionType = SessionType::UNKNOWN;
-    bool            isReplay;
+    bool            isReplay = false;
     Car             cars[IR_MAX_CARS];
     int             numCarClasses = -1;
     int             driverCarIdx = -1;

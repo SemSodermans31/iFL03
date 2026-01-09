@@ -383,10 +383,10 @@ static bool parseYamlStr(const char *yamlStr, const char *path, std::string& des
 
 bool ir_isReplayActive()
 {
-    // Session string has an explicit SimMode ("replay"), but it may not be updated yet.
-    // Also consult the live telemetry var so we can be correct immediately when the user
-    // switches into replay playback.
-    return ir_session.isReplay || ir_IsReplayPlaying.getBool();
+    // "Replay active" means the *session itself* is a replay session (WeekendInfo:SimMode == "replay").
+    // Do NOT include live-session replay playback (IsReplayPlaying), because we don't want to treat that
+    // as "DRIVING"/"replay mode" for overlay visibility yet.
+    return ir_session.isReplay;
 }
 
 double ir_now()
@@ -490,6 +490,8 @@ ConnectionStatus ir_tick()
         ir_session.isReplay = (simMode == "replay");
 
         // Driver/car info
+        // Reset to avoid using stale driver index while session info is still loading.
+        ir_session.driverCarIdx = -1;
         parseYamlInt( sessionYaml, "DriverInfo:DriverCarIdx:", &ir_session.driverCarIdx );
         parseYamlFloat( sessionYaml, "DriverInfo:DriverCarFuelMaxLtr:", &ir_session.fuelMaxLtr );
         parseYamlFloat( sessionYaml, "DriverInfo:DriverCarIdleRPM:", &ir_session.rpmIdle );
@@ -504,19 +506,21 @@ ConnectionStatus ir_tick()
         {
             Car& car = ir_session.cars[carIdx];
 
+            // Reset per-car fields every session-string update to avoid stale data when fields are missing
+            // during session transitions (practice->qualy->race, server change, etc).
+            car = Car();
+
             car.isSelf = int( carIdx==ir_session.driverCarIdx );
 
             _snprintf_s( path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}UserName:", carIdx );
             if( !parseYamlStr( sessionYaml, path, car.userName ) )
             {
-                car = Car();
                 continue;
             }
 
             _snprintf_s(path, _countof(path), _TRUNCATE, "DriverInfo:Drivers:CarIdx:{%d}TeamName:", carIdx);
             if (!parseYamlStr(sessionYaml, path, car.teamName))
             {
-                car = Car();
                 continue;
             }
 
@@ -827,7 +831,9 @@ ConnectionStatus ir_tick()
             car.lastLapInPits = ir_CarIdxLap.getInt(carIdx);
     }
 
-    if (ir_isReplayActive())
+    // Replay sessions should behave like "driving" for overlay visibility purposes
+    // (so show_in_replay can be applied).
+    if (ir_session.isReplay)
         return ConnectionStatus::DRIVING;
 
     return (ir_IsOnTrack.getBool() && ir_IsOnTrackCar.getBool()) ? ConnectionStatus::DRIVING : ConnectionStatus::CONNECTED;

@@ -50,6 +50,7 @@ SOFTWARE.
 #include <shellapi.h>
 #include "include/base/cef_build.h"
 #include "include/base/cef_ref_counted.h"
+#include "include/wrapper/cef_helpers.h"
 #include "include/wrapper/cef_message_router.h"
 #include "AppControl.h"
 #include "Config.h"

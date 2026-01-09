@@ -88,7 +88,7 @@ static LRESULT CALLBACK windowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
                 const int h = r.bottom - r.top;
                 o->setWindowPosAndSize( x, y, w, h, false );
                 o->saveWindowPosAndSize();
-                o->update(); // draw window content while moving/resizing
+                o->update();
             }
             break;
         }
@@ -121,7 +121,7 @@ void Overlay::enable( bool on )
     {
         const char* const wndclassName = "overlay";
         WNDCLASSEX wndclass = {};
-        if( !GetClassInfoEx( 0, wndclassName, &wndclass ) )  // only the first overlay we open registers the window class
+        if( !GetClassInfoEx( 0, wndclassName, &wndclass ) ) 
         {
             wndclass.cbSize = sizeof(WNDCLASSEX);
             wndclass.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;

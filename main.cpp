@@ -38,6 +38,7 @@ SOFTWARE.
 #include <stdio.h>
 #include <windows.h>
 #include <atomic>
+#include "irsdk/irsdk_client.h"
 #include <thread>
 #include <chrono>
 #include <exception>
@@ -188,7 +189,7 @@ static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus
 
     ir_handleConfigChange();
 
-    const bool replayActive = ir_isReplayActive();
+    const bool replaySession = ir_session.isReplay;
 
     for( Overlay* o : overlays )
     {
@@ -200,12 +201,16 @@ static void handleConfigChange( std::vector<Overlay*> overlays, ConnectionStatus
         bool showInReplay = g_cfg.getBool(o->getName(), "show_in_replay", true);
         
         bool connectionAllows = false;
+        
         if (status == ConnectionStatus::DRIVING) {
-            connectionAllows = replayActive ? showInReplay : showInRace;
+            // Replay *session* should use the "show_in_replay" toggle.
+            // Live-session replay playback should NOT; treat it like normal driving.
+            connectionAllows = replaySession ? showInReplay : showInRace;
         } else if (status == ConnectionStatus::CONNECTED) {
             connectionAllows = showInMenu && o->canEnableWhileNotDriving();
         } else if (status == ConnectionStatus::DISCONNECTED) {
-            connectionAllows = o->canEnableWhileDisconnected();
+            // When iRacing is disconnected, overlays are always hidden (except preview mode).
+            connectionAllows = false;
         }
         
         // In preview mode, show enabled overlays regardless of connection status
@@ -454,9 +459,14 @@ int main()
     {
         ConnectionStatus prevStatus       = status;
         SessionType      prevSessionType  = ir_session.sessionType;
+        int              prevSubsessionId = ir_session.subsessionId;
+        int              prevStatusID     = irsdkClient::instance().getStatusID();
+        bool             prevHasDriver    = ir_hasValidDriver();
 
         // Refresh connection and session info
         status = ir_tick();
+        const bool nowHasDriver = ir_hasValidDriver();
+        const int  nowStatusID  = irsdkClient::instance().getStatusID();
         if( status != prevStatus )
         {
             Logger::instance().logInfo(std::string("Connection status changed to ") + ConnectionStatusStr[(int)status]);
@@ -477,7 +487,15 @@ int main()
 #endif
         }
 
-        if( ir_session.sessionType != prevSessionType )
+        if( ir_session.sessionType != prevSessionType || ir_session.subsessionId != prevSubsessionId )
+        {
+            for( Overlay* o : overlays )
+                o->sessionChanged();
+        }
+
+        // When IRSDK header/var table changes, cached state across overlays can become stale.
+        // Also, when the driver index becomes valid after connection, overlays should reset once.
+        if( nowStatusID != prevStatusID || (nowHasDriver && !prevHasDriver) )
         {
             for( Overlay* o : overlays )
                 o->sessionChanged();
@@ -485,7 +503,33 @@ int main()
 
         // Update/render overlays
         {
-            if( !g_cfg.getBool("General", "performance_mode_30hz", false) )
+            // Avoid rendering during the brief window right after connect/session-load where
+            // IRSDK/YAML can be incomplete and values may temporarily be garbage.
+            static int stableFrames = 0;
+            static int lastStatusIDForStability = -1;
+            const bool isConnectedToSim = (status == ConnectionStatus::CONNECTED || status == ConnectionStatus::DRIVING);
+
+            if (!isConnectedToSim) {
+                stableFrames = 0;
+                lastStatusIDForStability = nowStatusID;
+            } else if (nowStatusID != lastStatusIDForStability) {
+                // IRSDK header/var-table changed -> reset stability window
+                stableFrames = 0;
+                lastStatusIDForStability = nowStatusID;
+            } else if (nowHasDriver) {
+                stableFrames = std::min(stableFrames + 1, 9999);
+            } else {
+                stableFrames = 0;
+            }
+
+            // Once the sim is connected and we have a valid driver and the IRSDK header has been stable
+            // for a short moment, allow overlays to update both in menu (CONNECTED) and in-car (DRIVING).
+            const bool allowOverlayUpdates = preview_mode_get() || (isConnectedToSim && nowHasDriver && stableFrames >= 15);
+            if( !allowOverlayUpdates )
+            {
+                // Keep pumping messages / config changes but don't update overlays yet.
+            }
+            else if( !g_cfg.getBool("General", "performance_mode_30hz", false) )
             {
                 // Update enabled overlays every frame, roughly every 16ms (~60Hz)
                 for( Overlay* o : overlays )
