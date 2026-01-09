@@ -45,6 +45,7 @@ public:
         : Overlay("OverlayTrack")
     {}
 
+    virtual bool canEnableWhileNotDriving() const { return true; }
     virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
 
 protected:

@@ -30,6 +30,7 @@ SOFTWARE.
 #include <string>
 #include <map>
 #include <algorithm>
+#include <array>
 #include <wincodec.h>
 #include "Overlay.h"
 #include "Config.h"
@@ -200,6 +201,8 @@ protected:
 
         std::vector<CarInfo> carInfo;
         carInfo.reserve( IR_MAX_CARS );
+        std::array<int, IR_MAX_CARS> carInfoIndexByCarIdx;
+        carInfoIndexByCarIdx.fill(-1);
         
         // Use stub data in preview mode
         const bool useStubData = StubDataManager::shouldUseStubData();
@@ -215,7 +218,7 @@ protected:
         std::map<int, classBestLap> bestLapClass;
         std::set<int> activeClasses;
         int selfPosition = ir_getPosition(ir_session.driverCarIdx);
-        bool hasPacecar = false;
+        // NOTE: `carInfo` is filtered, so we must not index it by `carIdx`.
         
         if (useStubData) {
             const auto& stubCars = StubDataManager::getStubCars();
@@ -241,6 +244,8 @@ protected:
 
                 activeClasses.insert(ci.classIdx);
                 carInfo.push_back(ci);
+                if (ci.carIdx >= 0 && ci.carIdx < IR_MAX_CARS)
+                    carInfoIndexByCarIdx[ci.carIdx] = (int)carInfo.size() - 1;
             }
         } else {
         for( int i=0; i<IR_MAX_CARS; ++i )
@@ -248,7 +253,6 @@ protected:
             const Car& car = ir_session.cars[i];
 
             if (car.isPaceCar || car.isSpectator || car.userName.empty()) {
-                hasPacecar = true;
                 continue;
             }
 
@@ -300,7 +304,7 @@ protected:
 
             if( ci.best > 0 && ci.best < bestLapClass[ci.classIdx].best) {
                 bestLapClass[ci.classIdx].best = ci.best;
-                bestLapClass[ci.classIdx].carIdx = hasPacecar ? ci.carIdx - 1 : ci.carIdx;               
+                bestLapClass[ci.classIdx].carIdx = ci.carIdx;
             }
             
             if(ci.lapCount > 0)
@@ -319,20 +323,27 @@ protected:
 
             activeClasses.insert(ci.classIdx);
             carInfo.push_back(ci);
+            if (ci.carIdx >= 0 && ci.carIdx < IR_MAX_CARS)
+                carInfoIndexByCarIdx[ci.carIdx] = (int)carInfo.size() - 1;
         }
         }
 
         for (const auto& pair : bestLapClass)
         {
-            if (pair.second.best > 0 && pair.second.carIdx >= 0) {
-                carInfo[pair.second.carIdx].hasFastestLap = true;
-                std::string str = formatLaptime(pair.second.best);
-            }
+            if (pair.second.best <= 0 || pair.second.carIdx < 0 || pair.second.carIdx >= IR_MAX_CARS)
+                continue;
+            const int idx = carInfoIndexByCarIdx[pair.second.carIdx];
+            if (idx >= 0 && idx < (int)carInfo.size())
+                carInfo[idx].hasFastestLap = true;
         }
 
         //const CarInfo ciSelf = carInfo[ir_PlayerCarIdx.getInt() > 0 ? hasPacecar ? ir_PlayerCarIdx.getInt() - 1 : ir_PlayerCarIdx.getInt() : 0];
         // Sometimes the offset is not necessary. In a free practice session it didn't need it, but in a qualifying it did
-        const CarInfo ciSelf = carInfo[ir_session.driverCarIdx];
+        const int selfCarIdx = ir_session.driverCarIdx;
+        const int selfVecIdx = (selfCarIdx >= 0 && selfCarIdx < IR_MAX_CARS) ? carInfoIndexByCarIdx[selfCarIdx] : -1;
+        if (selfVecIdx < 0 || selfVecIdx >= (int)carInfo.size())
+            return;
+        const CarInfo ciSelf = carInfo[selfVecIdx];
         
         // Sort by position
         std::sort( carInfo.begin(), carInfo.end(),

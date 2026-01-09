@@ -46,6 +46,25 @@ bool irsdkClient::waitForData(int timeoutMS)
 	// wait for start of session or new data
 	if(irsdk_waitForDataReady(timeoutMS, m_data) && irsdk_getHeader())
 	{
+		const irsdk_header* hdr = irsdk_getHeader();
+
+		// If the telemetry header structure changes (common during session loads / transitions),
+		// cached variable indices can become invalid even if bufLen stays the same.
+		// Bump statusID so all irsdkCVar instances re-resolve their indices.
+		if (m_lastHeaderVer != hdr->ver ||
+			m_lastHeaderTickRate != hdr->tickRate ||
+			m_lastHeaderSessionInfoOffset != hdr->sessionInfoOffset ||
+			m_lastHeaderNumVars != hdr->numVars ||
+			m_lastHeaderVarHeaderOffset != hdr->varHeaderOffset)
+		{
+			m_statusID++;
+			m_lastHeaderVer = hdr->ver;
+			m_lastHeaderTickRate = hdr->tickRate;
+			m_lastHeaderSessionInfoOffset = hdr->sessionInfoOffset;
+			m_lastHeaderNumVars = hdr->numVars;
+			m_lastHeaderVarHeaderOffset = hdr->varHeaderOffset;
+		}
+
 		// if new connection, or data changed lenght then init
 		if(!m_data || m_nData != irsdk_getHeader()->bufLen)
 		{
@@ -59,6 +78,13 @@ bool irsdkClient::waitForData(int timeoutMS)
 
 			// reset session info str status
 			m_lastSessionCt = -1;
+
+			// reset header snapshot so we don't compare against stale values
+			m_lastHeaderVer = -1;
+			m_lastHeaderTickRate = -1;
+			m_lastHeaderSessionInfoOffset = -1;
+			m_lastHeaderNumVars = -1;
+			m_lastHeaderVarHeaderOffset = -1;
 
 			// and try to fill in the data
 			if(irsdk_getNewData(m_data))
@@ -79,6 +105,13 @@ bool irsdkClient::waitForData(int timeoutMS)
 
 		// reset session info str status
 		m_lastSessionCt = -1;
+
+		// reset header snapshot
+		m_lastHeaderVer = -1;
+		m_lastHeaderTickRate = -1;
+		m_lastHeaderSessionInfoOffset = -1;
+		m_lastHeaderNumVars = -1;
+		m_lastHeaderVarHeaderOffset = -1;
 	}
 
 	return false;

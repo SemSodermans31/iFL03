@@ -28,6 +28,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef IRSDKCLIENT_H
 #define IRSDKCLIENT_H
 
+// Needed for irsdk_header and irsdk_getSessionInfoStrUpdate() declarations.
+#include "irsdk_defines.h"
+
 // A C++ wrapper around the irsdk calls that takes care of the details of maintaining a connection.
 // reads out the data into a cache so you don't have to worry about timming
 class irsdkClient
@@ -90,6 +93,11 @@ protected:
 		, m_nData(0)
 		, m_statusID(0)
 		, m_lastSessionCt(-1)
+		, m_lastHeaderVer(-1)
+		, m_lastHeaderTickRate(-1)
+		, m_lastHeaderSessionInfoOffset(-1)
+		, m_lastHeaderNumVars(-1)
+		, m_lastHeaderVarHeaderOffset(-1)
 	{ }
 
 	~irsdkClient() { shutdown(); }
@@ -101,6 +109,11 @@ protected:
 	int m_statusID;
 
 	int m_lastSessionCt;
+	int m_lastHeaderVer;
+	int m_lastHeaderTickRate;
+	int m_lastHeaderSessionInfoOffset;
+	int m_lastHeaderNumVars;
+	int m_lastHeaderVarHeaderOffset;
 
 	static irsdkClient *m_instance;
 };

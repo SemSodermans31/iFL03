@@ -300,8 +300,8 @@ protected:
                 }
             }
 
-            // Text colors (use class color as subtle accent)
-            float4 accent = classCol;
+            // Text colors (use base yellow color as subtle accent)
+            float4 accent = ClassColors::get(1);
             accent.w = 0.95f * globalOpacity;
 
             m_brush->SetColor(float4(0.95f, 0.95f, 0.98f, 0.92f * globalOpacity));

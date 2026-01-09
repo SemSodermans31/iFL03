@@ -40,9 +40,8 @@ class OverlayRelative : public Overlay
 {
     public:
 
+        virtual bool canEnableWhileNotDriving() const { return true; }
         virtual bool canEnableWhileDisconnected() const { return StubDataManager::shouldUseStubData(); }
-
-        
 
         OverlayRelative()
             : Overlay("OverlayRelative")
@@ -127,7 +126,11 @@ class OverlayRelative : public Overlay
             const float lastColScale = g_cfg.getFloat( m_name, "last_col_scale", 2.0f );
             if( g_cfg.getBool(m_name, "show_last", true) )
                 m_columns.add( (int)Columns::LAST,       computeTextExtent( L"99.99", m_dwriteFactory.Get(), m_textFormat.Get() ).x * lastColScale, fontSize/2 );
-            m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"+99L  -99.9", m_dwriteFactory.Get(), m_textFormat.Get() ).x, 1, fontSize/2 );
+            
+            // Replay sessions often have unreliable/empty delta timing (shows up as 0.0). Allow user to hide it in replay.
+            const bool includeDelta = !ir_session.isReplay || g_cfg.getBool(m_name, "show_delta_in_replay", false);
+            if (includeDelta)
+                m_columns.add( (int)Columns::DELTA,      computeTextExtent( L"+99L  -99.9", m_dwriteFactory.Get(), m_textFormat.Get() ).x, 1, fontSize/2 );
             
 
         }
@@ -640,8 +643,8 @@ class OverlayRelative : public Overlay
                 }
 
                 // Delta
+                if( (clm = m_columns.get((int)Columns::DELTA)) )
                 {
-                    clm = m_columns.get((int)Columns::DELTA);
                     swprintf(s, _countof(s), L"%.1f", ci.delta);
                     m_brush->SetColor(col);
                     m_text.render(m_renderTarget.Get(), s, m_textFormat.Get(), xoff + clm->textL, xoff + clm->textR, y, m_brush.Get(), DWRITE_TEXT_ALIGNMENT_TRAILING, m_fontSpacing);

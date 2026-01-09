@@ -192,6 +192,21 @@ function setupEventListeners() {
 		});
 	}
 
+	// Show in Replay toggle
+	const showReplayToggle = document.getElementById('overlay-show-replay');
+	if (showReplayToggle) {
+		showReplayToggle.addEventListener('change', function() {
+			if (selectedOverlay) {
+				const configKey = overlayConfig[selectedOverlay].configKey;
+				sendCommand('setConfigBool', {
+					component: configKey,
+					key: 'show_in_replay',
+					value: this.checked
+				});
+			}
+		});
+	}
+
 
 	// Hotkey input
 	const overlayHotkey = document.getElementById('overlay-hotkey');
@@ -525,7 +540,7 @@ function renderBooleanToggles(configKey) {
 	if (!cfg) return;
 
 	// Collect boolean keys
-	const exclude = new Set(['enabled', 'show_in_menu', 'show_in_race']);
+	const exclude = new Set(['enabled', 'show_in_menu', 'show_in_race', 'show_in_replay']);
 	const keys = Object.keys(cfg).filter(k => typeof cfg[k] === 'boolean' && !exclude.has(k));
 	if (keys.length === 0) return;
 
@@ -590,6 +605,26 @@ function renderBooleanToggles(configKey) {
 	});
 }
 
+function updateDisplayTogglesVisibility(configKey) {
+	const showMenuRow = document.getElementById('overlay-show-menu-row');
+	const showReplayRow = document.getElementById('overlay-show-replay-row');
+
+	// Show-in-menu should only be available for overlays that support it.
+	const caps = currentState && currentState.overlayCapabilities && currentState.overlayCapabilities[configKey];
+	const canShowInMenu = !!(caps && caps.canShowInMenu);
+	if (showMenuRow) {
+		if (canShowInMenu) showMenuRow.classList.remove('hidden');
+		else showMenuRow.classList.add('hidden');
+	}
+
+	// Show-in-replay should only be available when we're in a replay *session* (not live-session replay playback).
+	const isReplaySession = !!(currentState && currentState.replaySession);
+	if (showReplayRow) {
+		if (isReplaySession) showReplayRow.classList.remove('hidden');
+		else showReplayRow.classList.add('hidden');
+	}
+}
+
 function updateOverlaySettings(overlayKey) {
 	const config = overlayConfig[overlayKey];
 	if (!config) return;
@@ -620,7 +655,12 @@ function updateOverlaySettings(overlayKey) {
 		if (showMenu) showMenu.checked = cfg.show_in_menu !== false; // default true
 		const showRace = document.getElementById('overlay-show-race');
 		if (showRace) showRace.checked = cfg.show_in_race !== false; // default true
+		const showReplay = document.getElementById('overlay-show-replay');
+		if (showReplay) showReplay.checked = cfg.show_in_replay !== false; // default true
 	}
+
+	// Apply visibility rules for these toggles (capabilities + replay-session state)
+	updateDisplayTogglesVisibility(config.configKey);
 	
 	// Update hotkey
 	const overlayHotkey = document.getElementById('overlay-hotkey');
@@ -769,6 +809,11 @@ function updateUI() {
 	// Update selected overlay settings if one is selected
 	if (selectedOverlay) {
 		updateOverlaySettings(selectedOverlay);
+	}
+
+	// Ensure display-toggle visibility stays correct even if state changes while sidebar is open
+	if (selectedOverlay && overlayConfig[selectedOverlay]) {
+		updateDisplayTogglesVisibility(overlayConfig[selectedOverlay].configKey);
 	}
 }
 
