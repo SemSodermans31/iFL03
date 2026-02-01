@@ -2,7 +2,6 @@
 let currentState = {};
 
 // Initialize the page
-let saveAsMode = 'duplicate'; // 'duplicate' | 'create'
 document.addEventListener('DOMContentLoaded', function() {
 	console.log('User page loaded');
 	
@@ -14,25 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function setupEventListeners() {
-	// Config management actions
-	const dupBtn = document.getElementById('btn-duplicate-config');
-	if (dupBtn) dupBtn.addEventListener('click', showSaveAsModal);
-	const createBtn = document.getElementById('btn-create-config');
-	if (createBtn) createBtn.addEventListener('click', showCreateModal);
-	const delBtn = document.getElementById('deleteConfig');
-	if (delBtn) delBtn.addEventListener('click', deleteSelectedConfig);
-	const setActiveBtn = document.getElementById('btn-set-active');
-	if (setActiveBtn) setActiveBtn.addEventListener('click', setSelectedActive);
-
-	// Modal actions
-	document.getElementById('confirmSaveAs').addEventListener('click', confirmSaveAs);
-	document.getElementById('cancelSaveAs').addEventListener('click', hideSaveAsModal);
-
-	// Close modals on background click
-	document.getElementById('saveAsModal').addEventListener('click', function(e) {
-		if (e.target === this) hideSaveAsModal();
-	});
-
 	// Buddies/Flagged add buttons
 	const buddiesAdd = document.getElementById('buddies-add');
 	if (buddiesAdd) buddiesAdd.addEventListener('click', () => addListEntry('General', 'buddies', 'buddies-input'));
@@ -74,12 +54,6 @@ function requestState() {
 function updateUI() {
 	// Update connection status
 	updateConnectionStatus(currentState.connectionStatus);
-	
-	// Update current car information
-	updateCurrentCarInfo();
-	
-	// Update available configs
-	updateAvailableConfigs();
 
 	// Update general lists
 	updateGeneralLists();
@@ -247,174 +221,6 @@ function setConfigFloat(component, key, value) {
 function setConfigStringVec(component, key, values) {
     sendCommand({ cmd: 'setConfigStringVec', component, key, values }, 'List updated', 'Failed to update list');
 }
-
-function updateCurrentCarInfo() {
-	const currentCarName = document.getElementById('currentCarName');
-	const currentCarConfig = document.getElementById('currentCarConfig');
-	
-	if (currentState.previewMode) {
-		if (currentCarName) currentCarName.textContent = 'preview car';
-		if (currentCarConfig) currentCarConfig.textContent = 'preview config';
-		return;
-	}
-
-	// When not in preview, avoid leaking stub car names if not driving/connected
-	const carName = currentState.connectionStatus === 'DRIVING' ? (currentState.currentCar || '') : '';
-	if (currentCarName) {
-		currentCarName.textContent = carName || 'No car detected';
-	}
-
-	if (currentCarConfig) {
-		currentCarConfig.textContent = currentState.currentCarConfig || 'Default';
-	}
-}
-
-let selectedConfigName = '';
-
-function updateAvailableConfigs() {
-	const container = document.getElementById('availableConfigs');
-	if (!container) return;
-	
-	container.innerHTML = '';
-	
-	if (!currentState.availableCarConfigs || currentState.availableCarConfigs.length === 0) {
-		container.innerHTML = '<div class="col-span-full text-center text-[#a8a8a8] py-8">No car configurations found</div>';
-		return;
-	}
-	
-	const active = currentState.currentCarConfig || '';
-	currentState.availableCarConfigs.forEach(carName => {
-		const card = document.createElement('div');
-		const isActive = carName === active;
-		const isSelected = carName === selectedConfigName;
-
-		// Base classes
-		let className = 'bg-[#1f1f1f] rounded-lg p-4 hover:bg-[#3c3c3c] transition-colors relative';
-
-		// Add green border for selected config
-		if (isSelected) {
-			className += ' ring-2 ring-green-500/50';
-		}
-
-		// Add check icon for active config
-		const checkIcon = isActive ? '<i class="fa-solid fa-circle-check absolute top-2 right-2 text-green-500"></i>' : '';
-
-		card.className = className;
-		card.innerHTML = `
-			${checkIcon}
-			<div class="font-medium text-slate-100 mb-1">${escapeHtml(carName)}</div>
-			<div class="text-sm text-[#a8a8a8]">Car Configuration</div>
-		`;
-		card.addEventListener('click', () => selectCarConfig(carName));
-		container.appendChild(card);
-	});
-
-	const dupBtn = document.getElementById('btn-duplicate-config');
-	const delBtn = document.getElementById('deleteConfig');
-	const setActiveBtn = document.getElementById('btn-set-active');
-	const hasSelection = !!selectedConfigName;
-	if (dupBtn) dupBtn.disabled = !hasSelection;
-	if (delBtn) delBtn.disabled = !hasSelection;
-	if (setActiveBtn) setActiveBtn.disabled = !hasSelection;
-}
-
-function selectCarConfig(carName) {
-	selectedConfigName = carName;
-	updateAvailableConfigs();
-}
-
-// API Functions
-function deleteSelectedConfig() {
-	const name = selectedConfigName;
-	if (!name) {
-		showStatus('Please select a car configuration', 'error');
-		return;
-	}
-
-	showConfirmModal({
-		title: 'Delete Configuration',
-		message: `Are you sure you want to delete "${escapeHtml(name)}"?`,
-		confirmText: 'Delete',
-		confirmStyle: 'danger'
-	}).then(confirmed => {
-		if (!confirmed) return;
-		sendCommand({ cmd: 'deleteCarConfig', carName: name }, 
-			'Configuration deleted successfully', 'Configuration delete failed');
-		selectedConfigName = '';
-	});
-}
-
-// Modal Functions
-function showSaveAsModal() {
-	const modal = document.getElementById('saveAsModal');
-	const input = document.getElementById('saveAsCarName');
-	const title = document.getElementById('saveAsTitle');
-	
-	if (modal && input) {
-		saveAsMode = 'duplicate';
-		if (title) title.textContent = 'Duplicate Configuration';
-		input.value = selectedConfigName ? (selectedConfigName + ' copy') : '';
-		modal.classList.remove('hidden');
-		input.focus();
-	}
-}
-
-function showCreateModal() {
-	const modal = document.getElementById('saveAsModal');
-	const input = document.getElementById('saveAsCarName');
-	const title = document.getElementById('saveAsTitle');
-	if (modal && input) {
-		saveAsMode = 'create';
-		if (title) title.textContent = 'Create Configuration';
-		const canPrefill = currentState && !currentState.previewMode && currentState.connectionStatus === 'DRIVING';
-		const prefill = canPrefill ? (currentState.currentCar || '') : '';
-		input.value = prefill;
-		modal.classList.remove('hidden');
-		input.focus();
-	}
-}
-
-function hideSaveAsModal() {
-	const modal = document.getElementById('saveAsModal');
-	if (modal) {
-		modal.classList.add('hidden');
-		document.getElementById('saveAsCarName').value = '';
-	}
-}
-
-function confirmSaveAs() {
-	const input = document.getElementById('saveAsCarName');
-	if (!input || !input.value.trim()) {
-		showStatus('Please enter a car name', 'error');
-		return;
-	}
-	const newName = input.value.trim();
-
-	if (saveAsMode === 'create') {
-		// Save current settings as a new car config
-		sendCommand({ cmd: 'saveCarConfig', carName: newName }, 
-			'Configuration created successfully', 'Configuration create failed');
-	} else {
-		// Duplicate from selected config
-		const fromCar = selectedConfigName || '';
-		sendCommand({ cmd: 'copyCarConfig', fromCar: fromCar, toCar: newName }, 
-			'Configuration saved successfully', 'Configuration save failed');
-	}
-
-	hideSaveAsModal();
-}
-
-function setSelectedActive() {
-	const name = selectedConfigName;
-	if (!name) {
-		showStatus('Please select a car configuration', 'error');
-		return;
-	}
-	// Load the selected config; state update will reflect the active ring
-	sendCommand({ cmd: 'loadCarConfig', carName: name }, 'Configuration loaded', 'Configuration load failed');
-}
-
-// Removed copy modal logic; duplicate flow handled via Save As modal
 
 // Utility Functions
 function sendCommand(command, successMessage, errorMessage) {
