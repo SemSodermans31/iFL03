@@ -706,12 +706,16 @@ ConnectionStatus ir_tick()
 
         // Session info (may override qual results from above, but that's ok since hopefully they're the same!)
         //
-        // While parsing session results, we also accumulate Strength of Field (SoF) using
-        // the same definition as iRacing: average iRating of the drivers in our class
-        // who are part of the race field. For non-race contexts (practice, test, etc.)
-        // we fall back to averaging over all known drivers in our class.
+        // While parsing session results, we also accumulate Strength of Field (SoF).
+        //
+        // For maximum accuracy (and to match common SoF calculators), we use a
+        // "glommed" / log-space average of iRating (see util.h `sofAccumulateIRating`).
+        //
+        // We compute SoF per class: only drivers in our class are included.
+        // For non-race contexts (practice, test, etc.) we fall back to using all
+        // currently known drivers in our class.
         int ownClass = ir_PlayerCarClass.getInt();
-        double sofRace = 0.0;
+        double sofRaceExp = 0.0;
         int sofRaceCnt = 0;
 
         for( int session=0; ; ++session )
@@ -779,8 +783,7 @@ ConnectionStatus ir_tick()
                         const Car& car = ir_session.cars[carIdx];
                         if( !car.isPaceCar && !car.isSpectator && !car.userName.empty() && car.classId == ownClass )
                         {
-                            sofRace += car.irating;
-                            ++sofRaceCnt;
+                            sofAccumulateIRating(car.irating, sofRaceExp, sofRaceCnt);
                         }
                     }
                 }
@@ -789,19 +792,18 @@ ConnectionStatus ir_tick()
 
         // SoF
         //
-        // Primary path: when we have race results, SoF is the average iRating of all
-        // drivers in our car class that appear in the RACE session results. This
-        // mirrors how iRacing defines SoF for a race.
+        // Primary path: when we have race results, SoF is computed from the drivers
+        // in our car class that appear in the RACE session results.
         //
         // Fallback path: if we don't have race results yet (e.g., practice sessions),
-        // approximate SoF by averaging over all known drivers in our class.
+        // approximate SoF using all known drivers in our class.
         if( sofRaceCnt > 0 )
         {
-            ir_session.sof = int( sofRace / sofRaceCnt );
+            ir_session.sof = sofFromAccumulator(sofRaceExp, sofRaceCnt);
         }
         else
         {
-            double sof = 0.0;
+            double sofExp = 0.0;
             int cnt = 0;
             for( int i=0; i<IR_MAX_CARS; ++i )
             {
@@ -810,10 +812,9 @@ ConnectionStatus ir_tick()
                 if( car.isPaceCar || car.isSpectator || car.userName.empty() || car.classId != ownClass )
                     continue;
 
-                sof += car.irating;
-                ++cnt;
+                sofAccumulateIRating(car.irating, sofExp, cnt);
             }
-            ir_session.sof = (cnt > 0) ? int( sof / cnt ) : 0;
+            ir_session.sof = sofFromAccumulator(sofExp, cnt);
         }
 
         ir_handleConfigChange();

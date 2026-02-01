@@ -377,6 +377,32 @@ int main()
     // Load the config and watch it for changes
     if (!g_cfg.load())
         Logger::instance().logWarning("Initial config load failed");
+
+    // Restore last active car config (if any) so the selected config persists across restarts.
+    // Stored as plain UTF-8 text in the working directory.
+    {
+        std::string lastActive;
+        if (loadFile("active_car_config.txt", lastActive))
+        {
+            auto trim = [](std::string& s) {
+                auto isWs = [](unsigned char c) { return c == ' ' || c == '\t' || c == '\r' || c == '\n'; };
+                size_t b = 0;
+                while (b < s.size() && isWs((unsigned char)s[b])) b++;
+                size_t e = s.size();
+                while (e > b && isWs((unsigned char)s[e - 1])) e--;
+                s = s.substr(b, e - b);
+            };
+            trim(lastActive);
+            if (!lastActive.empty())
+            {
+                if (!g_cfg.loadCarConfig(lastActive))
+                {
+                    Logger::instance().logWarning("Failed to restore active car config: " + lastActive);
+                    // Keep default config.json if restore fails
+                }
+            }
+        }
+    }
     g_cfg.watchForChanges();
 
     // Initialize preview mode

@@ -588,7 +588,7 @@ protected:
                 int                 classId = 0;
                 std::wstring        name;
                 int                 participants = 0;
-                int                 sofSum = 0;
+                double              sofExpSum = 0.0; // accumulate exp(-iR/br1) for glommed SoF
                 int                 sofCount = 0;
                 float               leaderBest = 0.0f;
                 std::vector<int>    carIndices;     // indices into carInfo
@@ -629,8 +629,7 @@ protected:
                 summary.participants++;
                 if (car.irating > 0)
                 {
-                    summary.sofSum += car.irating;
-                    summary.sofCount++;
+                    sofAccumulateIRating(car.irating, summary.sofExpSum, summary.sofCount);
                 }
                 if (ci.best > 0.0f && (summary.leaderBest <= 0.0f || ci.best < summary.leaderBest))
                 {
@@ -642,8 +641,9 @@ protected:
             // Finalize per-class data: average SoF and sort cars by class position
             for (auto& summary : classSummaries)
             {
-                if (summary.sofCount > 0)
-                    summary.sofSum = summary.sofSum / summary.sofCount; // reuse sofSum as averaged SoF
+                const int sof = sofFromAccumulator(summary.sofExpSum, summary.sofCount);
+                // Reuse sofExpSum to store the final SoF (as a numeric value) to avoid larger refactors.
+                summary.sofExpSum = (double)sof;
 
                 std::sort(summary.carIndices.begin(), summary.carIndices.end(),
                     [&](int aIndex, int bIndex)
@@ -805,7 +805,7 @@ protected:
                     // SoF (center)
                     if (g_cfg.getBool(m_name, "show_SoF", true))
                     {
-                        const int sof = summary.sofSum > 0 ? summary.sofSum : 0;
+                        const int sof = (summary.sofExpSum > 0.0) ? (int)summary.sofExpSum : 0;
                         wchar_t sofBuf[64];
                         swprintf(sofBuf, _countof(sofBuf), L"SoF %d", sof);
                         m_brush->SetColor(float4(1, 1, 1, 1));

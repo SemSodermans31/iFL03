@@ -203,7 +203,12 @@ protected:
 		for (float v : m_fuelUsedLastLaps) avgPerLap += v;
 		if (!m_fuelUsedLastLaps.empty()) avgPerLap /= (float)m_fuelUsedLastLaps.size();
 		const float perLapConsEst = avgPerLap * estimateFactor;
-		const float maxPerLap = m_maxFuelUsedLapSession;
+		// "Max per lap" (and push calcs) should be based on the same data source as Avg per lap.
+		// Note: m_fuelUsedLastLaps may be seeded from cache before any valid lap is recorded this session,
+		// so we also take the max of the history deque to avoid maxPerLap being 0.0 early on.
+		float maxPerLapFromHistory = 0.0f;
+		for (float v : m_fuelUsedLastLaps) maxPerLapFromHistory = std::max(maxPerLapFromHistory, v);
+		const float maxPerLap = std::max(m_maxFuelUsedLapSession, maxPerLapFromHistory);
 		const float pushPerLapConsEst = maxPerLap * pushEstimateFactor;
 
 		// Persist a fresh average for this car/track combo once we have enough valid laps

@@ -28,6 +28,8 @@ SOFTWARE.
 #include <algorithm>
 #include <string>
 #include <format>
+#include <unordered_map>
+#include <cmath>
 #include "Overlay.h"
 #include "iracing.h"
 #include "ClassColors.h"
@@ -305,52 +307,177 @@ class OverlayRelative : public Overlay
             const float xoff = 10.0f;
             m_columns.layout( (float)m_width - 20 );
 
-            // Prepare participant list for iRating prediction
-            struct Participant { int carIdx; int position; int irating; };
-            std::vector<Participant> participants;
-            participants.reserve(IR_MAX_CARS);
-            for( int i=0; i<IR_MAX_CARS; ++i )
+            std::unordered_map<int, int> irPredDeltaByCarIdx;
+            const bool showIrPred = g_cfg.getBool(m_name, "show_ir_pred", false) && ir_session.sessionType == SessionType::RACE;
+            if( showIrPred )
             {
-                const Car& car = ir_session.cars[i];
-                if( car.isSpectator || car.carNumber < 0 )
-                    continue;
-                int pos = 0;
-                if( useStubData )
+                // Prepare participants for iRating prediction.
+                //
+                // IMPORTANT: In multiclass racing, iRating is gained/lost only against drivers in the same car class.
+                // Therefore, we compute predictions per class (using class positions).
+                struct Participant { int carIdx; int classId; int position; int irating; bool started; };
+                std::unordered_map<int, std::vector<Participant>> participantsByClass;
+                participantsByClass.reserve(16);
+
+                size_t totalParticipants = 0;
+                for( int i=0; i<IR_MAX_CARS; ++i )
                 {
-                    if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(i))
-                        pos = sc->position;
+                    const Car& car = ir_session.cars[i];
+                    if( car.isSpectator || car.carNumber < 0 || car.isPaceCar )
+                        continue;
+
+                    int pos = 0;
+                    if( useStubData )
+                    {
+                        if (const StubDataManager::StubCar* sc = StubDataManager::getStubCar(i))
+                            pos = sc->position;
+                    }
+                    else
+                    {
+                        pos = ir_getPosition(i); // class position when available
+                    }
+
+                    if( pos <= 0 )
+                        continue;
+
+                    // For live prediction we treat listed competitors as starters.
+                    // (Non-starters/forfeits are uncommon mid-session and would require results data to model correctly.)
+                    participantsByClass[car.classId].push_back( Participant{ i, car.classId, pos, car.irating, true } );
+                    ++totalParticipants;
                 }
-                else
+
+                // Spreadsheet-derived iRating change estimate (matches common community calculators closely).
+                //
+                // Based on the "iRacing SOF iRating Calculator v1_1.xlsx" logic (popularized via SIMRacingApps),
+                // using the same "chance" function (not the classic Elo base-10 / 400 logistic).
+                const float ln2 = std::log(2.0f);
+                const float br1 = (ln2 > 0.0f) ? (1600.0f / ln2) : 2307.0f; // fallback shouldn't ever be hit
+
+                auto chance = [&](float a, float b)->float
                 {
-                    pos = ir_getPosition(i);
-                }
-                if( pos <= 0 )
-                    continue;
-                participants.push_back( Participant{ i, pos, car.irating } );
+                    // Port of https://github.com/Turbo87/irating-rs (chance function)
+                    const float ea = std::exp(-a / br1);
+                    const float eb = std::exp(-b / br1);
+                    const float numerator = (1.0f - ea) * eb;
+                    const float denominator = (1.0f - eb) * ea + (1.0f - ea) * eb;
+                    if( denominator <= 0.0f )
+                        return 0.5f;
+                    return numerator / denominator;
+                };
+
+                irPredDeltaByCarIdx.reserve(totalParticipants);
+
+                auto computeClassDeltas = [&](std::vector<Participant>& cls)->void
+                {
+                    const int n = (int)cls.size();
+                    if( n <= 1 )
+                    {
+                        for( const auto& p : cls )
+                            irPredDeltaByCarIdx[p.carIdx] = 0;
+                        return;
+                    }
+
+                    // Ensure positions are in rank order (1..n within class)
+                    std::sort(cls.begin(), cls.end(), [](const Participant& a, const Participant& b) { return a.position < b.position; });
+
+                    const int numRegistrations = n;
+                    int numStarters = 0;
+                    for( const auto& p : cls )
+                        if( p.started ) ++numStarters;
+
+                    const int numNonStarters = numRegistrations - numStarters;
+                    if( numStarters <= 0 )
+                    {
+                        for( const auto& p : cls )
+                            irPredDeltaByCarIdx[p.carIdx] = 0;
+                        return;
+                    }
+
+                    // Expected scores
+                    std::vector<float> expectedScore(n, 0.0f);
+                    for( int i=0; i<n; ++i )
+                    {
+                        float sum = 0.0f;
+                        const float a = (float)cls[i].irating;
+                        for( int j=0; j<n; ++j )
+                        {
+                            const float b = (float)cls[j].irating;
+                            sum += chance(a, b);
+                        }
+                        expectedScore[i] = sum - 0.5f;
+                    }
+
+                    // Fudge factors (per spreadsheet implementation)
+                    const float x = (float)numRegistrations - (float)numNonStarters / 2.0f;
+                    std::vector<float> fudge(n, 0.0f);
+                    for( int i=0; i<n; ++i )
+                    {
+                        if( !cls[i].started )
+                            continue;
+                        fudge[i] = (x / 2.0f - (float)cls[i].position) / 100.0f;
+                    }
+
+                    // Changes for starters
+                    std::vector<float> changes(n, 0.0f);
+                    float sumChangesStarters = 0.0f;
+                    for( int i=0; i<n; ++i )
+                    {
+                        if( !cls[i].started )
+                            continue;
+                        changes[i] =
+                            ((float)numRegistrations
+                             - (float)cls[i].position
+                             - expectedScore[i]
+                             - fudge[i])
+                            * 200.0f
+                            / (float)numStarters;
+                        sumChangesStarters += changes[i];
+                    }
+
+                    // Distribute changes to non-starters (rare for our live view, but keep behavior defined)
+                    if( numNonStarters > 0 )
+                    {
+                        float sumExpectedNonStarters = 0.0f;
+                        for( int i=0; i<n; ++i )
+                            if( !cls[i].started )
+                                sumExpectedNonStarters += expectedScore[i];
+
+                        const float avgExpectedNonStarters = sumExpectedNonStarters / (float)numNonStarters;
+                        for( int i=0; i<n; ++i )
+                        {
+                            if( cls[i].started )
+                                continue;
+
+                            if( std::fabs(avgExpectedNonStarters) < 1e-6f )
+                            {
+                                changes[i] = -sumChangesStarters / (float)numNonStarters;
+                            }
+                            else
+                            {
+                                changes[i] =
+                                    (-sumChangesStarters / (float)numNonStarters)
+                                    * expectedScore[i]
+                                    / avgExpectedNonStarters;
+                            }
+                        }
+                    }
+
+                    for( int i=0; i<n; ++i )
+                    {
+                        irPredDeltaByCarIdx[cls[i].carIdx] = (int)std::lround(changes[i]);
+                    }
+                };
+
+                for( auto& kv : participantsByClass )
+                    computeClassDeltas(kv.second);
             }
 
-            const float irPredKTotal = g_cfg.getFloat( m_name, "ir_pred_k_total", 80.0f );
             auto predictIrDeltaFor = [&](int targetCarIdx)->int
             {
-                int n = (int)participants.size();
-                if( n <= 1 ) return 0;
-                int targetPos = 0;
-                int targetRating = 0;
-                for( const auto& p : participants )
-                {
-                    if( p.carIdx == targetCarIdx ) { targetPos = p.position; targetRating = p.irating; break; }
-                }
-                if( targetPos <= 0 ) return 0;
-                const float kPerOpponent = irPredKTotal / std::max(1, n - 1);
-                float delta = 0.0f;
-                for( const auto& opp : participants )
-                {
-                    if( opp.carIdx == targetCarIdx ) continue;
-                    const float expected = 1.0f / (1.0f + powf(10.0f, (opp.irating - targetRating) / 400.0f));
-                    const float actual = (targetPos < opp.position) ? 1.0f : (targetPos > opp.position ? 0.0f : 0.5f);
-                    delta += (actual - expected) * kPerOpponent;
-                }
-                return (int)roundf(delta);
+                if( !showIrPred )
+                    return 0;
+                auto it = irPredDeltaByCarIdx.find(targetCarIdx);
+                return (it != irPredDeltaByCarIdx.end()) ? it->second : 0;
             };
 
             m_renderTarget->BeginDraw();

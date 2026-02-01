@@ -29,6 +29,7 @@ SOFTWARE.
 #include <stdio.h>
 #include <string>
 #include <vector>
+#include <cmath>
 #include <windows.h>
 #include <d2d1_3.h>
 #include <dwrite.h>
@@ -75,6 +76,41 @@ struct float4
     float* operator&() { return &x; }
     const float* operator&() const { return &x; }
 };
+
+// -----------------------------------------------------------------------------
+// iRacing "Strength of Field" (SoF)
+//
+// Many community calculators use a "glommed" / log-space average of iRating,
+// rather than a plain arithmetic mean. This matches the behavior of the common
+// "SOF iRating Calculator" spreadsheets and avoids skew from the non-linear
+// mapping between iRating and win probability.
+//
+// Formula:
+//   br1 = 1600 / ln(2)
+//   sof = -br1 * ln( mean_i( exp( -ir_i / br1 ) ) )
+//
+// Callers should only include eligible competitors (e.g. same class, non-spectator,
+// non-pacecar, and "started" when that information is available).
+// -----------------------------------------------------------------------------
+inline void sofAccumulateIRating(int irating, double& sumExp, int& count)
+{
+    if (irating <= 0)
+        return;
+    static const double br1 = 1600.0 / std::log(2.0);
+    sumExp += std::exp(-double(irating) / br1);
+    ++count;
+}
+
+inline int sofFromAccumulator(double sumExp, int count)
+{
+    if (count <= 0 || !(sumExp > 0.0))
+        return 0;
+    static const double br1 = 1600.0 / std::log(2.0);
+    const double avg = sumExp / double(count);
+    if (!(avg > 0.0))
+        return 0;
+    return (int)std::lround(-br1 * std::log(avg));
+}
 
 inline bool loadFile( const std::string& fname, std::string& output )
 {

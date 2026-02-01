@@ -54,6 +54,7 @@ SOFTWARE.
 #include "include/wrapper/cef_message_router.h"
 #include "AppControl.h"
 #include "Config.h"
+#include "util.h"
 
 namespace {
 	static const wchar_t* kGuiWndClass = L"iFL03GuiWindow";
@@ -514,6 +515,8 @@ namespace {
 				std::string carName;
 				if (extractStringField(req, "carName", carName)) {
 					if (g_cfg.loadCarConfig(carName)) {
+						// Persist selected config so it survives restarts
+						(void)saveFile("active_car_config.txt", carName);
 						app_handleConfigChange_external();
 						callback->Success(app_get_state_json());
 					} else {
