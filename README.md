@@ -228,8 +228,35 @@ If you prefer, all settings remain available via config.json without opening the
 
 ## Building from source
 
-- Toolchain: Visual Studio 2022 (Community is fine). The solution should open and build as‑is.
+Prerequisits:
+- Visual Studio 2022
+- CEF can be downloaded [here](https://cef-builds.spotifycdn.com/cef_binary_144.0.12%2Bg1a1008c%2Bchromium-144.0.7559.110_windows64.tar.bz2)
 - You may need the standard DirectX SDK components that ship with Visual Studio.
+- CMake should be installed (also added to your environment variables)
+
+- Unzip the CEF folder, rename it to simply (cef_full_buildnumber for example /cef_binary_139.0.17+g6c347eb+chromium-139.0.7258.31_windows64) and place it somewhere you can read and write to it.
+- create a seperate folder next to the cef_buildnumber folder named cef_build. Then run the following CMake command:
+    `cmake -S "C:\YOUR_PATH\cef\cef_full_buildnumber" -B "C:\YOUR_PATH\cef\cef_build" -G "Visual Studio 17 2022" -A x64 -DCEF_RUNTIME_LIBRARY_FLAG=/MD`
+- This creates a cef.sln inside the cef_build folder. After, run the following command to create a build from the cef.sln:
+    `cmake --build "C:\YOUR_PATH\cef\cef_build" --config Release --target libcef_dll_wrapper
+- Now you have created the necessary cef files to run the project. 
+- In the project repo after opening and running the ifl03.sln file. It creates a Release folder. In this Release folder add the following files from the /cef_full_buildnumber/Resources folder:
+  - locales folder
+  - chrome_100_percent.pak
+  - chrome_200_percent.pak
+  - resources.pak
+  - icudtl.dat
+
+From /cef_full_buildnumber/Release folder add: 
+  - chrome_elf.dll
+  - d3dcompiler_47.dll
+  - libcef.dll
+  - libEGL.dll
+  - libGLESv2.dll
+  - v8_context_snapshot.bin
+  - vk_swiftshader_icd.json
+
+- This now should allow you to run the overlay application from Visual Studio 2022 in Release mode.
 
 ---
 
@@ -242,7 +269,7 @@ If you prefer, all settings remain available via config.json without opening the
 
 ## Bug reports and feature requests
 
-Please open an issue in this repository. Reproduced steps and logs/screenshots help a lot. PRs welcome.
+Please open an issue in this repository. Reproduced steps and logs/screenshots help a lot, same goes for feature requests. I will try to implement all features requested if they are a logical improvement to the overlay application.
 
 ---
 
