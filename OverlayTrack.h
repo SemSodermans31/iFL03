@@ -610,7 +610,7 @@ private:
         int id = ir_session.trackId;
         // In preview mode, default to Snetterton 300
         if (StubDataManager::shouldUseStubData() && id <= 0) {
-            id = 297; // Snetterton 300
+            id = 489; // Snetterton 300
         }
         if (id <= 0) return;
         
